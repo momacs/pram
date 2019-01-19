@@ -1,7 +1,3 @@
-# https://docs.python.org/3.6/library/unittest.html
-#
-# python -m unittest discover
-
 import unittest
 
 from pram import AttrFluStatus, AttrSex, Group, Site
