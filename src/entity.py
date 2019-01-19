@@ -220,7 +220,8 @@ class GroupQry:
     '''
     Group query.
 
-    Objects of this simple class are used to select groups from a group population.
+    Objects of this simple class are used to select groups from a group population using attribute- and relation-based
+    search criteria.
     '''
 
     attr : dict = attrib(default=dict())
