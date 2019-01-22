@@ -518,7 +518,3 @@ if __name__ == '__main__':
         add_probe(probe_grp_size_loc).
         run().
         run(4))
-
-
-# Commit message:
-# Improved implementation of sites; improved rule implementation to account for the new sites; removed entity manager; other minor improvements; tested a larger simulation
