@@ -31,6 +31,25 @@ class Data(object):
 
 
 # ======================================================================================================================
+class Err(object):
+    @staticmethod
+    def type(arg, arg_name, type, can_be_none=False):
+        '''
+        Raises a TypeError exception if the argument isn't of the required type.  Returns 'True' which enables it to be
+        used as a logical condition.
+        '''
+
+        if not can_be_none:
+            if arg is None:
+                raise TypeError("The argument '{}' cannot be None and has to be of type '{}'.".format(arg_name, type.__name__))
+        else:
+            if arg is not None and not isinstance(arg, type):
+                raise TypeError("The argument '{}' has to be of type '{}'{}.".format(arg_name, type.__name__, ' (can be None too)'))
+
+        return True
+
+
+# ======================================================================================================================
 class FS(object):
 
     # TODO: Add support for directories.

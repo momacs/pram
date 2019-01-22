@@ -1,4 +1,4 @@
-from entity import Group
+from entity import Group, GroupQry
 
 
 class Population(object):
@@ -18,8 +18,8 @@ class GroupPopulation(object):
     DEBUG_LVL = 0  # 0=none, 1=normal, 2=full
 
     def __init__(self):
-        self.groups = {}  # key is the group's hash
-        self.sites  = {}
+        self.groups = {}
+        self.sites = {}
 
     def __repr__(self):
         pass
@@ -31,7 +31,13 @@ class GroupPopulation(object):
         if self.DEBUG_LVL >= 1: print(msg)
 
     def add_group(self, group):
-        self.groups[group.get_hash()] = group
+        ''' Add a group if it doesn't exist and update the size if it does. '''
+
+        g = self.groups.get(group.get_hash())
+        if g is not None:
+            g.n += group.n
+        else:
+            self.groups[group.get_hash()] = group
 
     def add_groups(self, groups):
         for g in groups:
@@ -67,6 +73,8 @@ class GroupPopulation(object):
         self.distribute_mass(upd_group_hashes, new_groups)
 
     def create_group(self, n, attr, rel):
+        ''' This method uses auto-incrementing group names. '''
+
         g = Group('g.{}'.format(len(self.groups)), n, attr, rel)
         self.add_group(g)
         return g
@@ -83,7 +91,7 @@ class GroupPopulation(object):
 
         # Distribute the mass based on new groups:
         for g01 in new_groups:
-            g02 = self.get_group(g01.attr, g01.rel)
+            g02 = self.get_group(GroupQry(g01.attr, g01.rel))
 
             # The group already exists:
             if g02 is not None:
@@ -95,48 +103,43 @@ class GroupPopulation(object):
                 self._debug('group not found: {:16}  {:8}'.format(g01.name, g01.n))
                 self.add_group(g01)
 
-    def get_group(self, attr=None, rel=None):
+        # Notify sites of mass redistribution:
+        for s in self.sites.values():
+            s.invalidate_pop()
+
+    def get_group(self, qry=None):
         '''
         Returns the group with the all attributes and relations as specified; or None if such a group does not exist.
+
+        qry: GroupQry
         '''
 
-        return self.groups.get(Group.gen_hash(attr, rel))
+        qry = qry or GroupQry()
+        return self.groups.get(Group.gen_hash(qry.attr, qry.rel))
 
-    def get_groups(self, attr=None, rel=None):
+    def get_groups(self, qry=None):
         '''
         Returns a list of groups that contain the specified attributes and relation.  Both those dictionaries could be
         empty, in which case all groups would be returned.
+
+        qry: GroupQry
         '''
 
-        attr = attr or {}
-        rel  = rel  or {}
+        # qry = qry or GroupQry()
+        # attr_set = set(qry.attr.items())
+        # rel_set  = set(qry.rel.items())
+        #
+        # ret = []
+        # for g in self.groups.values():
+        #     if (set(g.attr.items()) & attr_set == attr_set) and (set(g.rel.items()) & rel_set == rel_set):
+        #         ret.append(g)
 
-        attr_set = set(attr.items())
-        rel_set  = set(rel.items())
+        qry = qry or GroupQry()
+        return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items())]
 
-        ret = []
-        for g in self.groups.values():
-            if (set(g.attr.items()) & attr_set == attr_set) and (set(g.rel.items()) & rel_set == rel_set):
-                ret.append(g)
         return ret
 
     def gen_agent_pop(self):
         ''' Generates a population of agents based on the current groups population. '''
 
         pass
-
-    def split_group(self):
-        '''
-        Splits the designated group into one or more new groups.  No intermediate group objects are instantiated unless
-        new groups need to be created.  Consequently, population mass redistributions happens automatically too.
-        '''
-
-        pass
-
-
-# ======================================================================================================================
-if __name__ == '__main__':
-    # Set operations:
-    assert(set({'a':1, 'b':2, 'c':3}.items()) & set({'b':2,'c':3}.items()) == set({'c':3,'b':2}.items()))
-    assert(set({'a':1, 'b':1, 'c':3}.items()) & set({'b':2,'c':3}.items()) != set({'c':3,'b':2}.items()))
-    assert(set({'a':1,        'c':3}.items()) & set({'b':2,'c':3}.items()) != set({'c':3,'b':2}.items()))

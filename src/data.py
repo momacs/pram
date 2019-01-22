@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from entity import GroupQry
 
 
 class Probe(object):
@@ -19,17 +20,21 @@ class Probe(object):
 
 
 class GroupSizeProbe(Probe):
-    __slots__ = ('name', 'qry')
+    __slots__ = ('name', 'queries')
 
-    def __init__(self, name, qry, pop=None):
+    def __init__(self, name, queries, pop=None):
+        '''
+        qry: GroupQry
+        '''
+
         super().__init__(pop)
 
         self.name = name
-        self.qry = qry
+        self.queries = queries
 
     def run(self, t):
-        n_tot = sum([g.n for g in self.pop.get_groups()])
-        n_qry = [sum([g.n for g in self.pop.get_groups(q.attr, q.rel)]) for q in self.qry]
+        n_tot = sum([g.n for g in self.pop.get_groups()])  # TODO: If the total mass never changes, we could memoize this.
+        n_qry = [sum([g.n for g in self.pop.get_groups(q)]) for q in self.queries]
 
         if n_tot > 0:
             print('{:2}  {}: ('.format(t, self.name), end='')

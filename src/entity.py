@@ -3,9 +3,10 @@ import itertools
 import math
 import numpy as np
 
-from attr import attrs, attrib
+from attr import attrs, attrib, converters
 from enum import Enum
 from scipy.stats import rv_continuous
+from util import Err
 
 
 class AttrSex(Enum):
@@ -67,18 +68,19 @@ class Site(Entity):
     similar pieces of information) may be desired at arbitrary times, it makes most sense to compute it lazily and
     memoize it.  For that reason, a site stores a link to the population it is associated with; it queries that
     population to compute quantities of interested when they are needed.  An added benefit of this design is fostering
-    composition.  That is, it is the site's responsibility to updating its own state, not the population's.
+    proper composition; that is, updating the state of a site should be done by a site, not the population.
     '''
 
-    DEF_REL_NAME = 'location'  # default relation name
+    DEF_REL_NAME = 'loc'  # default relation name
 
-    __slots__ = ('name', 'rel_name', 'pop')
+    __slots__ = ('name', 'rel_name', 'pop', 'groups')
 
     def __init__(self, name, rel_name=DEF_REL_NAME, pop=None):
         super().__init__(EntityType.site, '')
         self.name = name
         self.rel_name = rel_name  # name of the relation the site is the object of
         self.pop = pop  # pointer to the population (can be set elsewhere too)
+        self.groups = None  # None indicates the groups at the site might have changed and need to be retrieved again from the population
 
     def __eq__(self, other):
         '''
@@ -103,19 +105,28 @@ class Site(Entity):
     def get_hash(self):
         return self.__hash__()
 
-    def get_groups(self, non_empty_only=True):
+    def get_groups_here(self, qry=None, non_empty_only=True):
         '''
-        Non empty groups (i.e., those with size greater than 0) are returned by default, but that behavior can be
-        changed (non_empty_only=False)
+        Returns groups which currently are at this site.
+
+        qry: GroupQry
         '''
 
-        ret = self.pop.get_groups(None, { self.rel_name: self.get_hash() })
+        if self.groups is None:
+            qry = qry or GroupQry()
+            qry.rel.update({ self.rel_name: self.get_hash() })
+            self.groups = self.pop.get_groups(qry)
+
         if non_empty_only:
-            ret = [i for i in ret if i.n > 0]
-        return ret
+            return [g for g in self.groups if g.n > 0]
+        else:
+            return self.groups
 
     def get_pop_size(self):
-        return sum([g.n for g in self.pop.get_groups(None, { self.rel_name: self.get_hash() })])
+        return sum([g.n for g in self.get_groups_here()])
+
+    def invalidate_pop(self):
+        self.groups = None
 
     def set_pop(self, pop):
         self.pop = pop
@@ -215,20 +226,26 @@ class Agent(Entity):
 
 
 # ======================================================================================================================
-@attrs(frozen=True)
+@attrs(slots=True)
 class GroupQry:
     '''
     Group query.
 
     Objects of this simple class are used to select groups from a group population using attribute- and relation-based
     search criteria.
+
+    It would make sense to declare this class frozen (i.e., 'frozen=True'), however as can be revealsed by the
+    following two lines, performance suffers slightly when slotted classes are frozen.
+
+    python -m timeit -s "import attr; C = attr.make_class('C', ['x', 'y', 'z'], slots=True)"             "C(1, 2, 3)"
+    python -m timeit -s "import attr; C = attr.make_class('C', ['x', 'y', 'z'], slots=True,frozen=True)" "C(1, 2, 3)"
     '''
 
-    attr : dict = attrib(default=dict())
-    rel  : dict = attrib(default=dict())
+    attr : dict = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
+    rel  : dict = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
 
 
-@attrs(kw_only=True)
+@attrs(kw_only=True, slots=True)
 class GroupSplitSpec:
     '''
     A single group-split specification.
@@ -242,16 +259,16 @@ class GroupSplitSpec:
           values.
     '''
 
-    p        : float = attrib(default=0.0)  # validator=attr.validators.instance_of(float))
-    attr_upd : dict  = attrib(default=dict())
-    attr_del : set   = attrib(default=set())
-    rel_upd  : dict  = attrib(default=dict())
-    rel_del  : set   = attrib(default=set())  # repr=False
+    p        : float = attrib(default=0.0, converter=float)  # validator=attr.validators.instance_of(float))
+    attr_upd : dict  = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
+    attr_del : set   = attrib(factory=set, converter=converters.default_if_none(factory=set))
+    rel_upd  : dict  = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
+    rel_del  : set   = attrib(factory=set, converter=converters.default_if_none(factory=set))
 
     @p.validator
     def is_prob(self, attribute, value):
         if not isinstance(value, float):
-            raise TypeError("The probability 'p' must be of type float.")
+            raise TypeError(Err.type('p', 'float'))
         if not (0 <= value <= 1):
             raise ValueError("The probability 'p' must be in [0,1] range.")
 
@@ -296,15 +313,24 @@ class Group(Entity):
     @staticmethod
     def _has(d, qry):
         '''
-        Compares the dictionary 'd' against an iterable or a dictionary 'qry'.  If 'qry' is an iterable, the method
-        checks if all items in it are keys in 'd'.  If 'qry' is a dictionary, the method checks if all the items in
-        that dictionary exist in 'd'.
+        Compares the dictionary 'd' against 'qry' which can be a dictionary, an iterable (excluding a string), and a
+        string.  Depending on the type of 'qry', the method performs the following checks:
+
+            dictionary: all items in 'qry' must exist in 'd'
+            iterable: all items in 'qry' must be keys in 'd'
+            string: 'qry' must be a key in 'd'
         '''
 
         if isinstance(qry, dict):
             return qry.items() <= d.items()
 
-        return all(i in list(d.keys()) for i in qry)
+        if isinstance(qry, set) or isinstance(qry, list) or isinstance(qry, tuple):
+            return all(i in list(d.keys()) for i in qry)
+
+        if isinstance(qry, str):
+            return qry in d.keys()
+
+        raise TypeError(Err.type('qry', 'dictionary, set, list, tuple, or string'))
 
     def apply_rules(self, rules, t):
         '''
@@ -415,11 +441,9 @@ class Group(Entity):
 
         A note on performance.  The biggest performance hit is likley going to be generating a hash which happens as
         part of instantiating a new Group object.  While this may seem like a good reason to avoid crearing new groups,
-        that line of reasoning is deceptive in that a group's hash is needed anyway and therefore would need to be
-        computed regardless.  Other than that, a group object is light so it seems to me that going the extra mile
-        right here makes the most sense, especially that all the work done here happens in context and that fosters
-        compartmentalization.  Furthermore, this also grants access to full functionality of the Group class to any
-        function that uses the result of the present method.
+        that line of reasoning is deceptive in that a group's hash is needed regardless.  Other than that, a group
+        object is light so its impact on perfornace should be negligeable.  Furthermore, this also grants access to
+        full functionality of the Group class to any function that uses the result of the present method.
         '''
 
         groups = []  # split result (i.e., new groups)
@@ -447,52 +471,6 @@ class Group(Entity):
             groups.append(g)
 
         return groups
-
-
-# ======================================================================================================================
-class EntityMan(object):
-    '''
-    Entity manager.
-
-    Allows for entities to be kept in one place.  Entities can be added, removed, and retrieved (if they exist).
-    Entity type (i.e., EntityType class) check enforces homogeneity of the collection, which I suspect may help to
-    prevent bugs.
-
-    For every entity stored inside of the manager, a key used for later retrieval can be provided.  There is no
-    restriction on that key and therefore it could be a name of the entity or something equally human-friendly.  If no
-    key is provided, the class falls back on using the entity's hash as the key.
-    '''
-
-    __slots__ = ('type', 'dict')
-
-    def __init__(self, type):
-        if not isinstance(type, EntityType):
-            raise TypeError("Argument 'type' must take the EntityType enumeration type values.")
-
-        self.type = type
-        self.dict = {}
-
-    def add(self, key, entity):
-        '''
-        The 'key' is associated with the entity and can be used to retrieve that entity later on.  If no key is
-        provided (i.e., key=None), the entity's hash is used as the key.
-        '''
-
-        if entity.type != self.type:
-            raise TypeError("Entity of type '{}' cannot be added to an entity manager of type '{}'.".format(entity.type, self.type))
-
-        key = key or entity.get_hash()
-
-        self.dict[key] = entity
-
-    def rem(self, entity):
-        try:
-            del self.dict[entity.get_hash()]
-        except KeyError:
-            pass
-
-    def get(self, key):
-        return self.dict.get(key)
 
 
 # ======================================================================================================================
@@ -558,10 +536,10 @@ if __name__ == '__main__':
 
     print()
     print(g1)
-    print(GroupSplitSpec(p=0.1416, attr_del=['income']))
+    print(GroupSplitSpec(p=0.1416, attr_del={ 'income' }))
 
     g1_split = g1.split([
-        GroupSplitSpec(p=0.1416, attr_del=['income']),
+        GroupSplitSpec(p=0.1416, attr_del={ 'income' }),
         GroupSplitSpec(          rel_upd={ 'location': 'work' })
     ])
 
