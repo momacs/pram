@@ -19,6 +19,9 @@
 #         Add hash to Entity.  I thought it's necessary for EntityMan to work well without user keys.  Is it though?
 #         - Antagonistic rules (e.g., GoHome and GoToWork), if applied at the same time will always result in order
 #           effects, won't they? Think about that.
+#         - It is possible to have groups with identical names.  If we wanted to disallow that, the best to do that is
+#           in GroupPopulation.add_group().
+#         Abastract Group.commit() up a level in the hierarchy, to Entity, which will benefit Site.
 #     Internal mechanics
 #         Group querying
 #             Implement a more flexible way to query groups (GroupPopulation.get_groups())
@@ -313,8 +316,8 @@ class Simulation(object):
             np.random.seed(self.rand_seed)
 
         self.pop = GroupPopulation()
-        self.rules = set()
-        self.probes = set()
+        self.rules = []
+        self.probes = []
 
     def __repr__(self):
         return '{}({}, {}, {}, {})'.format(self.__class__.__name__, self.t, self.t_step_size, self.t_step_cnt, self.rand_seed)
@@ -322,13 +325,13 @@ class Simulation(object):
     def _debug(self, msg):
         if self.DEBUG_LVL >= 1: print(msg)
 
-    def add_probe(self, p):
-        self.probes.add(p)
-        p.set_pop(self.pop)
+    def add_probe(self, probe):
+        self.probes.append(probe)
+        probe.set_pop(self.pop)
         return self
 
-    def add_rule(self, r):
-        self.rules.add(r)
+    def add_rule(self, rule):
+        self.rules.append(rule)
         return self
 
     def add_site(self, site):
@@ -347,16 +350,23 @@ class Simulation(object):
         self.rules.clear()
         return self
 
+    def commit_group(self, group):
+        self.pop.add_group(group)
+        return self
+
     def create_group(self, n, attr=None, rel=None):
         self.pop.create_group(n, attr, rel)
         return self
 
-    def rem_probe(self, p):
-        self.probes.discard(p)
+    def new_group(self, name=None, n=0.0):
+        return Group(name or self.pop.get_next_group_name(), n, callee=self)
+
+    def rem_probe(self, probe):
+        self.probes.discard(probe)
         return self
 
-    def rem_rule(self, r):
-        self.rules.discard(r)
+    def rem_rule(self, rule):
+        self.rules.discard(rule)
         return self
 
     def run(self, t_step_cnt=None):
@@ -390,10 +400,37 @@ class Simulation(object):
 
         return self
 
+    def summary(self, do_detailed=False, end_line_cnt=0):
+        ''' Prints the simulation summary. '''
+
+        print('Simulation')
+        print('    Random seed: {}'.format(self.rand_seed))
+        print('    Timer')
+        print('        Start      : {}'.format(self.t))
+        print('        Step size  : {}'.format(self.t_step_size))
+        print('        Iterations : {}'.format(self.t_step_cnt))
+        print('        Sequence   : {}'.format([self.t + self.t_step_size * i for i in range(5)]))
+        print('    Population')
+        print('        Groups : {}'.format(len(self.pop.groups)))
+        print('        Sites  : {}'.format(len(self.pop.sites)))
+        print('        Rules  : {}'.format(len(self.rules)))
+        print('        Probes : {}'.format(len(self.probes)))
+
+        if not do_detailed: return
+
+        if len(self.pop.groups) > 0: print('    Groups ({})\n'.format(len(self.pop.groups)) + '\n'.join(['        {}'.format(g) for g in self.pop.groups.values()]))
+        if len(self.pop.sites)  > 0: print('    Sites ({})\n' .format(len(self.pop.sites))  + '\n'.join(['        {}'.format(s) for s in self.pop.sites.values()]))
+        if len(self.rules)      > 0: print('    Rules ({})\n' .format(len(self.rules))      + '\n'.join(['        {}'.format(r) for r in self.rules]))
+        if len(self.probes)     > 0: print('    Probes ({})\n'.format(len(self.probes))     + '\n'.join(['        {}'.format(p) for p in self.probes]))
+
+        print('\n' * end_line_cnt, end='')
+
+        return self
+
 
 # ======================================================================================================================
 if __name__ == '__main__':
-    from rule import RuleGoto, RuleProgressFlu, TimeSpec
+    from rule import RuleGoto, RuleProgressFlu, TimeInt
 
     rand_seed = 1928
 
@@ -416,7 +453,7 @@ if __name__ == '__main__':
     # s.add_sites(sites.values())
     # s.create_group(1000, { 'flu-status': AttrFluStatus.no }, { Site.DEF_REL_NAME: sites['home'].get_hash(), 'home': sites['home'].get_hash(), 'work': sites['work'].get_hash() })
     # s.add_rule(RuleProgressFlu())
-    # s.add_rule(RuleGoto(TimeSpec(10,16), 0.4, 'home', 'work'))
+    # s.add_rule(RuleGoto(TimeInt(10,16), 0.4, 'home', 'work'))
     # s.add_probe(probe_grp_size_flu)
     # s.run()
 
@@ -424,7 +461,7 @@ if __name__ == '__main__':
     # s = Simulation(6,1,16, rand_seed=rand_seed)
     # s.add_sites(sites.values())
     # s.create_group(1000, { 'flu-status': AttrFluStatus.no }, { Site.DEF_REL_NAME: sites['home'].get_hash(), 'home': sites['home'].get_hash(), 'work': sites['work'].get_hash() })
-    # s.add_rule(RuleGoto(TimeSpec(10,16), 0.4, 'home', 'work'))
+    # s.add_rule(RuleGoto(TimeInt(10,16), 0.4, 'home', 'work'))
     # s.add_rule(RuleProgressFlu())
     # s.add_probe(probe_grp_size_flu)
     # s.run()
@@ -435,7 +472,7 @@ if __name__ == '__main__':
     # s.create_group(1000, attr={ 'flu-status': AttrFluStatus.no })
     # s.create_group(2000, rel={ Site.DEF_REL_NAME: sites['home'].get_hash(), 'home': sites['home'].get_hash(), 'work': sites['work'].get_hash() })
     # s.add_rule(RuleProgressFlu())
-    # s.add_rule(RuleGoto(TimeSpec(10,16), 0.4, 'home', 'work'))
+    # s.add_rule(RuleGoto(TimeInt(10,16), 0.4, 'home', 'work'))
     # s.add_probe(probe_grp_size_flu)
     # s.run()
 
@@ -445,7 +482,7 @@ if __name__ == '__main__':
     # s.create_group(1000, { 'flu-status': AttrFluStatus.no }, { Site.DEF_REL_NAME: sites['home'].get_hash(), 'home': sites['home'].get_hash(), 'work': sites['work'].get_hash() })
     # s.create_group(2000, { 'flu-status': AttrFluStatus.no })
     # s.add_rule(RuleProgressFlu())
-    # s.add_rule(RuleGoto(TimeSpec(10,16), 0.4, 'home', 'work'))
+    # s.add_rule(RuleGoto(TimeInt(10,16), 0.4, 'home', 'work'))
     # s.add_probe(probe_grp_size_flu)
     # s.run()
 
@@ -455,8 +492,8 @@ if __name__ == '__main__':
     # s.create_group(1000, { 'flu-status': AttrFluStatus.no }, { Site.DEF_REL_NAME: sites['home'].get_hash(), 'home': sites['home'].get_hash(), 'work': sites['work'].get_hash() })
     # s.create_group(2000, { 'flu-status': AttrFluStatus.no }, { Site.DEF_REL_NAME: sites['home'].get_hash(), 'home': sites['home'].get_hash() })
     # s.add_rule(RuleProgressFlu())
-    # s.add_rule(RuleGoto(TimeSpec(10,22), 0.4, 'home', 'work'))
-    # s.add_rule(RuleGoto(TimeSpec(10,22), 0.4, 'work', 'home'))
+    # s.add_rule(RuleGoto(TimeInt(10,22), 0.4, 'home', 'work'))
+    # s.add_rule(RuleGoto(TimeInt(10,22), 0.4, 'work', 'home'))
     # s.add_probe(probe_grp_size_flu)
     # s.run()
 
@@ -464,17 +501,17 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # (2) Simulations testing rule interactions:
 
-    sites = { 'home': Site('home'), 'work': Site('work-a') }
-
-    probe_grp_size_flu = GroupSizeProbe('flu', [GroupQry(attr={ 'flu-status': fs }) for fs in AttrFluStatus])
-    probe_grp_size_loc = GroupSizeProbe('loc', [GroupQry(rel={ Site.DEF_REL_NAME: s.get_hash() }) for s in sites.values()])
+    # sites = { 'home': Site('home'), 'work': Site('work-a') }
+    #
+    # probe_grp_size_flu = GroupSizeProbe('flu', [GroupQry(attr={ 'flu-status': fs }) for fs in AttrFluStatus])
+    # probe_grp_size_loc = GroupSizeProbe('loc', [GroupQry(rel={ Site.DEF_REL_NAME: s.get_hash() }) for s in sites.values()])
 
     # (2.1) Antagonistic rules overlapping entirely in time (i.e., goto-home and goto-work; converges to a stable distribution):
     # s = Simulation(9,1,14, rand_seed=rand_seed)
     # s.add_sites(sites.values())
     # s.create_group(1000, {}, { Site.DEF_REL_NAME: sites['home'].get_hash(), 'home': sites['home'].get_hash(), 'work': sites['work'].get_hash() })
-    # s.add_rule(RuleGoto(TimeSpec(10,22), 0.4, 'home', 'work'))
-    # s.add_rule(RuleGoto(TimeSpec(10,22), 0.4, 'work', 'home'))
+    # s.add_rule(RuleGoto(TimeInt(10,22), 0.4, 'home', 'work'))
+    # s.add_rule(RuleGoto(TimeInt(10,22), 0.4, 'work', 'home'))
     # s.add_probe(probe_grp_size_loc)
     # s.run()
 
@@ -482,8 +519,8 @@ if __name__ == '__main__':
     # s = Simulation(9,1,14, rand_seed=rand_seed)
     # s.add_sites(sites.values())
     # s.create_group(1000, {}, { Site.DEF_REL_NAME: sites['home'].get_hash(), 'home': sites['home'].get_hash(), 'work': sites['work'].get_hash() })
-    # s.add_rule(RuleGoto(TimeSpec(10,16), 0.4, 'home', 'work'))
-    # s.add_rule(RuleGoto(TimeSpec(10,22), 0.4, 'work', 'home'))
+    # s.add_rule(RuleGoto(TimeInt(10,16), 0.4, 'home', 'work'))
+    # s.add_rule(RuleGoto(TimeInt(10,22), 0.4, 'work', 'home'))
     # s.add_probe(probe_grp_size_loc)
     # s.run()
 
@@ -502,19 +539,42 @@ if __name__ == '__main__':
     probe_grp_size_flu = GroupSizeProbe('flu', [GroupQry(attr={ 'flu-status': fs }) for fs in AttrFluStatus])
     probe_grp_size_loc = GroupSizeProbe('loc', [GroupQry(rel={ Site.DEF_REL_NAME: s.get_hash() }) for s in sites.values()])
 
+    at = Site.DEF_REL_NAME
+
     (Simulation(6,1,24, rand_seed=rand_seed).
         add_sites(sites.values()).
-        create_group(1000, { 'flu-status': AttrFluStatus.no }, { Site.DEF_REL_NAME: sites['home'].get_hash(), 'home': sites['home'].get_hash(), 'work': sites['work-a'].get_hash(), 'store': sites['store-a'].get_hash() }).
-        create_group(1000, { 'flu-status': AttrFluStatus.no }, { Site.DEF_REL_NAME: sites['home'].get_hash(), 'home': sites['home'].get_hash(), 'work': sites['work-b'].get_hash(), 'store': sites['store-b'].get_hash() }).
-        create_group( 100, { 'flu-status': AttrFluStatus.no }, { Site.DEF_REL_NAME: sites['home'].get_hash(), 'home': sites['home'].get_hash(), 'work': sites['work-c'].get_hash() }).
+        new_group('A', 1000).
+            set_attr('flu-status', AttrFluStatus.no).
+            set_rel(at,      sites['home'].get_hash()).
+            set_rel('home',  sites['home'].get_hash()).
+            set_rel('work',  sites['work-a'].get_hash()).
+            set_rel('store', sites['store-a'].get_hash()).
+            commit().
+        new_group('B', 1000).
+            set_attr('flu-status', AttrFluStatus.no).
+            set_rel(at,      sites['home'].get_hash()).
+            set_rel('home',  sites['home'].get_hash()).
+            set_rel('work',  sites['work-b'].get_hash()).
+            set_rel('store', sites['store-b'].get_hash()).
+            commit().
+        new_group('C', 100).
+            set_attr('flu-status', AttrFluStatus.no).
+            set_rel(at,     sites['home'].get_hash()).
+            set_rel('home', sites['home'].get_hash()).
+            set_rel('work', sites['work-c'].get_hash()).
+            commit().
         add_rule(RuleProgressFlu()).
-        add_rule(RuleGoto(TimeSpec( 8,12), 0.4, 'home', 'work')).    # some agents leave home to go to work
-        add_rule(RuleGoto(TimeSpec(16,20), 0.4, 'work', 'home')).    # some agents return home from work
-        add_rule(RuleGoto(TimeSpec(16,21), 0.2, 'home', 'store')).   # some agents go to a store after getting back home
-        add_rule(RuleGoto(TimeSpec(17,23), 0.3, 'store', 'home')).   # some shopping agents return home from a store
-        add_rule(RuleGoto(TimeSpec(24,24), 1.0, 'store', 'home')).   # all shopping agents return home after stores close
-        add_rule(RuleGoto(TimeSpec( 2, 2), 1.0, None, 'home')).      # all still-working agents return home
+        add_rule(RuleGoto(TimeInt( 8,12), 0.4, 'home',  'work',  'some agents leave home to go to work')).
+        add_rule(RuleGoto(TimeInt(16,20), 0.4, 'work',  'home',  'some agents return home from work')).
+        add_rule(RuleGoto(TimeInt(16,21), 0.2, 'home',  'store', 'some agents go to a store after getting back home')).
+        add_rule(RuleGoto(TimeInt(17,23), 0.3, 'store', 'home',  'some shopping agents return home from a store')).
+        add_rule(RuleGoto(TimeInt(24,24), 1.0, 'store', 'home',  'all shopping agents return home after stores close')).
+        add_rule(RuleGoto(TimeInt( 2, 2), 1.0, None,    'home',  'all still-working agents return home')).
         # add_probe(probe_grp_size_flu).
         add_probe(probe_grp_size_loc).
+        summary(True, 2).
         run().
         run(4))
+
+    # print(probe_grp_size_flu.get_msg())
+    # print(probe_grp_size_loc.get_msg())

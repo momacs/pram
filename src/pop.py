@@ -39,17 +39,22 @@ class GroupPopulation(object):
         else:
             self.groups[group.get_hash()] = group
 
+        return self
+
     def add_groups(self, groups):
         for g in groups:
             self.add_group(g)
+        return self
 
     def add_site(self, site):
         self.sites[site.get_hash()] = site
         site.set_pop(self)
+        return self
 
     def add_sites(self, sites):
         for s in sites:
             self.add_site(s)
+        return self
 
     def apply_rules(self, rules, t):
         '''
@@ -68,14 +73,14 @@ class GroupPopulation(object):
                 upd_group_hashes.add(g.get_hash())
 
         if len(new_groups) == 0:  # no mass to distribute
-            return
+            return self
 
-        self.distribute_mass(upd_group_hashes, new_groups)
+        return self.distribute_mass(upd_group_hashes, new_groups)
 
     def create_group(self, n, attr, rel):
         ''' This method uses auto-incrementing group names. '''
 
-        g = Group('g.{}'.format(len(self.groups)), n, attr, rel)
+        g = Group(self.get_next_group_name(), n, attr, rel)
         self.add_group(g)
         return g
 
@@ -106,6 +111,13 @@ class GroupPopulation(object):
         # Notify sites of mass redistribution:
         for s in self.sites.values():
             s.invalidate_pop()
+
+        return self
+
+    def gen_agent_pop(self):
+        ''' Generates a population of agents based on the current groups population. '''
+
+        pass
 
     def get_group(self, qry=None):
         '''
@@ -139,7 +151,5 @@ class GroupPopulation(object):
 
         return ret
 
-    def gen_agent_pop(self):
-        ''' Generates a population of agents based on the current groups population. '''
-
-        pass
+    def get_next_group_name(self):
+        return 'g.{}'.format(len(self.groups))

@@ -5,15 +5,21 @@ from util import Err
 
 
 @attrs(slots=True)
-class TimeSpec:
+class Time(object):
+    pass
+
+
+@attrs(slots=True)
+class TimeInt(Time):
     '''
-    A time specification for a rule.
+    A time interval a rule is active in.
     '''
 
     t0: float = attrib(default=-1.0, converter=float)
     t1: float = attrib(default=-1.0, converter=float)
 
 
+# ======================================================================================================================
 class Rule(object):
     '''
     A rule that can be applied to a group and may augment that group or split it into multiple subgroups.
@@ -25,26 +31,28 @@ class Rule(object):
     a group of city buses.  Each rule knows how to recognize a compatible group.
     '''
 
+    __slots__ = ('name', 't', 'memo')
+
     DEBUG_LVL = 0  # 0=none, 1=normal, 2=full
 
     pop = None
 
-    def __init__(self, name, t_spec):
+    def __init__(self, name, t, memo=None):
         '''
-        t_spec: TimeSpec
+        t: Time
         '''
 
-        if not isinstance(t_spec, TimeSpec):
-            raise TypeError(Err.type('t_spec', 'TimeSpec'))
+        Err.type(t, 't', Time)
 
         self.name = name
-        self.t_spec = t_spec
+        self.t = t
+        self.memo = memo
 
     def __repr__(self):
-        return '{}(name={}, t=({:>4},{:>4}))'.format(self.__class__.__name__, self.name, round(self.t_spec.t0, 1), round(self.t_spec.t1, 1))
+        return '{}(name={}, t=({:>4},{:>4}))'.format(self.__class__.__name__, self.name, round(self.t.t0, 1), round(self.t.t1, 1))
 
     def __str__(self):
-        return 'Rule  name: {:32}  t=({:>4},{:>4})'.format(self.name, round(self.t_spec.t0, 1), round(self.t_spec.t1, 1))
+        return 'Rule  name: {:16}  t: ({:>4},{:>4})'.format(self.name, round(self.t.t0, 1), round(self.t.t1, 1))
 
     def _debug(self, msg):
         if self.DEBUG_LVL >= 1: print(msg)
@@ -56,50 +64,10 @@ class Rule(object):
     def is_applicable(self, t):
         ''' Verifies if the rule is applicable given the context. '''
 
-        return self.t_spec.t0 <= t <= self.t_spec.t1
+        if isinstance(self.t, TimeInt):
+            return self.t.t0 <= t <= self.t.t1
 
-
-# ======================================================================================================================
-# class RuleGoto_BySite(Rule):
-#     '''
-#     Changes the location of the group from the designated site to the designated site.  Both of the sites are
-#     specificed by name (e.g., 'store-315').  The rule will only apply to a group that (a) is currently located at the
-#     "from" site and has the .
-#     However, if the "from" site is None, all groups will qualify.
-#     '''
-#
-#     def __init__(self, t_spec, p, site_from, site_to):
-#         super().__init__('goto--by-site', t_spec)
-#
-#         self.p = p
-#         self.site_from = site_from
-#         self.site_to = site_to
-#
-#     def apply(self, group, t):
-#         if not self.is_applicable(group, t): return
-#
-#         self._debug('rule.apply: {} (from:{} to:{})'.format(self.name, self.site_from, self.site_to))
-#
-#         return (
-#             GroupSplitSpec(p=self.p, rel_upd={ Site.DEF_REL_NAME: Site(self.site_to).get_hash() }),
-#             GroupSplitSpec(p=1 - self.p)
-#         )
-#
-#     def is_applicable(self, group, t):
-#         # Moving from a paricular location:
-#         if self.site_from is not None:
-#             return (
-#                 super().is_applicable(t) and
-#                 group.has_rel(self.site_to) and
-#                 group.has_rel(self.site_from) and
-#                 group.get_rel(Site.DEF_REL_NAME) == Site(self.site_from).get_hash()
-#             )
-#         # Moving from any location:
-#         else:
-#             return (
-#                 super().is_applicable(t) and
-#                 group.has_rel(self.site_to)
-#             )
+        raise TypeError("Type '{}' used for time not yet implemented.".format(type(self.t).__name__))
 
 
 # ======================================================================================================================
@@ -119,14 +87,10 @@ class RuleGoto(Rule):
         - Compel agents that are at 'home' go to 'work' or vice versa
     '''
 
-    def __init__(self, t_spec, p, rel_from, rel_to):
-        super().__init__('goto--by-rel', t_spec)
+    __slots__ = ('p', 'rel_from', 'rel_to')
 
-        # if self.rel_from is not None and not isinstance(self.rel_from, Site):
-        #     raise TypeError(Err.type('rel_from', 'Site', True))
-        #
-        # if not isinstance(self.rel_to, Site):
-        #     raise TypeError(Err.type('rel_from', 'Site'))
+    def __init__(self, t, p, rel_from, rel_to, memo=None):
+        super().__init__('goto', t, memo)
 
         Err.type(rel_from, 'rel_from', str, True)
         Err.type(rel_to, 'rel_to', str)
@@ -134,6 +98,12 @@ class RuleGoto(Rule):
         self.p = p
         self.rel_from = rel_from  # if None, the rule will not be conditional on current location
         self.rel_to = rel_to
+
+    def __repr__(self):
+        return '{}(name={}, t=({:>4},{:>4}), p={}, rel_from={}, rel_to={})'.format(self.__class__.__name__, self.name, round(self.t.t0, 1), round(self.t.t1, 1), self.p, self.rel_from, self.rel_to)
+
+    def __str__(self):
+        return 'Rule  name: {:16}  t: ({:>4},{:>4})  p: {}  rel: {} --> {}'.format(self.name, round(self.t.t0, 1), round(self.t.t1, 1), self.p, self.rel_from, self.rel_to)
 
     def apply(self, group, t):
         if not self.is_applicable(group, t): return
@@ -162,8 +132,8 @@ class RuleGoto(Rule):
 
 # ======================================================================================================================
 class RuleProgressFlu(Rule):
-    def __init__(self, t_spec=TimeSpec(8,20)):  # 8am - 8pm
-        super().__init__('progress-flu', t_spec)
+    def __init__(self, t=TimeInt(8,20), memo=None):  # 8am - 8pm
+        super().__init__('progress-flu', t, memo)
 
     def apply(self, group, t):
         if not self.is_applicable(group, t): return None
@@ -197,5 +167,5 @@ class RuleProgressFlu(Rule):
 
 # ======================================================================================================================
 if __name__ == '__main__':
-    print(RuleGoto(TimeSpec(8,10), 0.5, 'home', 'work'))
+    print(RuleGoto(TimeInt(8,10), 0.5, 'home', 'work'))
     print(RuleProgressFlu())

@@ -3,13 +3,25 @@ from entity import GroupQry
 
 
 class Probe(object):
-    __slots__ = ('pop')
+    __slots__ = ('do_cumul', 'pop', 'memo', 'msg')
 
-    def __init__(self, pop=None):
+    def __init__(self, do_cumul=False, pop=None, memo=None):
+        self.do_cumul = do_cumul
         self.pop = pop  # pointer to the population (can be set elsewhere too)
+        self.memo = memo
+        self.msg = []  # used to cumulate messages (only when 'do_cumul=True')
 
     def __repr__(self):
         return '{}()'.format(self.__class__.__name__)
+
+    def __str__(self):
+        return 'Probe'
+
+    def clear(self):
+        self.msg.clear()
+
+    def get_msg(self, do_join=True):
+        return '\n'.join(self.msg)
 
     @abstractmethod
     def run(self, t):
@@ -22,30 +34,42 @@ class Probe(object):
 class GroupSizeProbe(Probe):
     __slots__ = ('name', 'queries')
 
-    def __init__(self, name, queries, pop=None):
+    def __init__(self, name, queries, do_cumul=False, pop=None, memo=None):
         '''
-        qry: GroupQry
+        queries: iterable of GroupQry
         '''
 
-        super().__init__(pop)
+        super().__init__(do_cumul, pop, memo)
 
         self.name = name
         self.queries = queries
+
+    def __repr__(self):
+        return '{}()'.format(self.__class__.__name__)
+
+    def __str__(self):
+        return 'Probe  name: {:16}  query-cnt: {:>3}'.format(self.name, len(self.queries))
 
     def run(self, t):
         n_tot = sum([g.n for g in self.pop.get_groups()])  # TODO: If the total mass never changes, we could memoize this.
         n_qry = [sum([g.n for g in self.pop.get_groups(q)]) for q in self.queries]
 
+        msg = []
         if n_tot > 0:
-            print('{:2}  {}: ('.format(t, self.name), end='')
+            msg.append('{:2}  {}: ('.format(t, self.name))
             for n in n_qry:
-                print('{:.2f} '.format(round(n / n_tot, 2)), end='')
-            print(')   (', end='')
+                msg.append('{:.2f} '.format(round(n / n_tot, 2)))
+            msg.append(')   (')
             for n in n_qry:
-                print('{:>7} '.format(round(n, 1)), end='')
-            print(')   [{}]'.format(round(n_tot, 1)))
+                msg.append('{:>7} '.format(round(n, 1)))
+            msg.append(')   [{}]'.format(round(n_tot, 1)))
         else:
-            print('{:2}  {}: ---'.format(t, self.name))
+            msg.append('{:2}  {}: ---'.format(t, self.name))
+
+        if self.do_cumul:
+            self.msg.append(''.join(msg))
+        else:
+            print(''.join(msg))
 
 
 # ======================================================================================================================

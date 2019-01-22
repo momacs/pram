@@ -71,7 +71,7 @@ class Site(Entity):
     proper composition; that is, updating the state of a site should be done by a site, not the population.
     '''
 
-    DEF_REL_NAME = 'loc'  # default relation name
+    DEF_REL_NAME = '__at__'  # default relation name
 
     __slots__ = ('name', 'rel_name', 'pop', 'groups')
 
@@ -94,10 +94,10 @@ class Site(Entity):
         return hash(self.__key())
 
     def __repr__(self):
-        return '{}({}, {})'.format(self.__class__.__name__, self.type, self.name)
+        return '{}({})'.format(self.__class__.__name__, self.name)
 
     def __str__(self):
-        return '{}  name: {}'.format(self.__class__.__name__, self.name)
+        return '{}  name: {:16}  hash: {}'.format(self.__class__.__name__, self.name, self.__hash__())
 
     def __key(self):
         return (self.name)
@@ -227,7 +227,7 @@ class Agent(Entity):
 
 # ======================================================================================================================
 @attrs(slots=True)
-class GroupQry:
+class GroupQry(object):
     '''
     Group query.
 
@@ -246,7 +246,7 @@ class GroupQry:
 
 
 @attrs(kw_only=True, slots=True)
-class GroupSplitSpec:
+class GroupSplitSpec(object):
     '''
     A single group-split specification.
 
@@ -275,17 +275,19 @@ class GroupSplitSpec:
 
 # ======================================================================================================================
 class Group(Entity):
-    __slots__ = ('name', 'n', 'attr', 'rel', '_hash')
+    __slots__ = ('name', 'n', 'attr', 'rel', '_hash', '_callee')
 
-    def __init__(self, name=None, n=0.0, attr={}, rel={}):
+    def __init__(self, name=None, n=0.0, attr={}, rel={}, callee=None):
         super().__init__(EntityType.group, '')
 
-        self.name = name if name is not None else '.'
+        self.name = name or '.'
         self.n    = float(n)
-        self.attr = attr if attr is not None else {}
-        self.rel  = rel  if rel  is not None else {}
+        self.attr = attr or {}
+        self.rel  = rel  or {}
 
-        self._hash = Group.gen_hash(self.attr, self.rel)  # we could compute this lazily, but we will need it anyway
+        self._hash = None  # computed lazily
+
+        self._callee = callee  # used only throughout the process of creating group; unset by commit()
 
     def __eq__(self, other):
         '''
@@ -302,6 +304,9 @@ class Group(Entity):
         return isinstance(self, type(other)) and (self.attr == other.attr) and (self.rel == other.rel)
 
     def __hash__(self):
+        if self._hash is None:
+            self._hash = Group.gen_hash(self.attr, self.rel)
+
         return self._hash
 
     def __repr__(self):
@@ -368,6 +373,18 @@ class Group(Entity):
 
         return self.split(ss_prod)
 
+    def commit(self):
+        ''' Ends creating the group by notifing the callee who has begun the group creation. '''
+
+        if self._callee is None:
+            return None
+
+        c = self._callee
+        # print(self)
+        self._callee.commit_group(self)
+        self._callee = None
+        return c
+
     @staticmethod
     def gen_hash(attr, rel):
         '''
@@ -399,8 +416,8 @@ class Group(Entity):
         keys deleted based on the 'k_del' iterable.
 
         A shallow copy of the dictionary is returned at this point.  That is to avoid creating unnecessary copies of
-        Sites and other entities that might be stored as relations.  A more adaptive mechanism can be implemented
-        later if needed.
+        entities that might be stored as relations.  A more adaptive mechanism can be implemented later if needed.
+        This part is still being developed.
         '''
 
         # TODO: Consider: https://stackoverflow.com/questions/38987/how-to-merge-two-dictionaries-in-a-single-expression
@@ -420,7 +437,7 @@ class Group(Entity):
         return self.attr[name]
 
     def get_hash(self):
-        return self._hash
+        return self.__hash__()
 
     def get_rel(self, name):
         return self.rel[name]
@@ -430,6 +447,30 @@ class Group(Entity):
 
     def has_rel(self, qry):
         return Group._has(self.rel, qry)
+
+    def set_attr(self, name, value, do_force=True):
+        if self.attr.get(name) is not None and not do_force:
+            raise ValueError("Group '{}' already has the attribute '{}'.".format(self.name, name))
+
+        self.attr[name] = value
+        self._hash = None
+
+        return self
+
+    def set_attrs(self, attr, do_force=True):
+        pass
+
+    def set_rel(self, name, value, do_force=True):
+        if self.rel.get(name) is not None and not do_force:
+            raise ValueError("Group '{}' already has the relation '{}'.".format(self.name, name))
+
+        self.rel[name] = value
+        self._hash = None
+
+        return self
+
+    def set_rels(self, rel, do_force=True):
+        pass
 
     def split(self, specs):
         '''
