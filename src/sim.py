@@ -16,13 +16,12 @@
 #
 # TODO
 #     Quick
-#         Add a ResetCycleRule that's run prior to other rules at a designated time?
-#         Add hash to Entity.  I thought it's necessary for EntityMan to work well without user keys.  Is it though?
 #         - Antagonistic rules (e.g., GoHome and GoToWork), if applied at the same time will always result in order
 #           effects, won't they? Think about that.
 #         - It is possible to have groups with identical names.  If we wanted to disallow that, the best to do that is
 #           in GroupPopulation.add_group().
 #         Abastract Group.commit() up a level in the hierarchy, to Entity, which will benefit Site.
+#         Abstract hashing to Entity.
 #         Should all entities have attributes or only groups, like it is now?
 #         - Consider making attribute and relation values objects.  This way they could hold an object and its hash which
 #           could allow for more robust copying.
