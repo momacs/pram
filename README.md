@@ -6,6 +6,12 @@
 - [numpy](http://www.numpy.org)
 
 ## Setup
+### Just get the code
+```
+git clone https://github.com/momacs/pram
+```
+
+### Setup a runtime environment
 ...
 
 
