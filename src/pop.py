@@ -56,7 +56,7 @@ class GroupPopulation(object):
             self.add_site(s)
         return self
 
-    def apply_rules(self, rules, t):
+    def apply_rules(self, rules, t, is_setup=False):
         '''
         Iterates through groups and for each applies all rules (which is handles intelligently by the Group class).
         The result of (possible) rules applications is a list of new groups the original group should be split into.
@@ -67,7 +67,7 @@ class GroupPopulation(object):
         new_groups = []
         upd_group_hashes = set()  # hashes of groups to be updated (to safeguard against resetting unaffected groups)
         for g in self.groups.values():
-            new_groups_g = g.apply_rules(rules, t)
+            new_groups_g = g.apply_rules(rules, t, is_setup)
             if new_groups_g is not None:
                 new_groups.extend(new_groups_g)
                 upd_group_hashes.add(g.get_hash())
@@ -129,6 +129,12 @@ class GroupPopulation(object):
         qry = qry or GroupQry()
         return self.groups.get(Group.gen_hash(qry.attr, qry.rel))
 
+    def get_group_cnt(self, only_non_empty=False):
+        if only_non_empty:
+            return len([g for g in self.groups.values() if g.n > 0])
+        else:
+            return len(self.groups)
+
     def get_groups(self, qry=None):
         '''
         Returns a list of groups that contain the specified attributes and relation.  Both those dictionaries could be
@@ -153,3 +159,9 @@ class GroupPopulation(object):
 
     def get_next_group_name(self):
         return 'g.{}'.format(len(self.groups))
+
+    def get_site_cnt(self):
+        return len(self.sites)
+
+    def get_size(self):
+        return sum([g.n for g in self.groups.values()])

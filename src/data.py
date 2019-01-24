@@ -1,8 +1,8 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from entity import GroupQry
 
 
-class Probe(object):
+class Probe(ABC):
     __slots__ = ('do_cumul', 'pop', 'memo', 'msg')
 
     def __init__(self, do_cumul=False, pop=None, memo=None):
@@ -72,7 +72,7 @@ class GroupSizeProbe(Probe):
             print(''.join(msg))
 
 
-# ======================================================================================================================
+# ----------------------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     from entity import AttrFluStatus, GroupQry
 

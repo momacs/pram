@@ -11,17 +11,23 @@ class GroupTestCase(unittest.TestCase):
         g0 = Group('g.0', 100)
         g1 = Group('g.1', 200, { 'sex': 'f', 'income': 'l' }, { 'location': 'home' })
 
-        f(g0.has_attr([ 'sex' ]))
-        f(g0.has_attr({ 'sex': 'f' }))
-        f(g0.has_attr({ 'sex': 'f', 'income': 'l' }))
+        # Attributes:
+        f(g0.has_attr('sex'))                          # query is a string
+        f(g0.has_attr([ 'sex' ]))                      # query is an iterable (one string)
+        f(g0.has_attr([ 'sex', 'income' ]))            # query is an iterable (multiple strings)
+        f(g0.has_attr({ 'sex': 'f' }))                 # query is a dict (one element)
+        f(g0.has_attr({ 'sex': 'f', 'income': 'l' }))  # query is a dict (multiple elements)
 
         f(g0.has_rel({ 'location': 'home' }))
 
-        t(g1.has_attr([ 'sex' ]))
-        t(g1.has_attr({ 'sex': 'f' }))
-        t(g1.has_attr({ 'sex': 'f', 'income': 'l' }))
-        f(g1.has_attr({ 'sex': 'f', 'income': 'h' }))
+        t(g1.has_attr('sex'))                          # query is a string
+        t(g1.has_attr([ 'sex' ]))                      # query is an iterable (one string)
+        t(g1.has_attr([ 'sex', 'income' ]))            # query is an iterable (multiple strings)
+        t(g1.has_attr({ 'sex': 'f' }))                 # query is a dict (one element)
+        t(g1.has_attr({ 'sex': 'f', 'income': 'l' }))  # query is a dict (multiple elements)
+        f(g1.has_attr({ 'sex': 'f', 'income': 'h' }))  # query is a dict (multiple elements)
 
+        # Relations (the mechanism is identical to that for attributes, so we only test two relations):
         t(g1.has_rel({ 'location': 'home' }))
         f(g1.has_rel({ 'location': 'work' }))
 
@@ -36,6 +42,7 @@ class GroupTestCase(unittest.TestCase):
         eq(Group(attr={}), Group())           # no attributes
         eq(Group(attr={}), Group(attr={}))    # no attributes
         eq(Group(attr={}), Group(attr=None))  # no attributes
+        eq(Group(),        Group(rel=None))   # no relations
 
         eq(Group(attr={ 'sex': 'f' }), Group(attr={ 'sex': 'f' }))  # same attributes (primitive data types)
         eq(Group(attr={ 'age': 99 }),  Group(attr={ 'age': 99 }))   # same attributes (primitive data types)

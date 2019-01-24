@@ -3,12 +3,14 @@ import itertools
 import math
 import numpy as np
 
-from attr import attrs, attrib, converters
+from abc import ABC
+from attr import attrs, attrib, converters, validators
 from enum import Enum
 from scipy.stats import rv_continuous
 from util import Err
 
 
+# ======================================================================================================================
 class AttrSex(Enum):
     f = 0
     m = 1
@@ -20,6 +22,24 @@ class AttrFluStatus(Enum):
     sympt  = 2
 
 
+# @attrs()
+# class Attr(object):
+#     pass
+#
+#
+# @attrs(slots=True)
+# class AttrSex(Attr):
+#     name : str = 'sex'
+#     val  : AttrSexEnum = attrib(default=AttrSexEnum.m, validator=validators.in_(AttrSexEnum))
+#
+#
+# @attrs(slots=True)
+# class AttrFluStatus(Attr):
+#     name : str = 'flu-status'
+#     val  : AttrFluStatusEnum = attrib(default=AttrFluStatusEnum.no, validator=validators.in_(AttrFluStatusEnum))
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class DistributionAgeSchool(rv_continuous):
     # TODO: Finish.
     def _pdf(self, x):
@@ -32,7 +52,7 @@ class DistributionAgeWork(rv_continuous):
         return np.exp(-x**2 / 2.) / np.sqrt(2.0 * np.pi)
 
 
-# ======================================================================================================================
+# ----------------------------------------------------------------------------------------------------------------------
 class EntityType(Enum):
     agent    = 1
     group    = 2
@@ -40,7 +60,7 @@ class EntityType(Enum):
     resource = 4  # e.g., a public bus
 
 
-class Entity(object):
+class Entity(ABC):
     DEBUG_LVL = 1  # 0=none, 1=normal, 2=full
 
     __slots__ = ('type', 'id')
@@ -71,11 +91,11 @@ class Site(Entity):
     proper composition; that is, updating the state of a site should be done by a site, not the population.
     '''
 
-    DEF_REL_NAME = '__at__'  # default relation name
+    AT = '__at__'  # relation name for the current location
 
     __slots__ = ('name', 'rel_name', 'pop', 'groups')
 
-    def __init__(self, name, rel_name=DEF_REL_NAME, pop=None):
+    def __init__(self, name, rel_name=AT, pop=None):
         super().__init__(EntityType.site, '')
         self.name = name
         self.rel_name = rel_name  # name of the relation the site is the object of
@@ -147,7 +167,7 @@ class Resource(object):
     pass
 
 
-# ======================================================================================================================
+# ----------------------------------------------------------------------------------------------------------------------
 class Agent(Entity):
     __slots__ = ('name', 'sex', 'age', 'flu', 'school', 'work', 'location')
 
@@ -225,7 +245,7 @@ class Agent(Entity):
         return np.random.choice(list(AttrSex))
 
 
-# ======================================================================================================================
+# ----------------------------------------------------------------------------------------------------------------------
 @attrs(slots=True)
 class GroupQry(object):
     '''
@@ -260,9 +280,9 @@ class GroupSplitSpec(object):
     '''
 
     p        : float = attrib(default=0.0, converter=float)  # validator=attr.validators.instance_of(float))
-    attr_upd : dict  = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
+    attr_set : dict  = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
     attr_del : set   = attrib(factory=set, converter=converters.default_if_none(factory=set))
-    rel_upd  : dict  = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
+    rel_set  : dict  = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
     rel_del  : set   = attrib(factory=set, converter=converters.default_if_none(factory=set))
 
     @p.validator
@@ -273,7 +293,7 @@ class GroupSplitSpec(object):
             raise ValueError("The probability 'p' must be in [0,1] range.")
 
 
-# ======================================================================================================================
+# ----------------------------------------------------------------------------------------------------------------------
 class Group(Entity):
     __slots__ = ('name', 'n', 'attr', 'rel', '_hash', '_callee')
 
@@ -321,9 +341,9 @@ class Group(Entity):
         Compares the dictionary 'd' against 'qry' which can be a dictionary, an iterable (excluding a string), and a
         string.  Depending on the type of 'qry', the method performs the following checks:
 
-            dictionary: all items in 'qry' must exist in 'd'
-            iterable: all items in 'qry' must be keys in 'd'
             string: 'qry' must be a key in 'd'
+            iterable: all items in 'qry' must be keys in 'd'
+            dictionary: all items in 'qry' must exist in 'd'
         '''
 
         if isinstance(qry, dict):
@@ -337,7 +357,7 @@ class Group(Entity):
 
         raise TypeError(Err.type('qry', 'dictionary, set, list, tuple, or string'))
 
-    def apply_rules(self, rules, t):
+    def apply_rules(self, rules, t, is_setup=False):
         '''
         Applies the list of rules, each of which may split the group into (possibly already extant) subgroups.  A
         sequential rule application scheme is (by the definition of sequentiality) bound to produce order effects which
@@ -354,7 +374,11 @@ class Group(Entity):
         '''
 
         # Apply all the rules and get their respective split specs (ss):
-        ss_rules = [r.apply(self, t) for r in rules]
+        if is_setup:
+            ss_rules = [r.setup(self) for r in rules]
+        else:
+            ss_rules = [r.apply(self, t) for r in rules]
+
         ss_rules = [i for i in ss_rules if i is not None]
         if len(ss_rules) == 0:
             return None
@@ -362,12 +386,12 @@ class Group(Entity):
         # Create a Cartesian product of the split specs (ss):
         ss_prod = []
         for ss_lst in itertools.product(*ss_rules):
-            ss_comb = GroupSplitSpec(p=1.0, attr_upd={}, attr_del=set(), rel_upd={}, rel_del=set())  # the combined split spec
+            ss_comb = GroupSplitSpec(p=1.0, attr_set={}, attr_del=set(), rel_set={}, rel_del=set())  # the combined split spec
             for i in ss_lst:
                 ss_comb.p *= i.p  # this assumes rule independence
-                ss_comb.attr_upd.update(i.attr_upd)
+                ss_comb.attr_set.update(i.attr_set)
                 ss_comb.attr_del.update(i.attr_del)
-                ss_comb.rel_upd.update(i.rel_upd)
+                ss_comb.rel_set.update(i.rel_set)
                 ss_comb.rel_del.update(i.rel_del)
             ss_prod.append(ss_comb)
 
@@ -422,7 +446,7 @@ class Group(Entity):
 
         # TODO: Consider: https://stackoverflow.com/questions/38987/how-to-merge-two-dictionaries-in-a-single-expression
 
-        ret = dict(d_in)  # shallow copy
+        ret = d_in.copy()
 
         if d_upd is not None:
             ret.update(d_upd)
@@ -503,8 +527,8 @@ class Group(Entity):
             p_sum += p
             n_sum += n
 
-            attr = Group.gen_dict(self.attr, s.attr_upd, s.attr_del)
-            rel  = Group.gen_dict(self.rel,  s.rel_upd,  s.rel_del)
+            attr = Group.gen_dict(self.attr, s.attr_set, s.attr_del)
+            rel  = Group.gen_dict(self.rel,  s.rel_set,  s.rel_del)
 
             g = Group('{}.{}'.format(self.name, i), n, attr, rel)
             if g == self:
@@ -514,7 +538,7 @@ class Group(Entity):
         return groups
 
 
-# ======================================================================================================================
+# ----------------------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     rand_seed = 1928
 
