@@ -30,9 +30,13 @@ git pull origin master
 [ -f requirements.txt ] && python -m pip install -r requirements.txt
 ```
 
-The same result can be achieved with the [`momacs`](https://github.com/momacs/misc) command-line utility.  Specifically, the command of interest is `momacs pram make-venv`.  Another command (i.e., `momacs pram update-venv`) can be subsequently used to download the latest version of PRAM into an existing PRAM `venv`.
+The same result can be achieved with one of the commands of the [`momacs`](https://github.com/momacs/misc) command-line utility.  Another command can be subsequently used to update an existing PRAM `venv` with the latest version of the source code from the present repository.  These two commands are, respectively:
+```
+momacs pram make-venv
+momacs pram update-venv
+```
 
-Once the PRAM `venv` has been activated, run the following from the `src` directory to see the results of a simple simulation:
+Once a PRAM `venv` has been activated, run the following from the `src` directory to see the results of a simple simulation:
 ```
 python sim_01_simple.py
 ```
