@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 from attr import attrs, attrib
-from entity import AttrFluStatus, GroupSplitSpec, Site
+from entity import AttrFluStatus, GroupQry, GroupSplitSpec, Site
 from util import Err
 
 
@@ -75,7 +75,7 @@ class Rule(ABC):
         if self.DEBUG_LVL >= 1: print(msg)
 
     @abstractmethod
-    def apply(self):
+    def apply(self, pop, group, t):
         pass
 
     def is_applicable(self, t):
@@ -90,7 +90,7 @@ class Rule(ABC):
         raise TypeError("Type '{}' used for specifying rule timing not yet implemented (Rule.is_applicable).".format(type(self.t).__name__))
 
     @staticmethod
-    def setup(group):
+    def setup(pop, group):
         pass
 
 
@@ -129,7 +129,7 @@ class GotoRule(Rule):
     def __str__(self):
         return 'Rule  name: {:16}  t: ({:>4},{:>4})  p: {}  rel: {} --> {}'.format(self.name, round(self.t.t0, 1), round(self.t.t1, 1), self.p, self.rel_from, self.rel_to)
 
-    def apply(self, group, t):
+    def apply(self, pop, group, t):
         if not self.is_applicable(group, t): return None
 
         return [
@@ -158,7 +158,7 @@ class ResetDayRule(Rule):
     def __init__(self, t, memo=None):
         super().__init__('reset-day', t, memo)
 
-    def apply(self, group, t):
+    def apply(self, pop, group, t):
         if not self.is_applicable(group, t): return None
 
         return [GroupSplitSpec(p=1.0, attr_set={ 'did-attend-school-today': False })]  # attr_del=['t-at-school'],
@@ -174,7 +174,7 @@ class AttendSchoolRule(Rule):
     def __init__(self, t=TimeInt(8,16), memo=None):
         super().__init__('attend-school', t, memo)
 
-    def apply(self, group, t):
+    def apply(self, pop, group, t):
         if not self.is_applicable(group, t): return None
 
         if group.has_rel({ Site.AT: group.get_rel('home') }) and (not group.has_attr('did-attend-school-today') or group.has_attr({ 'did-attend-school-today': False })):
@@ -205,12 +205,6 @@ class AttendSchoolRule(Rule):
             GroupSplitSpec(p=1 - p, attr_set={ 't-at-school': (t_at_school + 1) })
         ]
 
-        # t_at_school = group.get_attr('t-at-school')
-        # if t_at_school < 6:
-        #     return [GroupSplitSpec(p=1.0, attr_set={ 't-at-school': (t_at_school + 1) })]
-        # else:
-        #     return [GroupSplitSpec(p=1.0, attr_set={ 't-at-school': (t_at_school + 1) }, rel_set={ Site.AT: group.get_rel('home') })]
-
         # TODO: Give timer information to the rule so it can appropriate determine time passage (e.g., to add it to 't-at-school' above).
 
     def is_applicable(self, group, t):
@@ -220,8 +214,56 @@ class AttendSchoolRule(Rule):
             group.has_rel(['home', 'school']))
 
     @staticmethod
-    def setup(group):
-        # pass
+    def setup(pop, group):
+        return [GroupSplitSpec(p=1.0, attr_set={ 'did-attend-school-today': False })]  # attr_del=['t-at-school'],
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class AttendSchool02Rule(Rule):
+    __slots__ = ()
+
+    def __init__(self, t=TimeInt(8,16), memo=None):
+        super().__init__('attend-school-02', t, memo)
+
+    def apply(self, pop, group, t):
+        if not self.is_applicable(group, t): return None
+
+        if group.has_rel({ Site.AT: group.get_rel('home') }) and (not group.has_attr('did-attend-school-today') or group.has_attr({ 'did-attend-school-today': False })):
+            return self.apply_at_home(group, t)
+
+        if group.has_rel({ Site.AT:  group.get_rel('school') }):
+            return self.apply_at_school(group, t)
+
+    def apply_at_home(self, group, t):
+        if t < 8 or t > 12:
+            return
+
+        p = { 8:0.50, 9:0.50, 10:0.50, 11:0.50, 12:1.00 }.get(t, 0.00)  # TODO: Provide these as a CDF
+            # prob of goint to school = f(time of day)
+
+        return [
+            GroupSplitSpec(p=p, attr_set={ 'did-attend-school-today': True, 't-at-school': 0 }, rel_set={ Site.AT: group.get_rel('school') }),
+            GroupSplitSpec(p=1 - p)
+        ]
+
+    def apply_at_school(self, group, t):
+        t_at_school = group.get_attr('t-at-school')
+        p = { 0: 0.00, 1:0.05, 2:0.05, 3:0.25, 4:0.50, 5:0.70, 6:0.80, 7:0.90, 8:1.00 }.get(t_at_school, 1.00) if t < self.t.t1 else 1.00
+            # prob of going home = f(time spent at school)
+
+        return [
+            GroupSplitSpec(p=p, attr_set={ 't-at-school': (t_at_school + 1) }, rel_set={ Site.AT: group.get_rel('home') }),
+            GroupSplitSpec(p=1 - p, attr_set={ 't-at-school': (t_at_school + 1) })
+        ]
+
+    def is_applicable(self, group, t):
+        return (
+            super().is_applicable(t) and
+            group.has_attr({ 'is-student': True }) and
+            group.has_rel(['home', 'school']))
+
+    @staticmethod
+    def setup(pop, group):
         return [GroupSplitSpec(p=1.0, attr_set={ 'did-attend-school-today': False })]  # attr_del=['t-at-school'],
 
 
@@ -232,7 +274,7 @@ class ProgressFluRule(Rule):
     def __init__(self, t=TimeInt(8,20), memo=None):  # 8am - 8pm
         super().__init__('progress-flu', t, memo)
 
-    def apply(self, group, t):
+    def apply(self, pop, group, t):
         if not self.is_applicable(group, t): return None
 
         p_infection = 0.05
@@ -258,6 +300,94 @@ class ProgressFluRule(Rule):
 
     def is_applicable(self, group, t):
         return super().is_applicable(t) and group.has_attr([ 'flu-status' ])
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class GotoHomeFluRule(Rule):
+    __slots__ = ()
+
+    def __init__(self, t=TimeInt(1,500), memo=None):
+        super().__init__('goto-home-flu', t, memo)
+
+    def apply(self, pop, group, t):
+        if not self.is_applicable(group, t): return None
+
+        p = 1.00
+        return [
+            GroupSplitSpec(p=p, rel_set={ Site.AT: group.get_rel('home') }),
+            GroupSplitSpec(p=1 - p)
+        ]
+
+    def is_applicable(self, group, t):
+        return super().is_applicable(t) and group.has_rel({ Site.AT: group.get_rel('school') })
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class GotoSchoolFluRule(Rule):
+    __slots__ = ()
+
+    def __init__(self, t=TimeInt(1,500), memo=None):
+        super().__init__('goto-school-flu', t, memo)
+
+    def apply(self, pop, group, t):
+        if not self.is_applicable(group, t): return None
+
+        if group.has_attr({ 'flu-status': AttrFluStatus.no }):
+            p = 1.00
+        else:
+            if group.has_rel({ 'school': Site('school-a').get_hash()}):
+                p = 0.50
+            else:
+                p = 0.10
+
+        return [
+            GroupSplitSpec(p=p, rel_set={ Site.AT: group.get_rel('school') }),
+            GroupSplitSpec(p=1 - p)
+        ]
+
+    def is_applicable(self, group, t):
+        return super().is_applicable(t) and group.has_rel({ Site.AT: group.get_rel('home') })
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class ProgressFlu02Rule(Rule):
+    __slots__ = ()
+
+    def __init__(self, t=TimeInt(1,500), memo=None):
+        super().__init__('progress-flu-day', t, memo)
+
+    def apply(self, pop, group, t):
+        if not self.is_applicable(group, t): return None
+
+        site = pop.sites[group.get_rel(Site.AT)]
+        n = site.get_pop_size()
+        n_infectious = (
+            sum([g.n for g in site.get_groups_here(GroupQry(rel={ 'flu-status': AttrFluStatus.asympt }))]) +
+            sum([g.n for g in site.get_groups_here(GroupQry(rel={ 'flu-status': AttrFluStatus.sympt }))]))
+        # p_infection = n_infectious / n
+
+        # print('* {}: {} / {}'.format(site.name, n_infectious, n))
+
+        p_infection = 0.05
+
+        if group.get_attr('flu-status') == AttrFluStatus.no:
+            return [
+                GroupSplitSpec(p=p_infection,     attr_set={ 'flu-status': AttrFluStatus.sympt }),
+                GroupSplitSpec(p=1 - p_infection, attr_set={ 'flu-status': AttrFluStatus.no })
+            ]
+        elif group.get_attr('flu-status') == AttrFluStatus.sympt:
+            return [
+                GroupSplitSpec(p=0.75, attr_set={ 'flu-status': AttrFluStatus.sympt }),
+                GroupSplitSpec(p=0.05, attr_set={ 'flu-status': AttrFluStatus.no })
+            ]
+        else:
+            raise ValueError("Invalid value for attribute 'flu-status'.")
+
+    def is_applicable(self, group, t):
+        return (
+            super().is_applicable(t) and
+            group.has_attr([ 'flu-status' ]) and
+            not group.has_rel({ Site.AT: group.get_rel('home') }))  # not at home
 
 
 # ----------------------------------------------------------------------------------------------------------------------

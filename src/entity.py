@@ -132,15 +132,18 @@ class Site(Entity):
         qry: GroupQry
         '''
 
-        if self.groups is None:
-            qry = qry or GroupQry()
-            qry.rel.update({ self.rel_name: self.get_hash() })
-            self.groups = self.pop.get_groups(qry)
+        # TODO: Implement memoization (probably of only all the groups, i.e., not account for the 'qry').
+
+        # if self.groups is None:
+
+        qry = qry or GroupQry()
+        qry.rel.update({ self.rel_name: self.get_hash() })
+        groups = self.pop.get_groups(qry)
 
         if non_empty_only:
-            return [g for g in self.groups if g.n > 0]
+            return [g for g in groups if g.n > 0]
         else:
-            return self.groups
+            return groups
 
     def get_pop_size(self):
         return sum([g.n for g in self.get_groups_here()])
@@ -357,7 +360,7 @@ class Group(Entity):
 
         raise TypeError(Err.type('qry', 'dictionary, set, list, tuple, or string'))
 
-    def apply_rules(self, rules, t, is_setup=False):
+    def apply_rules(self, pop, rules, t, is_setup=False):
         '''
         Applies the list of rules, each of which may split the group into (possibly already extant) subgroups.  A
         sequential rule application scheme is (by the definition of sequentiality) bound to produce order effects which
@@ -375,9 +378,9 @@ class Group(Entity):
 
         # Apply all the rules and get their respective split specs (ss):
         if is_setup:
-            ss_rules = [r.setup(self) for r in rules]
+            ss_rules = [r.setup(pop, self) for r in rules]
         else:
-            ss_rules = [r.apply(self, t) for r in rules]
+            ss_rules = [r.apply(pop, self, t) for r in rules]
 
         ss_rules = [i for i in ss_rules if i is not None]
         if len(ss_rules) == 0:
@@ -519,10 +522,12 @@ class Group(Entity):
             if i == len(specs) - 1:  # last group spec
                 p = 1 - p_sum        # complement the probability
                 n = self.n - n_sum   # make sure we're not missing anybody due to floating-point arithmetic
+                # print('        (1) {} {}'.format(p, n))
             else:
                 p = s.p
                 n = self.n * p
                 # n = math.floor(self.n * p)  # conservative floor() use to make sure we don't go over due to rounding
+                # print('        (2) {} {}'.format(p, n))
 
             p_sum += p
             n_sum += n
@@ -605,7 +610,7 @@ if __name__ == '__main__':
 
     g1_split = g1.split([
         GroupSplitSpec(p=0.1416, attr_del={ 'income' }),
-        GroupSplitSpec(          rel_upd={ 'location': 'work' })
+        GroupSplitSpec(          rel_set={ 'location': 'work' })
     ])
 
     print()
