@@ -1,4 +1,4 @@
-name = 'pram'
+__all__ = ['util', 'data', 'entity', 'rule', 'pop', 'sim']
 
 import pram.util
 import pram.data

@@ -1,6 +1,6 @@
 # Probabilistic Relational Agent-based Modeling (PRAM) Framework
 
-A simulation framework that fuses relatinal probabilistic models and agent-based models.  This software is in the pre-alpha development stage, so feel free to play around with it, but keep in mind that it is constantly evolving and not all pieces may be working.
+A simulation framework that fuses relational probabilistic models and agent-based models.  This software is in the pre-alpha development stage, so feel free to play around with it, but keep in mind that it is constantly evolving and not all pieces may be working.
 
 
 ## Dependencies
@@ -10,7 +10,7 @@ A simulation framework that fuses relatinal probabilistic models and agent-based
 
 
 ## Setup
-The following shell script creates a Python virtual environment (`venv`), activates it, downloads the source code of PRAM into it, and installs all dependencies.  When done, PRAM is executable in that `venv`.  Please note, that Python 3.6 is required.
+The following shell script creates a Python virtual environment (`venv`), activates it, downloads the source code of PRAM into it, and installs all dependencies.
 
 ```
 #!/bin/sh
@@ -30,13 +30,13 @@ git pull origin master
 [ -f requirements.txt ] && python -m pip install -r requirements.txt
 ```
 
-The same result can be achieved with one of the commands of the [`momacs`](https://github.com/momacs/misc) command-line utility.  Another command can be subsequently used to update an existing PRAM `venv` with the latest version of the source code from the present repository.  These two commands are, respectively:
+The same result can be achieved with one of the commands of the [`momacs`](https://github.com/momacs/misc) command-line utility.  Another command can be used subsequently to update an existing PRAM `venv` with the latest version of the source code from the present repository.  These two commands are, respectively:
 ```
 momacs pram make-venv
 momacs pram update-venv
 ```
 
-Once a PRAM `venv` has been activated, run the following from the `src` directory to see the results of a simple simulation:
+Once a PRAM `venv` has been activated, running the following from the `src` directory will display results of a simple simulation:
 ```
 python sim_01_simple.py
 ```
