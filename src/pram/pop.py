@@ -1,4 +1,4 @@
-from entity import Group, GroupQry
+from .entity import Group, GroupQry
 
 
 class Population(object):

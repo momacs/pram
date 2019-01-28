@@ -7,7 +7,8 @@ from abc import ABC
 from attr import attrs, attrib, converters, validators
 from enum import Enum
 from scipy.stats import rv_continuous
-from util import Err
+
+from .util import Err
 
 
 # ======================================================================================================================
@@ -336,7 +337,7 @@ class Group(Entity):
         return '{}(name={}, n={}, attr={}, rel={})'.format(__class__.__name__, self.name, self.n, self.attr, self.rel)
 
     def __str__(self):
-        return '{}  name: {:16}  n: {:8}  attr: {}  rel: {}'.format(self.__class__.__name__, self.name, self.n, self.attr, self.rel)
+        return '{}  name: {:16}  n: {:8}  attr: {}  rel: {}'.format(self.__class__.__name__, self.name, round(self.n, 2), self.attr, self.rel)
 
     @staticmethod
     def _has(d, qry):

@@ -1,5 +1,6 @@
 from abc import abstractmethod, ABC
-from entity import GroupQry
+
+from .entity import GroupQry
 
 
 class Probe(ABC):
@@ -70,10 +71,3 @@ class GroupSizeProbe(Probe):
             self.msg.append(''.join(msg))
         else:
             print(''.join(msg))
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-if __name__ == '__main__':
-    from entity import AttrFluStatus, GroupQry
-
-    p = GroupSizeProbe('flu', [GroupQry({ 'flu-status': x }, None) for x in AttrFluStatus])

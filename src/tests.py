@@ -1,6 +1,6 @@
 import unittest
 
-from entity import AttrFluStatus, AttrSex, EntityType, Group, Site
+from pram.entity import AttrFluStatus, AttrSex, EntityType, Group, Site
 
 
 class GroupTestCase(unittest.TestCase):

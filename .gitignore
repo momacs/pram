@@ -20,6 +20,8 @@
 
 *.pyc
 __pycache__/
+/dist/
+/*.egg-info
 
 .RData
 .Rhistory
