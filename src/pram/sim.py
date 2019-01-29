@@ -261,7 +261,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #
 # Deployment: MacOS  (Python 3.6.1)
-#     dir=/Volumes/D/pitt/sci/pram
+#     dir=...
 #
 #     if [ $(which brew | wc -l | bc) == 0 ]
 #     then/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
@@ -270,6 +270,7 @@
 #
 #     brew install git python3
 #
+#     [ -d $dir ] && echo "Directory already exists" && exit 1
 #     python -m venv $dir && cd $dir
 #     source ./bin/activate
 #
@@ -277,8 +278,7 @@
 #
 #     python -m pip install numpy attrs
 #
-#     mkdir -p src && cd src
-#     git clone https://github/...
+#     git clone https://github.com/momacs/pram
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -308,11 +308,11 @@ class Simulation(object):
     for modeling quantum phenomena.
     '''
 
-    __slots__ = ('t', 't_step_size', 't_step_cnt', 'rand_seed', 'pop', 'rules', 'probes')
+    __slots__ = ('t', 't_step_size', 't_step_cnt', 'rand_seed', 'pop', 'rules', 'probes', 'is_setup_done')
 
     DEBUG_LVL = 0  # 0=none, 1=normal, 2=full
 
-    def __init__(self, t=4, t_step_size=1, t_step_cnt=24, rand_seed=None):
+    def __init__(self, t=0, t_step_size=1, t_step_cnt=0, rand_seed=None):
         '''
         One interpretation of 't=4' is that the simulation starts at 4am.  Similarily, 't_step_size=1' could mean that
         the simulation time increments in one-hour intervals.
@@ -329,6 +329,10 @@ class Simulation(object):
         self.pop = GroupPopulation()
         self.rules = []
         self.probes = []
+
+        self.is_setup_done = False
+            # ensures simulation setup is performed only once while enabling multiple incremental simulation runs of
+            # arbitrary length thus promoting user-interactivity
 
     def __repr__(self):
         return '{}({}, {}, {}, {})'.format(self.__class__.__name__, self.t, self.t_step_size, self.t_step_cnt, self.rand_seed)
@@ -380,10 +384,14 @@ class Simulation(object):
         self.rules.discard(rule)
         return self
 
-    def run(self, t_step_cnt=None):
-        self.pop.apply_rules(self.rules, self.t, True)
+    def run(self, t_step_cnt=0):
+        # Do setup:
+        if not self.is_setup_done:
+            self.pop.apply_rules(self.rules, self.t, True)
+            self.is_setup_done = True
 
-        if t_step_cnt is not None:
+        # Run the simulation
+        if t_step_cnt > 0:
             self.t_step_cnt = t_step_cnt
 
         for i in range(self.t_step_cnt):

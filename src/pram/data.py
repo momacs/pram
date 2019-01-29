@@ -45,6 +45,18 @@ class GroupSizeProbe(Probe):
         self.name = name
         self.queries = queries
 
+    @classmethod
+    def by_attr(cls, probe_name, attr_name, attr_values, do_cumul=False, pop=None, memo=None):
+        ''' Generates QueryGrp objects automatically for the attribute name and values specified. '''
+
+        return cls(probe_name, [GroupQry(attr={ attr_name: v }) for v in attr_values], do_cumul, pop, memo)
+
+    @classmethod
+    def by_rel(cls, probe_name, rel_name, rel_values, do_cumul=False, pop=None, memo=None):
+        ''' Generates QueryGrp objects automatically for the relation name and values specified. '''
+
+        return cls(probe_name, [GroupQry(rel={ rel_name: v }) for v in rel_values], do_cumul, pop, memo)
+
     def __repr__(self):
         return '{}()'.format(self.__class__.__name__)
 
@@ -52,7 +64,7 @@ class GroupSizeProbe(Probe):
         return 'Probe  name: {:16}  query-cnt: {:>3}'.format(self.name, len(self.queries))
 
     def run(self, t):
-        n_tot = sum([g.n for g in self.pop.get_groups()])  # TODO: If the total mass never changes, we could memoize this.
+        n_tot = sum([g.n for g in self.pop.get_groups()])  # TODO: If the total mass never changed, we could memoize this (likely in GroupPopulation).
         n_qry = [sum([g.n for g in self.pop.get_groups(q)]) for q in self.queries]
 
         msg = []

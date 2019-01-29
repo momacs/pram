@@ -1,4 +1,4 @@
-from .entity import Group, GroupQry
+from .entity import Group, GroupQry, Site
 
 
 class Population(object):
@@ -31,13 +31,17 @@ class GroupPopulation(object):
         if self.DEBUG_LVL >= 1: print(msg)
 
     def add_group(self, group):
-        ''' Add a group if it doesn't exist and update the size if it does. '''
+        '''
+        Add a group if it doesn't exist and update the size if it does. This method also adds all Site objects from
+        the group's relations so there is no need for the user to do this manually.
+        '''
 
         g = self.groups.get(group.get_hash())
         if g is not None:
             g.n += group.n
         else:
             self.groups[group.get_hash()] = group
+            self.add_sites([v for (_,v) in group.get_rel().items() if isinstance(v, Site)])
 
         return self
 
@@ -47,8 +51,13 @@ class GroupPopulation(object):
         return self
 
     def add_site(self, site):
-        self.sites[site.get_hash()] = site
+        h = site.get_hash()
+        if h in self.sites.keys():
+            return
+
+        self.sites[h] = site
         site.set_pop(self)
+
         return self
 
     def add_sites(self, sites):

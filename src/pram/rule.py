@@ -92,6 +92,23 @@ class Rule(ABC):
 
     @staticmethod
     def setup(pop, group):
+        '''
+        A rule's setup place.  If the rule relies on groups having a certain set of attributes and relations, this is
+        where they should be set.  For example, a rule might set an attribute of all the groups like so:
+
+            return [GroupSplitSpec(p=1.0, attr_set={ 'did-attend-school-today': False })]
+
+        This reuses the group splitting mechanism; here, each group will be split into a (possibly non-extant) new
+        group and the entirety of the group's mass will be moved into that new group.
+
+        This is also where a rule should do any other population initialization required.  For example, a rule that may
+        introduce a new Site object to the simulation, should make the population object aware of that site like so:
+
+            pop.add_site(Site('new-site'))
+
+        Every rule's setup() method is called only once by Simulation.run() method before a simulation run commences.
+        '''
+
         pass
 
 
@@ -141,7 +158,7 @@ class GotoRule(Rule):
     def is_applicable(self, group, t):
         if not super().is_applicable(t): return False
 
-        # Moving from the designated location only:
+        # Moving from the designated location:
         if self.rel_from is not None:
             return (
                 group.has_rel(self.rel_to) and Err.type(group.get_rel(self.rel_to), 'self.rel_to', Site) and

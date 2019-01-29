@@ -86,25 +86,24 @@ sites = {
     'school-b' : Site('school-b')
 }
 
-probe_grp_size_loc = GroupSizeProbe('loc', [GroupQry(rel={ Site.AT: s.get_hash() }) for s in sites.values()])
+probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), memo='Mass distribution across sites')
 
 (Simulation(7,1,10, rand_seed=rand_seed).
-    add_sites(sites.values()).
     new_group('0', 500).
         set_attr('is-student', True).
-        set_rel(Site.AT,  sites['home'].get_hash()).
-        set_rel('home',   sites['home'].get_hash()).
-        set_rel('school', sites['school-a'].get_hash()).
+        set_rel(Site.AT,  sites['home']).
+        set_rel('home',   sites['home']).
+        set_rel('school', sites['school-a']).
         commit().
     new_group('1', 500).
         set_attr('is-student', True).
-        set_rel(Site.AT,  sites['home'].get_hash()).
-        set_rel('home',   sites['home'].get_hash()).
-        set_rel('school', sites['school-b'].get_hash()).
+        set_rel(Site.AT,  sites['home']).
+        set_rel('home',   sites['home']).
+        set_rel('school', sites['school-b']).
         commit().
     add_rule(ResetDayRule(TimePoint(7))).
     add_rule(AttendSchoolRule()).
-    add_probe(probe_grp_size_loc).
+    add_probe(probe_grp_size_site).
     # summary((True, True, True, True, True), (0,1)).
     # run(1).summary((False, True, False, False, False), (1,1)).
     # run(1).summary((False, True, False, False, False), (1,1)).

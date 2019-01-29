@@ -230,7 +230,7 @@ class Agent(Entity):
 
     @classmethod
     def gen_lst(cls, n):
-        ''' Generates a list of agents (with monotnously increasing names). '''
+        ''' Generates a list of agents (with auto-incrementing names). '''
 
         if n <= 0:
             return []
@@ -461,14 +461,14 @@ class Group(Entity):
 
         return ret
 
-    def get_attr(self, name):
-        return self.attr[name]
+    def get_attr(self, name=None):
+        return self.attr[name] if name is not None else self.attr
 
     def get_hash(self):
         return self.__hash__()
 
-    def get_rel(self, name):
-        return self.rel[name]
+    def get_rel(self, name=None):
+        return self.rel[name] if name is not None else self.rel
 
     def has_attr(self, qry):
         return Group._has(self.attr, qry)
