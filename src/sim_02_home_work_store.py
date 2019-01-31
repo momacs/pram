@@ -26,21 +26,21 @@ probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), mem
 
 (Simulation(6,1,24, rand_seed=rand_seed).
     new_group('g0', 1000).
-        set_attr('flu-status', AttrFluStatus.no).
+        set_attr('flu-status', AttrFluStatus.NO).
         set_rel(Site.AT, sites['home']).
         set_rel('home',  sites['home']).
         set_rel('work',  sites['work-a']).
         set_rel('store', sites['store-a']).
         commit().
     new_group('g1', 1000).
-        set_attr('flu-status', AttrFluStatus.no).
+        set_attr('flu-status', AttrFluStatus.NO).
         set_rel(Site.AT, sites['home']).
         set_rel('home',  sites['home']).
         set_rel('work',  sites['work-b']).
         set_rel('store', sites['store-b']).
         commit().
     new_group('g2', 100).
-        set_attr('flu-status', AttrFluStatus.no).
+        set_attr('flu-status', AttrFluStatus.NO).
         set_rel(Site.AT, sites['home']).
         set_rel('home',  sites['home']).
         set_rel('work',  sites['work-c']).

@@ -6,7 +6,7 @@ A simulation testing a group-state-aware school attending rule.
 from pram.sim import Simulation
 from pram.entity import GroupQry, GroupSplitSpec, Site
 from pram.data import GroupSizeProbe
-from pram.rule import AttrFluStatus, GotoRule, Rule, TimeInt, TimePoint
+from pram.rule import GotoRule, Rule, TimeInt, TimePoint
 
 
 rand_seed = 1928

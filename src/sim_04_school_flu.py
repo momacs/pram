@@ -23,13 +23,13 @@ probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), mem
 
 (Simulation(1,1,14, rand_seed=rand_seed).  # 14-day simulation
     new_group('A', 500).
-        set_attr('flu-status', AttrFluStatus.no).
+        set_attr('flu-status', AttrFluStatus.NO).
         set_rel(Site.AT,  sites['home']).
         set_rel('home',   sites['home']).
         set_rel('school', sites['school-a']).
         commit().
     new_group('B', 500).
-        set_attr('flu-status', AttrFluStatus.no).
+        set_attr('flu-status', AttrFluStatus.NO).
         set_rel(Site.AT,  sites['home']).
         set_rel('home',   sites['home']).
         set_rel('school', sites['school-b']).

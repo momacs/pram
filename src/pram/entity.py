@@ -5,22 +5,22 @@ import numpy as np
 
 from abc import ABC
 from attr import attrs, attrib, converters, validators
-from enum import Enum
+from enum import IntEnum
 from scipy.stats import rv_continuous
 
 from .util import Err
 
 
 # ======================================================================================================================
-class AttrSex(Enum):
-    f = 0
-    m = 1
+class AttrSex(IntEnum):
+    F = 1
+    M = 2
 
 
-class AttrFluStatus(Enum):
-    no     = 0
-    asympt = 1
-    sympt  = 2
+class AttrFluStatus(IntEnum):
+    NO     = 1
+    ASYMPT = 2
+    SYMPT  = 3
 
 
 # @attrs()
@@ -54,11 +54,11 @@ class DistributionAgeWork(rv_continuous):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class EntityType(Enum):
-    agent    = 1
-    group    = 2
-    site     = 3  # e.g., home, school, etc.
-    resource = 4  # e.g., a public bus
+class EntityType(IntEnum):
+    AGENT    = 1
+    GROUP    = 2
+    SITE     = 3  # e.g., home, school, etc.
+    RESOURCE = 4  # e.g., a public bus
 
 
 class Entity(ABC):
@@ -97,7 +97,7 @@ class Site(Entity):
     __slots__ = ('name', 'rel_name', 'pop', 'groups')
 
     def __init__(self, name, rel_name=AT, pop=None):
-        super().__init__(EntityType.site, '')
+        super().__init__(EntityType.SITE, '')
         self.name = name
         self.rel_name = rel_name  # name of the relation the site is the object of
         self.pop = pop  # pointer to the population (can be set elsewhere too)
@@ -183,8 +183,8 @@ class Agent(Entity):
     P_STUDENT = 0.25  # unconditional prob. of being a student
     P_WORKER  = 0.60  # unconditional prob. of being a worker
 
-    def __init__(self, name=None, sex=AttrSex.f, age=AGE_M, flu=AttrFluStatus.no, school=None, work=None, location='home'):
-        super().__init__(EntityType.agent, '')
+    def __init__(self, name=None, sex=AttrSex.F, age=AGE_M, flu=AttrFluStatus.NO, school=None, work=None, location='home'):
+        super().__init__(EntityType.AGENT, '')
 
         self.name     = name if name is not None else '.'
         self.sex      = sex
@@ -302,7 +302,7 @@ class Group(Entity):
     __slots__ = ('name', 'n', 'attr', 'rel', '_hash', '_callee')
 
     def __init__(self, name=None, n=0.0, attr={}, rel={}, callee=None):
-        super().__init__(EntityType.group, '')
+        super().__init__(EntityType.GROUP, '')
 
         self.name = name or '.'
         self.n    = float(n)
@@ -553,7 +553,7 @@ if __name__ == '__main__':
     # (1) Agents:
     print('(1) Agents')
 
-    print(Agent('smith', AttrSex.m, 99.99, school=None, work='matrix', location='matrix'))
+    print(Agent('smith', AttrSex.M, 99.99, school=None, work='matrix', location='matrix'))
 
     # (1.1) Generation - Individual:
     print(Agent.gen('duncan'))
