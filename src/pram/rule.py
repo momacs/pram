@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 from attr import attrs, attrib
 
-from .entity import AttrFluStatus, GroupQry, GroupSplitSpec, Site
+from .entity import GroupQry, GroupSplitSpec, Site
 from .util import Err
 
 
@@ -142,14 +142,12 @@ class GotoRule(Rule):
         self.rel_to = rel_to
 
     def __repr__(self):
-        return '{}(name={}, t=({:>4},{:>4}), p={}, rel_from={}, rel_to={})'.format(self.__class__.__name__, self.name, round(self.t.t0, 1), round(self.t.t1, 1), self.p, self.rel_from, self.rel_to)
+        return '{}(name={}, t={}, p={}, rel_from={}, rel_to={})'.format(self.__class__.__name__, self.name, self.t.t, self.p, self.rel_from, self.rel_to)
 
     def __str__(self):
-        return 'Rule  name: {:16}  t: ({:>4},{:>4})  p: {}  rel: {} --> {}'.format(self.name, round(self.t.t0, 1), round(self.t.t1, 1), self.p, self.rel_from, self.rel_to)
+        return 'Rule  name: {:16}  t: {}  p: {}  rel: {} --> {}'.format(self.name, self.t, self.p, self.rel_from, self.rel_to)
 
     def apply(self, pop, group, t):
-        if not self.is_applicable(group, t): return None
-
         return [
             GroupSplitSpec(p=self.p, rel_set={ Site.AT: group.get_rel(self.rel_to) }),
             GroupSplitSpec(p=1 - self.p)

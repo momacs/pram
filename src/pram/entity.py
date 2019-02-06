@@ -17,7 +17,7 @@ class AttrSex(IntEnum):
     M = 2
 
 
-class AttrFluStatus(IntEnum):
+class AttrFluStage(IntEnum):
     NO     = 1
     ASYMPT = 2
     SYMPT  = 3
@@ -35,9 +35,9 @@ class AttrFluStatus(IntEnum):
 #
 #
 # @attrs(slots=True)
-# class AttrFluStatus(Attr):
-#     name : str = 'flu-status'
-#     val  : AttrFluStatusEnum = attrib(default=AttrFluStatusEnum.no, validator=validators.in_(AttrFluStatusEnum))
+# class AttrFluStage(Attr):
+#     name : str = 'flu-stage'
+#     val  : AttrFluStageEnum = attrib(default=AttrFluStageEnum.no, validator=validators.in_(AttrFluStageEnum))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -138,7 +138,8 @@ class Site(Entity):
         # if self.groups is None:
 
         qry = qry or GroupQry()
-        qry.rel.update({ self.rel_name: self.get_hash() })
+        # qry.rel.update({ self.rel_name: self.get_hash() })
+        qry.rel.update({ self.rel_name: self })
         groups = self.pop.get_groups(qry)
 
         if non_empty_only:
@@ -183,10 +184,10 @@ class Agent(Entity):
     P_STUDENT = 0.25  # unconditional prob. of being a student
     P_WORKER  = 0.60  # unconditional prob. of being a worker
 
-    def __init__(self, name=None, sex=AttrSex.F, age=AGE_M, flu=AttrFluStatus.NO, school=None, work=None, location='home'):
+    def __init__(self, name=None, sex=AttrSex.F, age=AGE_M, flu=AttrFluStage.NO, school=None, work=None, location='home'):
         super().__init__(EntityType.AGENT, '')
 
-        self.name     = name if name is not None else '.'
+        self.name     = name or '.'
         self.sex      = sex
         self.age      = age
         self.flu      = flu
@@ -198,15 +199,13 @@ class Agent(Entity):
         return '{}(name={}, sex={}, age={}, flu={}, school={}, work={}, location={})'.format(self.__class__.__name__, self.name, self.sex.name, round(self.age, 2), self.flu.name, self.school, self.work, self.location)
 
     def __str__(self):
-        return '{}  name: {:12}   sex:{}   age: {:3}   flu: {:6}   school: {:16}   work: {:16}   location: {:12}'.format(self.__class__.__name__, self.name, self.sex.name, round(self.age), self.flu.name, self.school or '.', self.work or '.', self.location or '.')
+        return '{}  name: {:12}  sex:{}  age: {:3}  flu: {:6}  school: {:16}  work: {:16}  location: {:12}'.format(self.__class__.__name__, self.name, self.sex.name, round(self.age), self.flu.name, self.school or '.', self.work or '.', self.location or '.')
 
     @classmethod
     def gen(cls, name=None):
         ''' Generates a singular agent. '''
 
-        if (name is None):
-            name = '.'
-
+        name     = name or '.'
         sex      = Agent.random_sex()
         age      = Agent.random_age()
         school   = None
@@ -242,11 +241,11 @@ class Agent(Entity):
 
     @staticmethod
     def random_flu():
-        return np.random.choice(list(AttrFluStatus))
+        return AttrFluStage(np.random.choice(AttrFluStage))
 
     @staticmethod
     def random_sex():
-        return np.random.choice(list(AttrSex))
+        return AttrSex(np.random.choice(AttrSex))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -258,11 +257,11 @@ class GroupQry(object):
     Objects of this simple class are used to select groups from a group population using attribute- and relation-based
     search criteria.
 
-    It would make sense to declare this class frozen (i.e., 'frozen=True'), however as can be revealsed by the
-    following two lines, performance suffers slightly when slotted classes are frozen.
+    It would make sense to declare this class frozen (i.e., 'frozen=True'), but as is revealsed by the following two
+    measurements, performance suffers slightly when slotted classes get frozen.
 
-    python -m timeit -s "import attr; C = attr.make_class('C', ['x', 'y', 'z'], slots=True)"             "C(1, 2, 3)"
-    python -m timeit -s "import attr; C = attr.make_class('C', ['x', 'y', 'z'], slots=True,frozen=True)" "C(1, 2, 3)"
+    python -m timeit -s "import attr; C = attr.make_class('C', ['x', 'y', 'z'], slots=True)"             "C(1,2,3)"
+    python -m timeit -s "import attr; C = attr.make_class('C', ['x', 'y', 'z'], slots=True,frozen=True)" "C(1,2,3)"
     '''
 
     attr : dict = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
@@ -381,7 +380,7 @@ class Group(Entity):
         if is_setup:
             ss_rules = [r.setup(pop, self) for r in rules]
         else:
-            ss_rules = [r.apply(pop, self, t) for r in rules]
+            ss_rules = [r.apply(pop, self, t) for r in rules if r.is_applicable(self, t)]
 
         ss_rules = [i for i in ss_rules if i is not None]
         if len(ss_rules) == 0:

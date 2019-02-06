@@ -2,11 +2,10 @@
 A simulation of agents going from home to work and then, sometimes, to a store and back home again.
 '''
 
-
-from pram.sim import Simulation
+from pram.sim    import Simulation
 from pram.entity import GroupQry, Site
-from pram.data import GroupSizeProbe
-from pram.rule import AttrFluStatus, TimeInt, GotoRule
+from pram.data   import GroupSizeProbe
+from pram.rule   import GotoRule, TimeInt, TimePoint
 
 
 rand_seed = 1928
@@ -26,21 +25,18 @@ probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), mem
 
 (Simulation(6,1,24, rand_seed=rand_seed).
     new_group('g0', 1000).
-        set_attr('flu-status', AttrFluStatus.NO).
         set_rel(Site.AT, sites['home']).
         set_rel('home',  sites['home']).
         set_rel('work',  sites['work-a']).
         set_rel('store', sites['store-a']).
         commit().
     new_group('g1', 1000).
-        set_attr('flu-status', AttrFluStatus.NO).
         set_rel(Site.AT, sites['home']).
         set_rel('home',  sites['home']).
         set_rel('work',  sites['work-b']).
         set_rel('store', sites['store-b']).
         commit().
     new_group('g2', 100).
-        set_attr('flu-status', AttrFluStatus.NO).
         set_rel(Site.AT, sites['home']).
         set_rel('home',  sites['home']).
         set_rel('work',  sites['work-c']).
@@ -49,8 +45,8 @@ probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), mem
     add_rule(GotoRule(TimeInt(16,20), 0.4, 'work',  'home',  'Some agents return home from work')).
     add_rule(GotoRule(TimeInt(16,21), 0.2, 'home',  'store', 'Some agents go to a store after getting back home')).
     add_rule(GotoRule(TimeInt(17,23), 0.3, 'store', 'home',  'Some shopping agents return home from a store')).
-    add_rule(GotoRule(TimeInt(24,24), 1.0, 'store', 'home',  'All shopping agents return home after stores close')).
-    add_rule(GotoRule(TimeInt( 2, 2), 1.0, None,    'home',  'All still-working agents return home')).
+    add_rule(GotoRule(TimePoint(24),  1.0, 'store', 'home',  'All shopping agents return home after stores close')).
+    add_rule(GotoRule(TimePoint( 2),  1.0, None,    'home',  'All still-working agents return home')).
     add_probe(probe_grp_size_site).
     summary((True, True, True, True, True), (0,1)).
     run().

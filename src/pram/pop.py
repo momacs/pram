@@ -67,7 +67,7 @@ class GroupPopulation(object):
 
     def apply_rules(self, rules, t, is_setup=False):
         '''
-        Iterates through groups and for each applies all rules (which is handles intelligently by the Group class).
+        Iterates through groups and for each applies all rules (which is handled intelligently by the Group class).
         The result of (possible) rules applications is a list of new groups the original group should be split into.
         When all the groups have been processed in this way, and all new groups have been defined, they are
         subsequently used for actual mass redistribution (which updates existing groups and creates new ones).

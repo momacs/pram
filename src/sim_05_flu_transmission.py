@@ -1,11 +1,11 @@
 '''
-A simulation testing a location-aware flu progression rule.
+A simulation of the flu transmission model (testing a location-awareness).
 '''
 
-from pram.sim import Simulation
-from pram.entity import GroupQry, GroupSplitSpec, Site
-from pram.data import GroupSizeProbe
-from pram.rule import AttrFluStatus, GotoRule, Rule, TimeInt, TimePoint
+from pram.sim    import Simulation
+from pram.entity import AttrFluStage, GroupQry, GroupSplitSpec, Site
+from pram.data   import GroupSizeProbe
+from pram.rule   import GotoRule, Rule, TimeInt, TimePoint
 
 
 rand_seed = 1928
@@ -18,18 +18,18 @@ sites = {
     'school-b' : Site('school-b')
 }
 
-probe_grp_size_flu  = GroupSizeProbe.by_attr('flu', 'flu-status', AttrFluStatus, memo='Mass distribution across flu status')
+probe_grp_size_flu  = GroupSizeProbe.by_attr('flu', 'flu-stage', AttrFluStage, memo='Mass distribution across flu stages')
 probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), memo='Mass distribution across sites')
 
 (Simulation(1,1,14, rand_seed=rand_seed).  # 14-day simulation
     new_group('A', 500).
-        set_attr('flu-status', AttrFluStatus.NO).
+        set_attr('flu-stage', AttrFluStage.NO).
         set_rel(Site.AT,  sites['home']).
         set_rel('home',   sites['home']).
         set_rel('school', sites['school-a']).
         commit().
     new_group('B', 500).
-        set_attr('flu-status', AttrFluStatus.NO).
+        set_attr('flu-stage', AttrFluStage.NO).
         set_rel(Site.AT,  sites['home']).
         set_rel('home',   sites['home']).
         set_rel('school', sites['school-b']).

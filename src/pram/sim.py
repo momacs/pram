@@ -16,8 +16,11 @@
 #
 # TODO
 #     Quick
+#         - Abstract the single-group group splitting mechanism as a dedicated method.  Currently, that is used in
+#           ResetDayRule.apply() and AttendSchoolRule.setup() methods.
 #         Allow executing rule sets in the order provided
 #             E.g., some rules need to be run after all others have been applied
+#             This may not be what we want because the idea of PRAMs is to avoid order effects.
 #         Prevent creating empty groups in Group.split().
 #         - Antagonistic rules (e.g., GoHome and GoToWork), if applied at the same time will always result in order
 #           effects, won't they? Think about that.
@@ -255,6 +258,18 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
+# Resources: Publishing
+#     Bayesian Nets plate notation graphs
+#         LaTeX
+#             https://github.com/jluttine/tikz-bayesnet
+#         Python
+#             http://daft-pgm.org
+#     Graphs
+#         http://www.graphviz.org
+#         http://latexdraw.sourceforge.net
+#
+# ----------------------------------------------------------------------------------------------------------------------
+#
 # Resources: Other
 #     ...
 #
@@ -295,7 +310,7 @@
 import numpy as np
 
 from .data   import GroupSizeProbe
-from .entity import Agent, AttrFluStatus, AttrSex, Group, GroupQry, Home, Site
+from .entity import Agent, Group, GroupQry, Home, Site
 from .pop    import GroupPopulation
 
 
