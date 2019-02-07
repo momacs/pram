@@ -32,8 +32,8 @@ git pull origin master
 
 The same result can be achieved with one of the commands of the [`momacs`](https://github.com/momacs/misc) command-line utility.  Another command can be used subsequently to update an existing PRAM `venv` with the latest version of the source code from the present repository.  These two commands are, respectively:
 ```
-momacs pram make-venv
-momacs pram update-venv
+momacs pram setup
+momacs pram update
 ```
 
 Once a PRAM `venv` has been activated, running the following from the `src` directory will display results of a simple simulation:
