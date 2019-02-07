@@ -191,6 +191,7 @@
 #     State-space models
 #         In a more general sense, how does PRAM correpond to state-space models?
 #     Logistic map
+#         [2019.01]
 #         My early and simple simulations resulted with the population distribution reaching what appears to be some
 #         sort of a stationary distribution.  That convergence was rather fast (around 20 time steps) and while I don't
 #         know what's driving it, I wonder if it's in any way related to the logistic map:
@@ -200,9 +201,25 @@
 #         If there is a connection, perhaps it can be described with polynomial mapping of degree higher than two.  I'm
 #         not sure how to visualize those higher dimensions.
 #
+#         [2019.01]
 #         Having thought of this a tiny bit more, I started to question my initial intuition because the logistic
 #         function models population size change (i.e., growth or decline) and not distribution.  Perhaps it would
 #         still apply to subpopulation... not sure.
+#
+#         [2019.02.07]
+#         I am now almost certain that I was wrong all along.  I think that the observed convergence is that of a
+#         time-homogenous Markov chain with a finite state space tending to its stationary distribution \pi:
+#
+#             \pi = \pi P,
+#
+#         where $P$ is the chain's transition probability matrix.  While the flu progression simulation is equivalent
+#         to such a Markov chain, more complicated simulations (e.g., the flu transmission model) won't reduce to
+#         stationary chains.
+#     Evaluation of PRAM
+#         Historical data
+#             - Use the initial state given by historical data to seed a PRAM simulation.  Compare how short of the
+#              rest of the data the simulation is at specific milestone points.
+#             - Additionally, historical data could be used to infer the rules.
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
