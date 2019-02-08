@@ -14,7 +14,7 @@ class Time(object):
 class TimePoint(Time):
     # TODO: Restrict valid value range to [0-24).
 
-    t: float = attrib(default=-1.0, converter=float)
+    t: float = attrib(default=0.00, converter=float)
 
 
 @attrs(slots=True)
@@ -25,8 +25,8 @@ class TimeInt(Time):
 
     # TODO: Restrict valid value range to [0-24).
 
-    t0: float = attrib(default=-1.0, converter=float)
-    t1: float = attrib(default=-1.0, converter=float)
+    t0: float = attrib(default= 0.00, converter=float)
+    t1: float = attrib(default=24.00, converter=float)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

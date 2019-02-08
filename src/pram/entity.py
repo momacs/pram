@@ -488,8 +488,8 @@ class Group(Entity):
         pass
 
     def set_rel(self, name, value, do_force=True):
-        if name == Site.AT:
-            raise ValueError("Relation name '{}' is restricted for internal use.".format(Site.AT))
+        # if name == Site.AT:
+        #     raise ValueError("Relation name '{}' is restricted for internal use.".format(Site.AT))
 
         if self.rel.get(name) is not None and not do_force:
             raise ValueError("Group '{}' already has the relation '{}'.".format(self.name, name))
