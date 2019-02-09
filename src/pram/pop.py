@@ -1,4 +1,4 @@
-from .entity import Group, GroupQry, Site
+from .entity import Group, GroupQry, Resource, Site
 
 
 class Population(object):
@@ -20,6 +20,7 @@ class GroupPopulation(object):
     def __init__(self):
         self.groups = {}
         self.sites = {}
+        self.resources = {}
 
     def __repr__(self):
         pass
@@ -41,13 +42,29 @@ class GroupPopulation(object):
             g.n += group.n
         else:
             self.groups[group.get_hash()] = group
-            self.add_sites([v for (_,v) in group.get_rel().items() if isinstance(v, Site)])
+            self.add_sites    ([v for (_,v) in group.get_rel().items() if isinstance(v, Site)])
+            self.add_resources([v for (_,v) in group.get_rel().items() if isinstance(v, Resource)])
 
         return self
 
     def add_groups(self, groups):
         for g in groups:
             self.add_group(g)
+        return self
+
+    def add_resource(self, resource):
+        h = resource.get_hash()
+        if h in self.resources.keys():
+            return
+
+        self.resources[h] = resource
+        # resource.set_pop(self)
+
+        return self
+
+    def add_resources(self, resources):
+        for r in resources:
+            self.add_resource(r)
         return self
 
     def add_site(self, site):

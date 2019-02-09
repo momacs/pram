@@ -98,6 +98,7 @@ class Site(Entity):
 
     def __init__(self, name, rel_name=AT, pop=None):
         super().__init__(EntityType.SITE, '')
+
         self.name = name
         self.rel_name = rel_name  # name of the relation the site is the object of
         self.pop = pop  # pointer to the population (can be set elsewhere too)
@@ -164,12 +165,91 @@ class Home(Site):
         super().__init__('home')
 
 
-class Resource(object):
+# ----------------------------------------------------------------------------------------------------------------------
+class Resource(Entity):
     '''
     A resource shared by the agents (e.g., a public bus).
+
+    This is a basic implementation of a shared resource and can safely be used only within a single simulation.  A more
+    elaborate implementation based on synchronization mechanisms will be provided later and will accommodate multiple
+    concurrent simulations of different and interacting systems with the agent population moving seamlessly between
+    them.
     '''
 
-    pass
+    __slots__ = ('name', 'capacity', 'capacity_max')
+
+    def __init__(self, name, capacity_max=1):
+        super().__init__(EntityType.RESOURCE, '')
+
+        self.name = name
+        self.capacity = 0
+        self.capacity_max = capacity_max
+
+    def __eq__(self, other):
+        '''
+        We will make two resources identical if their keys are equal (i.e., object identity is not necessary).  This
+        will let us recognize resources even if they are instantiated multiple times.
+        '''
+
+        return isinstance(self, type(other)) and (self.__key() == other.__key())
+
+    def __hash__(self):
+        return hash(self.__key())
+
+    def __repr__(self):
+        return '{}({} {} {})'.format(self.__class__.__name__, self.name, self.capacity, self.capacity_max)
+
+    def __str__(self):
+        return '{}  name: {:16}  cap: {}/{}  hash: {}'.format(self.__class__.__name__, self.name, self.capacity, self.capacity_max, self.__hash__())
+
+    def __key(self):
+        return (self.name)
+
+    def allocate(self, n, do_all=False):
+        if do_all:
+            return self.accommodate_all(n)
+        else:
+            return self.accommodate_any(n)
+
+    def allocate_any(self, n):
+        ''' Return the number of not accommodated agents (i.e., those over the max capacity). '''
+
+        n_accommodated = self.capacity_max - n
+        self.capacity += n_accommodated
+        return n - n_accommodated
+
+    def allocate_all(self, n):
+        ''' Returns True if all agents can be accommodated, and False otherwise. '''
+
+        if self.capacity + n <= self.capacity_max:
+            self.capacity += n
+            return True
+        else:
+            return False
+
+    def can_accommodate_all(self, n):
+        return self.capacity + n <= self.capacity_max
+
+    def can_accommodate_any(self, n):
+        return self.capacity < self.capacity_max
+
+    def get_capacity(self):
+        return self.capacity
+
+    def get_capacity_left(self):
+        return self.capacity_max - self.capacity
+
+    def get_capacity_max(self):
+        return self.capacity_max
+
+    def get_hash(self):
+        return self.__hash__()
+
+    def release(self, n):
+        if self.capacity == 0:
+            return
+
+        self.capacity = max(0, self.capacity - n)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -468,6 +548,9 @@ class Group(Entity):
 
     def get_rel(self, name=None):
         return self.rel[name] if name is not None else self.rel
+
+    def get_size(self):
+        return self.n
 
     def has_attr(self, qry):
         return Group._has(self.attr, qry)

@@ -340,11 +340,11 @@ class Simulation(object):
     for modeling quantum phenomena.
     '''
 
-    __slots__ = ('t', 't_step_size', 't_step_cnt', 'rand_seed', 'pop', 'rules', 'probes', 'is_setup_done')
+    __slots__ = ('t', 't_step_size', 't_step_cnt', 'rand_seed', 'pop', 'rules', 'probes', 'is_setup_done', 'do_disp_t')
 
     DEBUG_LVL = 0  # 0=none, 1=normal, 2=full
 
-    def __init__(self, t=0, t_step_size=1, t_step_cnt=0, rand_seed=None):
+    def __init__(self, t=0, t_step_size=1, t_step_cnt=0, do_disp_t=False, rand_seed=None):
         '''
         One interpretation of 't=4' is that the simulation starts at 4am.  Similarily, 't_step_size=1' could mean that
         the simulation time increments in one-hour intervals.
@@ -365,6 +365,8 @@ class Simulation(object):
         self.is_setup_done = False
             # ensures simulation setup is performed only once while enabling multiple incremental simulation runs of
             # arbitrary length thus promoting user-interactivity
+
+        self.do_disp_t = do_disp_t
 
     def __repr__(self):
         return '{}({}, {}, {}, {})'.format(self.__class__.__name__, self.t, self.t_step_size, self.t_step_cnt, self.rand_seed)
@@ -428,6 +430,8 @@ class Simulation(object):
 
         for i in range(self.t_step_cnt):
             self._debug('t: {}'.format(self.t))
+
+            if self.do_disp_t: print('t:{}'.format(self.t))
 
             self.pop.apply_rules(self.rules, self.t)
 
