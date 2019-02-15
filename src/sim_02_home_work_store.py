@@ -2,10 +2,10 @@
 A simulation of agents going from home to work and then, sometimes, to a store and back home again.
 '''
 
-from pram.sim    import Simulation
-from pram.entity import GroupQry, Site
 from pram.data   import GroupSizeProbe
+from pram.entity import GroupQry, Site
 from pram.rule   import GotoRule, TimeInt, TimePoint
+from pram.sim    import Simulation
 
 
 rand_seed = 1928

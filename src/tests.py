@@ -1,6 +1,6 @@
 import unittest
 
-from pram.entity import AttrFluStatus, AttrSex, EntityType, Group, Site
+from pram.entity import AttrFluStage, AttrSex, EntityType, Group, Site
 
 
 class GroupTestCase(unittest.TestCase):
@@ -47,9 +47,9 @@ class GroupTestCase(unittest.TestCase):
         eq(Group(attr={ 'sex': 'f' }), Group(attr={ 'sex': 'f' }))  # same attributes (primitive data types)
         eq(Group(attr={ 'age': 99 }),  Group(attr={ 'age': 99 }))   # same attributes (primitive data types)
 
-        eq(Group(attr={ 'sex': AttrSex.f }),        Group(attr={ 'sex': AttrSex.f }))            # same attributes (composite data types)
-        eq(Group(attr={ 'sex': AttrFluStatus.no }), Group(attr={ 'sex': AttrFluStatus.no }))     # same attributes (composite data types)
-        ne(Group(attr={ 'sex': AttrFluStatus.no }), Group(attr={ 'sex': AttrFluStatus.sympt }))  # different attributes (composite data types)
+        eq(Group(attr={ 'sex': AttrSex.F }),        Group(attr={ 'sex': AttrSex.F }))          # same attributes (composite data types)
+        eq(Group(attr={ 'sex': AttrFluStage.NO }), Group(attr={ 'sex': AttrFluStage.NO }))     # same attributes (composite data types)
+        ne(Group(attr={ 'sex': AttrFluStage.NO }), Group(attr={ 'sex': AttrFluStage.SYMPT }))  # different attributes (composite data types)
 
         ne(Group(attr={ 'sex': 'f' }), Group(attr={ 'xes': 'f' }))  # different attribute keys
         ne(Group(attr={ 'sex': 'f' }), Group(attr={ 'sex': 'm' }))  # different attribute values

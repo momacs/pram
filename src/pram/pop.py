@@ -184,7 +184,7 @@ class GroupPopulation(object):
         return ret
 
     def get_next_group_name(self):
-        return 'g.{}'.format(len(self.groups))
+        return f'g.{len(self.groups)}'
 
     def get_site_cnt(self):
         return len(self.sites)

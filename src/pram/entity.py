@@ -2,13 +2,15 @@ import copy
 import itertools
 import math
 import numpy as np
+import os
+import sqlite3
 
 from abc import ABC
 from attr import attrs, attrib, converters, validators
 from enum import IntEnum
 from scipy.stats import rv_continuous
 
-from .util import Err
+from .util import Err, DB
 
 
 # ======================================================================================================================
@@ -94,13 +96,14 @@ class Site(Entity):
 
     AT = '__at__'  # relation name for the group's current location
 
-    __slots__ = ('name', 'rel_name', 'pop', 'groups')
+    __slots__ = ('name', 'attr', 'rel_name', 'pop', 'groups')
 
-    def __init__(self, name, rel_name=AT, pop=None):
+    def __init__(self, name, attr=None, rel_name=AT, pop=None):
         super().__init__(EntityType.SITE, '')
 
         self.name = name
         self.rel_name = rel_name  # name of the relation the site is the object of
+        self.attr = attr or {}
         self.pop = pop  # pointer to the population (can be set elsewhere too)
         self.groups = None  # None indicates the groups at the site might have changed and need to be retrieved again from the population
 
@@ -116,13 +119,26 @@ class Site(Entity):
         return hash(self.__key())
 
     def __repr__(self):
-        return '{}({})'.format(self.__class__.__name__, self.name)
+        return '{}({} {} {})'.format(self.__class__.__name__, self.name, self.__hash__(), self.attr)
 
     def __str__(self):
-        return '{}  name: {:16}  hash: {}'.format(self.__class__.__name__, self.name, self.__hash__())
+        return '{}  name: {:16}  hash: {}  attr: {}'.format(self.__class__.__name__, self.name, self.__hash__(), self.attr)
 
     def __key(self):
         return (self.name)
+
+    @classmethod
+    def gen_from_db(cls, db_fpath, tbl, name_col, rel_name, attr=[], limit=0):
+        if not os.path.isfile(db_fpath):
+            raise ValueError(f'The database does not exist: {db_fpath}')
+
+        sites = {}
+        with DB.open_conn(db_fpath) as c:
+            for row in c.execute('SELECT {} FROM {}{}'.format(','.join(attr + [name_col]), tbl, '' if limit <= 0 else f' LIMIT {limit}')).fetchall():
+                s = cls(row[name_col], { a: row[a] for a in attr }, rel_name=rel_name)
+                sites[s.get_hash()] = s
+
+        return sites
 
     def get_hash(self):
         return self.__hash__()
@@ -376,6 +392,13 @@ class GroupSplitSpec(object):
             raise ValueError("The probability 'p' must be in [0,1] range.")
 
 
+@attrs(slots=True)
+class GroupDBRelSpec(object):
+    name     : str  = attrib()
+    col      : str  = attrib()
+    entities : dict = attrib()
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 class Group(Entity):
     __slots__ = ('name', 'n', 'attr', 'rel', '_hash', '_callee')
@@ -515,6 +538,33 @@ class Group(Entity):
         rel  = rel  or {}
 
         return hash(tuple([frozenset(attr.items()), frozenset(rel.items())]))
+
+    @classmethod
+    def gen_from_db(cls, db_fpath, tbl, attr=[], rel=[], rel_at=None, limit=0):
+        if not os.path.isfile(db_fpath):
+            raise ValueError(f'The database does not exist: {db_fpath}')
+
+        qry = 'SELECT COUNT(*) AS n{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
+            tbl=tbl,
+            cols=', '.join(attr + [r.col for r in rel]),
+            cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr + [r.col for r in rel]]),
+            comma='' if len(attr + [r.col for r in rel]) == 0 else ', ',
+            limit='' if limit <= 0 else f' LIMIT {limit}'
+        )
+
+        groups = []
+        with DB.open_conn(db_fpath) as c:
+            for row in c.execute(qry).fetchall():
+                g = cls(
+                    n=row['n'],
+                    attr={ a: row[a] for a in attr },
+                    rel={ spec.name: spec.entities[row[spec.col]] for spec in rel}
+                )
+                if rel_at is not None:
+                    g.set_rel(Site.AT, g.get_rel(rel_at))
+                groups.append(g)
+
+        return groups
 
     @staticmethod
     def gen_dict(d_in, d_upd=None, k_del=None):

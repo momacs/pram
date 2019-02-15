@@ -88,6 +88,17 @@
 #             - Provide probabilities as a transition matrix.  Perhaps the entire simulation could be specified as a
 #               Bayesian network which would naturally imply a conditional probability distributions (or densities).
 #         Define simulation based on a relational database
+#         Hand-drawn input
+#             Implement a UI that turns hand-drawn graphs into PRAM simulations
+#             Possible approaches
+#                 Image moments
+#             Quick literature search
+#                 https://www.researchgate.net/publication/302980429_Hand_Drawn_Optical_Circuit_Recognition
+#                 http://homepages.inf.ed.ac.uk/thospeda/papers/yu2016sketchanet.pdf
+#                 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5578632/
+#                 http://cs231n.stanford.edu/reports/2017/pdfs/420.pdf
+#                 DeepSketch2
+#                     https://www.semanticscholar.org/paper/DeepSketch-2%3A-Deep-convolutional-neural-networks-Dupont-Seddati/feac7ae2ce66e6dcc8e8c64223dc5624edea8d08
 #     Visualization and UI
 #         Visualize simulations
 #         Make the visualization controlable (ideally MVC)
@@ -100,25 +111,26 @@
 #     Ported to FreeBSD (Python 3._._; 12.0R)                                                  []
 #     Ported to Ubuntu (Python 3._._; 18.04 LTS)                                               []
 #     Moved to PyPy                                                                            []
+#     Published to PyPI                                                                        []
 #     Containerized (Docker)                                                                   []
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
 # Milestones: Code
 #     Simulation
-#         c Simulation class                                                                   [2018.12.16 - ...]
+#         c Simulation class                                                                   [2018.12.16 - 2019.02.11]
 #             f Read and output time in time format (e.g., 'hh:mm')                            []
 #             f Convert between list of agents and groups                                      []
 #         Entities
 #             c Agent                                                                          [2018.12.16 - 2019.01.05]
 #             c Entity                                                                         [2018.12.16 - ...]
 #             c Group                                                                          [2019.12.16 - ...]
-#                 f Splitting                                                                  [2019.01.04 - 2019.01.16]
+#                 f Splitting                                                                  [2019.01.04 - 2019.02.11]
 #             c GroupSplitSpec                                                                 [2019.01.06 - 2019.01.21]
 #             c GroupQry                                                                       [2019.01.12 - 2019.01.21]
-#             c Site                                                                           [2018.12.16 - ...]
+#             c Site                                                                           [2018.12.16 - 2019.02.11]
 #                 f Canonical functionality                                                    [2010.01.19 - 2019.01.21]
-#             c Resource                                                                       [2010.01.18]
+#             c Resource                                                                       [2010.01.18 - 2019.01.08]
 #         Rules
 #             c Time                                                                           [2019.01.06]
 #             c TimePoint                                                                      [2019.01.22]
@@ -161,11 +173,12 @@
 #
 #     Utilities
 #         c Data                                                                               [2019.01.06]
+#         c DB                                                                                 [2019.02.11]
 #         c Err                                                                                [2019.01.21]
 #         c FS                                                                                 [2019.01.06]
 #         c Hash                                                                               [2019.01.06 - ...]
 #         c MPCounter                                                                          [2019.01.06]
-#         c Size                                                                               [2019.01.06]
+#         c Size                                                                               [2019.01.06 - 2019.02.11]
 #         c Str                                                                                [2019.01.06]
 #         c Tee                                                                                [2019.01.06]
 #         c Time                                                                               [2019.01.06]
@@ -369,10 +382,19 @@ class Simulation(object):
         self.do_disp_t = do_disp_t
 
     def __repr__(self):
-        return '{}({}, {}, {}, {})'.format(self.__class__.__name__, self.t, self.t_step_size, self.t_step_cnt, self.rand_seed)
+        return f'{self.__class__.__name__}({self.t}, {self.t_step_size}, {self.t_step_cnt}, {self.rand_seed})'
 
     def _debug(self, msg):
-        if self.DEBUG_LVL >= 1: print(msg)
+        if self.DEBUG_LVL >= 1:
+            print(msg)
+
+    def add_group(self, group):
+        self.pop.add_site(group)
+        return self
+
+    def add_groups(self, groups):
+        self.pop.add_groups(groups)
+        return self
 
     def add_probe(self, probe):
         self.probes.append(probe)
@@ -429,9 +451,9 @@ class Simulation(object):
             self.t_step_cnt = t_step_cnt
 
         for i in range(self.t_step_cnt):
-            self._debug('t: {}'.format(self.t))
+            self._debug(f't: {self.t}')
 
-            if self.do_disp_t: print('t:{}'.format(self.t))
+            if self.do_disp_t: print(f't:{self.t}')
 
             self.pop.apply_rules(self.rules, self.t)
 
@@ -463,29 +485,29 @@ class Simulation(object):
         print('\n' * end_line_cnt[0], end='')
 
         if part[0]:
-            print('Simulation')
-            print('    Random seed: {}'.format(self.rand_seed))
-            print('    Timer')
-            print('        Start      : {}'.format(self.t))
-            print('        Step size  : {}'.format(self.t_step_size))
-            print('        Iterations : {}'.format(self.t_step_cnt))
-            print('        Sequence   : {}'.format([self.t + self.t_step_size * i for i in range(5)]))
-            print('    Population')
-            print('        Size        : {}'.format(round(self.pop.get_size(), 1)))
-            print('        Groups      : {}'.format(self.pop.get_group_cnt()))
-            print('        Groups (ne) : {}'.format(self.pop.get_group_cnt(True)))
-            print('        Sites       : {}'.format(self.pop.get_site_cnt()))
-            print('        Rules       : {}'.format(len(self.rules)))
-            print('        Probes      : {}'.format(len(self.probes)))
+            print( 'Simulation')
+            print(f'    Random seed: {self.rand_seed}')
+            print( '    Timer')
+            print(f'        Start      : {self.t}')
+            print(f'        Step size  : {self.t_step_size}')
+            print(f'        Iterations : {self.t_step_cnt}')
+            print(f'        Sequence   : {[self.t + self.t_step_size * i for i in range(5)]}')
+            print( '    Population')
+            print(f'        Size        : {round(self.pop.get_size(), 1)}')
+            print(f'        Groups      : {self.pop.get_group_cnt()}')
+            print(f'        Groups (ne) : {self.pop.get_group_cnt(True)}')
+            print(f'        Sites       : {self.pop.get_site_cnt()}')
+            print(f'        Rules       : {len(self.rules)}')
+            print(f'        Probes      : {len(self.probes)}')
 
         if part[1]:
-            if len(self.pop.groups) > 0: print('    Groups ({})\n'.format(len(self.pop.groups)) + '\n'.join(['        {}'.format(g) for g in self.pop.groups.values()]))
+            if len(self.pop.groups) > 0: print(f'    Groups ({len(self.pop.groups)})\n' + '\n'.join(['        {}'.format(g) for g in self.pop.groups.values()]))
         if part[2]:
-            if len(self.pop.sites)  > 0: print('    Sites ({})\n' .format(len(self.pop.sites))  + '\n'.join(['        {}'.format(s) for s in self.pop.sites.values()]))
+            if len(self.pop.sites)  > 0: print(f'    Sites ({len(self.pop.sites)})\n'   + '\n'.join(['        {}'.format(s) for s in self.pop.sites.values()]))
         if part[3]:
-            if len(self.rules)      > 0: print('    Rules ({})\n' .format(len(self.rules))      + '\n'.join(['        {}'.format(r) for r in self.rules]))
+            if len(self.rules)      > 0: print(f'    Rules ({len(self.rules)})\n'       + '\n'.join(['        {}'.format(r) for r in self.rules]))
         if part[4]:
-            if len(self.probes)     > 0: print('    Probes ({})\n'.format(len(self.probes))     + '\n'.join(['        {}'.format(p) for p in self.probes]))
+            if len(self.probes)     > 0: print(f'    Probes ({len(self.probes)})\n'     + '\n'.join(['        {}'.format(p) for p in self.probes]))
 
         print('\n' * end_line_cnt[1], end='')
 

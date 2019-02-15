@@ -13,6 +13,7 @@ import multiprocessing
 import os
 import random
 import shutil
+import sqlite3
 import sys
 import time
 
@@ -28,6 +29,17 @@ class Data(object):
     @staticmethod
     def rand_float_lst(l, u, n):
         return [random.uniform(l, u) for _ in range(n)]
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class DB(object):
+    @staticmethod
+    def open_conn(fpath):
+        conn = sqlite3.connect(fpath, check_same_thread=False)
+        conn.execute('PRAGMA foreign_keys = ON')
+        conn.execute('PRAGMA journal_mode=WAL')  # PRAGMA journal_mode = DELETE
+        conn.row_factory = sqlite3.Row
+        return conn
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -206,17 +218,49 @@ class MPCounter(object):
         self.lock = multiprocessing.Lock()
 
     def dec(self):
-        with self.lock: self.val.value -= 1
+        with self.lock:
+            self.val.value -= 1
 
     def inc(self):
-        with self.lock: self.val.value += 1
+        with self.lock:
+            self.val.value += 1
 
     def value(self):
-        with self.lock: return self.val.value
+        with self.lock:
+            return self.val.value
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Size(object):
+    @staticmethod
+    def get_size(obj0):
+        ''' https://stackoverflow.com/questions/449560/how-do-i-determine-the-size-of-an-object-in-python/30316760#30316760 '''
+
+        from numbers import Number
+        from collections import Set, Mapping, deque
+
+        _seen_ids = set()
+
+        def inner(obj):
+            obj_id = id(obj)
+            if obj_id in _seen_ids:
+                return 0
+            _seen_ids.add(obj_id)
+            size = sys.getsizeof(obj)
+            if isinstance(obj, (str, bytes, Number, range, bytearray)):
+                pass # bypass remaining control flow and return
+            elif isinstance(obj, (tuple, list, Set, deque)):
+                size += sum(inner(i) for i in obj)
+            elif isinstance(obj, Mapping) or hasattr(obj, 'items'):
+                size += sum(inner(k) + inner(v) for k, v in getattr(obj, 'items')())
+            # Check for custom object instances - may subclass above too
+            if hasattr(obj, '__dict__'):
+                size += inner(vars(obj))
+            if hasattr(obj, '__slots__'): # can have __slots__ with __dict__
+                size += sum(inner(getattr(obj, s)) for s in obj.__slots__ if hasattr(obj, s))
+            return size
+
+        return inner(obj0)
 
     @staticmethod
     def bytes2human(b, do_ret_tuple=False):
@@ -242,7 +286,6 @@ class Size(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Str(object):
-
     @staticmethod
     def float(s):
         '''

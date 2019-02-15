@@ -2,10 +2,10 @@
 Several simple simulations testing various aspects of PRAM.
 '''
 
-from pram.sim    import Simulation
-from pram.entity import AttrFluStage, GroupQry, GroupSplitSpec, Site
 from pram.data   import GroupSizeProbe
+from pram.entity import AttrFluStage, GroupQry, GroupSplitSpec, Site
 from pram.rule   import GotoRule, Rule, TimeInt
+from pram.sim    import Simulation
 
 
 rand_seed = 1928
