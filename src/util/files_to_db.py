@@ -1,3 +1,4 @@
+import csv
 import os
 import pandas as pd
 import re
@@ -8,13 +9,16 @@ from collections import namedtuple
 
 class FilesToDB(object):
     '''
-    Generates a SQLite database based on a set of text files.
+    Generates a SQLite database based on a set of CSV files.
+
+    The CSV separator character is infered.  Missing values strings need to be provided.  Data is assumed to have been
+    clean beforehand.
     '''
 
     PATT_SQL_NAME = re.compile('^[a-zA-Z][a-zA-Z0-9_]*$')
     TBL_TMP_SUFF = '__tmp'
 
-    File = namedtuple('File', ['path', 'sep', 'na_values', 'tbl', 'refs'])
+    File = namedtuple('File', ['path', 'missing_values', 'tbl', 'refs'])
     Ref  = namedtuple('Ref', ['src_col', 'dst_tbl', 'dst_col'])
 
     def __init__(self, fpath_db, dpath_files):
@@ -32,7 +36,7 @@ class FilesToDB(object):
         self.conn_close()
 
     # ------------------------------------------------------------------------------------------------------------------
-    def add_file(self, fname, sep='\t', na_values=None, refs=[]):
+    def add_file(self, fname, na_values=None, refs=[]):
         # Validate table name:
         tbl = os.path.splitext(fname)[0]
         if self.PATT_SQL_NAME.fullmatch(os.path.basename(tbl)) is None:
@@ -46,7 +50,7 @@ class FilesToDB(object):
             raise ValueError()
 
         # Add:
-        self.files.append(self.File(fpath, sep, na_values, tbl, refs))
+        self.files.append(self.File(fpath, na_values, tbl, refs))
 
         return self
 
@@ -84,11 +88,16 @@ class FilesToDB(object):
 
         print('    File: {}'.format(os.path.basename(file.path)))
 
-        df = pd.read_csv(file.path, sep=file.sep, na_values=file.na_values)
+        with open(file.path, 'r') as f:
+            dialect = csv.Sniffer().sniff(f.read(1024), delimiters='\t,')
+            print('        Sep   : \'{}\''.format(dialect.delimiter))
+            print('        NA    : {}'.format(file.missing_values))
+
+        df = pd.read_csv(file.path, sep=dialect.delimiter, na_values=file.missing_values)
         df.to_sql(file.tbl, c, if_exists='fail', index=False)
 
-        print('        Table: {}'.format(file.tbl))
-        print('        Rows: {}'.format(c.execute('SELECT COUNT(*) FROM {}'.format(file.tbl)).fetchone()[0]))
+        print('        Table : {}'.format(file.tbl))
+        print('        Rows  : {}'.format(c.execute('SELECT COUNT(*) FROM {}'.format(file.tbl)).fetchone()[0]))
 
     # ------------------------------------------------------------------------------------------------------------------
     def proc_file_refs(self, c, file):
@@ -143,12 +152,12 @@ class FilesToDB(object):
         with self.conn as c:
             print('Importing data')
             for f in self.files:
-                self._proc_file_data(c,f)
+                self.proc_file_data(c,f)
 
             print('Adding references')
             c.execute('PRAGMA foreign_keys=OFF')
             for f in self.files:
-                self._proc_file_refs(c,f)
+                self.proc_file_refs(c,f)
             c.execute('PRAGMA foreign_keys=ON')
 
         self.conn.execute('VACUUM')
@@ -165,21 +174,23 @@ if __name__ == '__main__':
     dpath_files = os.path.join(dpath_res, '2019 02 05 - Flu Transmission Model', '42003')
     fpath_db    = os.path.join(dpath_res, 'flu.sqlite3')
 
+    na = ['X']  # missing values strings
+
     try:
         (FilesToDB(fpath_db, dpath_files).
-            add_file('gq_people.txt',  '\t', 'X', refs=[
+            add_file('gq_people.txt',  na, refs=[
                 FilesToDB.Ref('sp_gq_id', 'gq', 'sp_id')
             ]).
-            add_file('gq.txt',         '\t', 'X').
-            add_file('hospitals.txt',  '\t', 'X').
-            add_file('households.txt', '\t', 'X').
-            add_file('people.txt',     '\t', 'X', refs=[
+            add_file('gq.txt',         na).
+            add_file('hospitals.txt',  na).
+            add_file('households.txt', na).
+            add_file('people.txt',     na, refs=[
                 FilesToDB.Ref('sp_hh_id',  'households', 'sp_id'),
                 FilesToDB.Ref('school_id', 'school',     'sp_id'),
                 FilesToDB.Ref('work_id',   'workplaces', 'sp_id')
             ]).
-            add_file('schools.txt',    '\t', 'X').
-            add_file('workplaces.txt', '\t', 'X').
+            add_file('schools.txt',    na).
+            add_file('workplaces.txt', na).
             run(True)
         )
     except ValueError:
