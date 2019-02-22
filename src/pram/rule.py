@@ -76,10 +76,10 @@ class Rule(ABC):
         if self.DEBUG_LVL >= 1: print(msg)
 
     @abstractmethod
-    def apply(self, pop, group, t):
+    def apply(self, pop, group, iter, t):
         pass
 
-    def is_applicable(self, t):
+    def is_applicable(self, iter, t):
         ''' Verifies if the rule is applicable given the context. '''
 
         if isinstance(self.t, TimePoint):
@@ -147,14 +147,14 @@ class GotoRule(Rule):
     def __str__(self):
         return 'Rule  name: {:16}  t: {}  p: {}  rel: {} --> {}'.format(self.name, self.t, self.p, self.rel_from, self.rel_to)
 
-    def apply(self, pop, group, t):
+    def apply(self, pop, group, iter, t):
         return [
             GroupSplitSpec(p=self.p, rel_set={ Site.AT: group.get_rel(self.rel_to) }),
             GroupSplitSpec(p=1 - self.p)
         ]
 
-    def is_applicable(self, group, t):
-        if not super().is_applicable(t): return False
+    def is_applicable(self, group, iter, t):
+        if not super().is_applicable(iter, t): return False
 
         # Moving from the designated location:
         if self.rel_from is not None:

@@ -9,8 +9,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #
 # Contributors
-#     Paul R Cohen  (prcohen@pitt.edu)                                                         [2018.10.01 - ...]
-#     Tomek D Loboda  (tomek.loboda@gmail.com)                                                 [2018.12.16 - ...]
+#     Paul R Cohen  (prcohen@pitt.edu; the idea of PRAMs and the original implementation)      [2018.10.01 - ...]
+#     Tomek D Loboda  (tomek.loboda@gmail.com; the present design and implementation)          [2018.12.16 - ...]
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -27,8 +27,7 @@
 #         - It is possible to have groups with identical names.  If we wanted to disallow that, the best place to do
 #           that in is GroupPopulation.add_group().
 #         Abastract Group.commit() up a level in the hierarchy, to Entity, which will benefit Site.
-#         Abstract hashing to Entity.
-#         Should all entities have attributes or only groups, like it is now?
+#         Abstract hashing up to Entity.
 #         - Consider making attribute and relation values objects.  This way they could hold an object and its hash
 #           which could allow for more robust copying.
 #     Paradigm shift
@@ -83,6 +82,8 @@
 #             Move to PyPy
 #             Memoize GroupQry queries
 #                 They should be reset (or handled inteligently) after mass redistribution
+#             Persist probe results on a batch basis (e.g., via 'executemany()')
+#             Remove groups unused in certain number of simulation steps to account for high group-dynamic scenarios
 #     Simulation contsruction
 #         Define simulation definition language
 #             - Provide probabilities as a transition matrix.  Perhaps the entire simulation could be specified as a
@@ -401,6 +402,11 @@ class Simulation(object):
         probe.set_pop(self.pop)
         return self
 
+    def add_probes(self, probes):
+        for p in probes:
+            self.add_probe(p)
+        return self
+
     def add_rule(self, rule):
         self.rules.append(rule)
         return self
@@ -455,10 +461,10 @@ class Simulation(object):
 
             if self.do_disp_t: print(f't:{self.t}')
 
-            self.pop.apply_rules(self.rules, self.t)
+            self.pop.apply_rules(self.rules, i, self.t)
 
             for p in self.probes:
-                p.run(self.t)
+                p.run(i, self.t)
 
             # Population size by location:
             # print('{:2}  '.format(self.t), end='')

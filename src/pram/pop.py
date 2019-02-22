@@ -82,7 +82,7 @@ class GroupPopulation(object):
             self.add_site(s)
         return self
 
-    def apply_rules(self, rules, t, is_setup=False):
+    def apply_rules(self, rules, iter, t, is_setup=False):
         '''
         Iterates through groups and for each applies all rules (which is handled intelligently by the Group class).
         The result of (possible) rules applications is a list of new groups the original group should be split into.
@@ -93,7 +93,7 @@ class GroupPopulation(object):
         new_groups = []
         upd_group_hashes = set()  # hashes of groups to be updated (to safeguard against resetting unaffected groups)
         for g in self.groups.values():
-            new_groups_g = g.apply_rules(self, rules, t, is_setup)
+            new_groups_g = g.apply_rules(self, rules, iter, t, is_setup)
             if new_groups_g is not None:
                 new_groups.extend(new_groups_g)
                 upd_group_hashes.add(g.get_hash())

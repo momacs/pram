@@ -4,7 +4,14 @@ import os
 import pickle
 import sys
 
-from pram.data   import GroupSizeProbe
+import os
+import sys
+from inspect import getsourcefile
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+
+from pram.data   import GroupSizeProbe, ProbeMsgMode
 from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
 from pram.rule   import GotoRule, Rule, TimeInt, TimePoint
 from pram.sim    import Simulation
@@ -68,7 +75,6 @@ class AttendSchoolRule(Rule):
     def is_applicable(self, group, t):
         return (
             super().is_applicable(t) and
-            # group.has_attr({ 'is-student': True }) and
             group.has_rel(['home', 'school']))
 
     @staticmethod
@@ -254,9 +260,8 @@ inf('groups', groups, do_calc_size_groups)
 n_schools = 8
 few_schools = [sites['school'][k] for k in list(sites['school'].keys())[:n_schools]]
 
-probe_grp_size_schools = GroupSizeProbe('school', [GroupQry(rel={ Site.AT: v }) for v in few_schools])
-
-# sys.exit(0)
+probe_grp_size_schools = GroupSizeProbe('school', [GroupQry(rel={ Site.AT: v }) for v in few_schools], msg_mode=ProbeMsgMode.DISP)
+# probe_grp_size_schools = GroupSizeProbe.by_rel('school', Site.AT, few_schools, msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across few schools')
 
 (Simulation(6,1,16, rand_seed=rand_seed).
     add_groups(groups).

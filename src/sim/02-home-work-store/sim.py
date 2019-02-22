@@ -2,16 +2,22 @@
 A simulation of agents going from home to work and then, sometimes, to a store and back home again.
 '''
 
-from pram.data   import GroupSizeProbe
+import os
+import sys
+from inspect import getsourcefile
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+
+from pram.data   import GroupSizeProbe, ProbeMsgMode
 from pram.entity import GroupQry, Site
 from pram.rule   import GotoRule, TimeInt, TimePoint
 from pram.sim    import Simulation
 
 
+# ----------------------------------------------------------------------------------------------------------------------
 rand_seed = 1928
 
-
-# ----------------------------------------------------------------------------------------------------------------------
 sites = {
     'home'    : Site('home'),
     'work-a'  : Site('work-a'),
@@ -21,7 +27,7 @@ sites = {
     'store-b' : Site('store-b')
 }
 
-probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), memo='Mass distribution across sites')
+probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across sites')
 
 (Simulation(6,1,24, rand_seed=rand_seed).
     new_group('g0', 1000).

@@ -164,8 +164,8 @@ class Site(Entity):
         else:
             return groups
 
-    def get_pop_size(self):
-        return sum([g.n for g in self.get_groups_here()])
+    def get_pop_size(self, qry=None):
+        return sum([g.n for g in self.get_groups_here(qry)])
 
     def invalidate_pop(self):
         self.groups = None
@@ -463,7 +463,7 @@ class Group(Entity):
 
         raise TypeError(Err.type('qry', 'dictionary, set, list, tuple, or string'))
 
-    def apply_rules(self, pop, rules, t, is_setup=False):
+    def apply_rules(self, pop, rules, iter, t, is_setup=False):
         '''
         Applies the list of rules, each of which may split the group into (possibly already extant) subgroups.  A
         sequential rule application scheme is (by the definition of sequentiality) bound to produce order effects which
@@ -483,7 +483,7 @@ class Group(Entity):
         if is_setup:
             ss_rules = [r.setup(pop, self) for r in rules]
         else:
-            ss_rules = [r.apply(pop, self, t) for r in rules if r.is_applicable(self, t)]
+            ss_rules = [r.apply(pop, self, iter, t) for r in rules if r.is_applicable(self, iter, t)]
 
         ss_rules = [i for i in ss_rules if i is not None]
         if len(ss_rules) == 0:
@@ -504,7 +504,7 @@ class Group(Entity):
         return self.split(ss_prod)
 
     def commit(self):
-        ''' Ends creating the group by notifing the callee who has begun the group creation. '''
+        ''' Ends creating the group by notifing the callee that has begun the group creation. '''
 
         if self._callee is None:
             return None
@@ -558,7 +558,7 @@ class Group(Entity):
                 g = cls(
                     n=row['n'],
                     attr={ a: row[a] for a in attr },
-                    rel={ spec.name: spec.entities[row[spec.col]] for spec in rel}
+                    rel={ spec.name: spec.entities[row[spec.col]] for spec in rel }
                 )
                 if rel_at is not None:
                     g.set_rel(Site.AT, g.get_rel(rel_at))
@@ -667,6 +667,9 @@ class Group(Entity):
 
             p_sum += p
             n_sum += n
+
+            if n == 0:  # preventing instantiating empty groups
+                continue
 
             attr = Group.gen_dict(self.attr, s.attr_set, s.attr_del)
             rel  = Group.gen_dict(self.rel,  s.rel_set,  s.rel_del)

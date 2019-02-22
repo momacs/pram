@@ -11,10 +11,16 @@ For simplicity, this simulation assumes that at each simulation step philosopher
 probability.
 '''
 
+import os
+import sys
+from inspect import getsourcefile
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+
 import numpy as np
 
 from pram.sim    import Simulation
-from pram.data   import GroupSizeProbe
 from pram.entity import GroupSplitSpec, Resource
 from pram.rule   import Rule, TimeInt, TimePoint
 

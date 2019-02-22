@@ -15,7 +15,7 @@ class FilesToDB(object):
     clean beforehand.
     '''
 
-    PATT_SQL_NAME = re.compile('^[a-zA-Z][a-zA-Z0-9_]*$')
+    PATT_VALID_DB_NAME = re.compile('^[a-zA-Z][a-zA-Z0-9_]*$')
     TBL_TMP_SUFF = '__tmp'
 
     File = namedtuple('File', ['path', 'missing_values', 'tbl', 'refs'])
@@ -39,7 +39,7 @@ class FilesToDB(object):
     def add_file(self, fname, na_values=None, refs=[]):
         # Validate table name:
         tbl = os.path.splitext(fname)[0]
-        if self.PATT_SQL_NAME.fullmatch(os.path.basename(tbl)) is None:
+        if FilesToDB.PATT_VALID_DB_NAME.fullmatch(os.path.basename(tbl)) is None:
             print('The filename does not translate into a valid SQL table name: {}'.format(fname))
             raise ValueError()
 

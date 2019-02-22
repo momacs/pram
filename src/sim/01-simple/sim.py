@@ -2,7 +2,14 @@
 Several simple simulations testing various aspects of PRAM.
 '''
 
-from pram.data   import GroupSizeProbe
+import os
+import sys
+from inspect import getsourcefile
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+
+from pram.data   import GroupSizeProbe, ProbeMsgMode
 from pram.entity import AttrFluStage, GroupQry, GroupSplitSpec, Site
 from pram.rule   import GotoRule, Rule, TimeInt
 from pram.sim    import Simulation
@@ -18,7 +25,7 @@ class ProgressFluRule(Rule):
     def __init__(self, t=TimeInt(8,20), memo=None):  # 8am - 8pm
         super().__init__('progress-flu', t, memo)
 
-    def apply(self, pop, group, t):
+    def apply(self, pop, group, iter, t):
         # An equivalent Dynamic Bayesian net:
         #
         # flu-stage:
@@ -50,8 +57,8 @@ class ProgressFluRule(Rule):
         else:
             raise ValueError("Invalid value for attribute 'flu-stage'.")
 
-    def is_applicable(self, group, t):
-        return super().is_applicable(t) and group.has_attr([ 'flu-stage' ])
+    def is_applicable(self, group, iter, t):
+        return super().is_applicable(iter, t) and group.has_attr([ 'flu-stage' ])
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -62,7 +69,7 @@ sites = {
     'work': Site('w')
 }
 
-probe_grp_size_flu = GroupSizeProbe.by_attr('flu', 'flu-stage', AttrFluStage, memo='Mass distribution across flu stages')
+probe_grp_size_flu = GroupSizeProbe.by_attr('flu', 'flu-stage', AttrFluStage, msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across flu stages')
 
 # (1.1) A single-group, single-rule (1g.1r) simulation:
 s = Simulation(6,1,16, rand_seed=rand_seed)
@@ -124,8 +131,8 @@ s.run()
 #     'work': Site('w')
 # }
 #
-# probe_grp_size_flu = GroupSizeProbe.by_attr('flu', 'flu-stage', AttrFluStage, memo='Mass distribution across flu stage')
-# probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), memo='Mass distribution across sites')
+# probe_grp_size_flu = GroupSizeProbe.by_attr('flu', 'flu-stage', AttrFluStage, msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across flu stage')
+# probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across sites')
 
 # (2.1) Antagonistic rules overlapping entirely in time (i.e., goto-home and goto-work; converges to a stable distribution):
 # s = Simulation(9,1,14, rand_seed=rand_seed)

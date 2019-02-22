@@ -12,8 +12,10 @@ import gzip
 import multiprocessing
 import os
 import random
+import re
 import shutil
 import sqlite3
+import string
 import sys
 import time
 
@@ -33,6 +35,12 @@ class Data(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class DB(object):
+    ''' Made for SQLite3. '''
+
+    VALID_CHARS = f'_{string.ascii_letters}{string.digits}'
+
+    PATT_VALID_NAME = re.compile('^[a-zA-Z][a-zA-Z0-9_]*$')
+
     @staticmethod
     def open_conn(fpath):
         conn = sqlite3.connect(fpath, check_same_thread=False)
@@ -40,6 +48,30 @@ class DB(object):
         conn.execute('PRAGMA journal_mode=WAL')  # PRAGMA journal_mode = DELETE
         conn.row_factory = sqlite3.Row
         return conn
+
+    @staticmethod
+    def str_to_name(s, do_raise_on_empty=True):
+        s = s.strip().lower()
+        s = re.sub(r'( |-|,|[.])', '_', s)                # preserve select punctuation and white spaces as underscores
+        s = ''.join(c for c in s if c in DB.VALID_CHARS)  # remove invalid characters
+        s = re.sub(r'_+', '_', s)                         # compress multiple sequential underscores to one
+        s = re.sub(r'^\d+', '', s)                        # leading digits
+        s = re.sub(r'^_+', '', s)                         # leading underscores
+        s = re.sub(r'_+$', '', s)                         # trailing underscores
+
+        if len(s) == 0 and do_raise_on_empty:
+            raise TypeError(f'The string provided translates into an empty database-compliant name: {s}')
+
+        return f"'{s}'"  # quote in case it's a keyword
+
+    @staticmethod
+    def str_to_type(s):
+        return {
+            'int'   : 'INTEGER',
+            'float' : 'REAL',
+            'str'   : 'TEXT',
+            'obj'   : 'BLOB'
+        }.get(s, None)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -430,6 +462,7 @@ class Time(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
+    print('--- Size ---')
     print(Size.bytes2human(154))
     print(Size.bytes2human(1540))
     print(Size.bytes2human(15400))
@@ -444,3 +477,12 @@ if __name__ == '__main__':
 
     print(*Size.bytes2human(154, True))
     print('{:.1f}{}'.format(*Size.bytes2human(154, True)))
+
+    print('\n--- DB ---')
+    print(DB.str_to_name('one fine column name'))
+    print(DB.str_to_name('one fine column name 3'))
+    print(DB.str_to_name('one fine column name?,.-'))
+    print(DB.str_to_name('1   fine column name'))
+    print(DB.str_to_name('123 fine column name'))
+    print(DB.str_to_name('123 fine column ... name'))
+    print(DB.str_to_name('123 /a77&<>.,":[)(]'))
