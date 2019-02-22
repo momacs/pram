@@ -36,10 +36,15 @@ momacs pram setup
 momacs pram update
 ```
 
-Once a PRAM `venv` has been activated, running the following from the `src` directory will display results of a simple simulation:
+Once a PRAM `venv` has been activated, running the following will display results of a simple simulation:
 ```
-python sim_01_simple.py
+python src/sim/01-simple/sim.py
 ```
+
+
+## References
+
+Loboda, T.D. (2019) [Milestone 3 Report](https://github.com/momacs/pram/blob/master/docs/Milestone-3-Report.pdf).
 
 
 ## License
