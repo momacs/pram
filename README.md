@@ -1,6 +1,6 @@
 # Probabilistic Relational Agent-based Modeling (PRAM) Framework
 
-A simulation framework that fuses relational probabilistic models and agent-based models.  This software is in the pre-alpha development stage, so feel free to play around with it, but keep in mind that it is constantly evolving and not all pieces may be working.
+A simulation framework that fuses relational probabilistic models and agent-based models.  This software is in the pre-release stage, so feel free to play with it, but keep in mind that not all pieces may be working.  Until there is a release, please don't open issues and flex your own Python muscle to fix problems you encounter.
 
 
 ## Dependencies
