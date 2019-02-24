@@ -17,8 +17,6 @@ from pram.rule   import Rule, TimeInt
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProgressFluRule(Rule):
-    __slots__ = ()
-
     def __init__(self, t=TimeInt(8,20), memo=None):  # 8am - 8pm
         super().__init__('progress-flu', t, memo)
 

@@ -20,8 +20,8 @@ specs = [
     Spec('6', 50000)
 ]
 
-sim_dur_days_data = 14
-sim_dur_days_plot = 7
+sim_dur_days_data = 2
+sim_dur_days_plot = 2
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -53,6 +53,8 @@ for s in specs:
     plt.plot(df['i'] / 24, df[f'p_inf_{s.name}'], lw=1, antialiased=True)
     legend.append(f'n={s.n}')
 plt.legend(legend, loc='lower right')
+plt.xlabel('days')
+plt.ylabel('proportion of infected students')
 plt.xticks(range(sim_dur_days_plot + 1))
 plt.grid(alpha=0.25, antialiased=True)
 fig.savefig(fpath_plot, dpi=dpi)

@@ -1,22 +1,9 @@
 '''
-A simulation of the flu transmission model in a population of school-attenting agents.  Specifically, the transmission
-modeled as a mechanism with a dual underpinning:
+This simulation scrutinizes the previous simulation (i.e., 05-flu-trans-01) by performing sensitivity analysis on the
+following simultation parameters:
 
-1. Sontaneous (extraneous).
-The disease afflicts an agent with a small unconditional probability.  This accounts for unmodeled influences, such as
-the introduction of the virus from outside of the simulation.
-
-2. Proximy based.
-The probability of an agent getting infected increases with the number of nearby agents who are infectious.  The
-infection probability increaes as a function of the environment and once the maximum number of infectious agents is
-reached, it does not increase any more.  This simulates the intuition that even in a densly populated location only a
-certain number of agents can be nearby (or get in contact with) an agent.
-
-For simplicity, infection probability increases only when agents are at school.
-
-Irrespective of the infection mode, an infected agent goes through the flu stages specified by the progression model.
-In this simulation, agents attend school irrespective of being sick or not which allows us to draw some interesting
-conclusions.  Five schools of different sizes are modeled.
+- The probability of spontanoeous flu infection
+- The agent density based formula for infection
 '''
 
 import os
@@ -26,11 +13,13 @@ from inspect import getsourcefile
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
+import numpy as np
+
 from collections import namedtuple
 
 from pram.sim    import Simulation
 from pram.entity import AttrFluStage, GroupQry, GroupSplitSpec, Site
-from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
+from pram.data   import GroupSizeProbe, Probe, ProbeMsgMode, ProbePersistanceDB
 from pram.rule   import GotoRule, Rule, TimeInt, TimePoint
 
 
@@ -150,6 +139,7 @@ class ProgressAndTransmitFluRule(Rule):
 
     def get_p_infection_site(self, na, ns):
         ''' Agent density based formula for infection. '''
+
         return min(self.p_infection_max, self.p_infection_min * ((na + ns) / 2))
 
 
@@ -157,7 +147,7 @@ class ProgressAndTransmitFluRule(Rule):
 # (1) Init, sites, and probes:
 
 rand_seed = 1928
-sim_dur_days = 7
+sim_dur_days = 1
 
 Spec = namedtuple('Spec', ('name', 'n'))
 specs = [
@@ -172,6 +162,9 @@ specs = [
 
 dir = os.path.dirname(__file__)
 fpath_db = os.path.join(dir, f'probes-{sim_dur_days}d.sqlite3')
+
+if os.path.isfile(fpath_db):
+    os.remove(fpath_db)
 
 probe_persistance = ProbePersistanceDB(fpath_db, True)
 
@@ -198,7 +191,6 @@ for s in specs:
             ],
             qry_tot=GroupQry(rel={ 'school': site }),
             var_names=['pn', 'pa', 'ps', 'nn', 'na', 'ns'],
-            persistance=probe_persistance,
             memo=f'Flu at school {s.name.upper()}'
         )
     )
@@ -210,21 +202,43 @@ probe_grp_size_site = GroupSizeProbe.by_rel ('site', Site.AT,    sites.values(),
 # ----------------------------------------------------------------------------------------------------------------------
 # (2) Simulation:
 
-sim = Simulation(6,1,24 * sim_dur_days, rand_seed=rand_seed)
-for s in specs:
-    (sim.new_group(s.name, s.n).
-        set_attr('is-student', True).
-        set_attr('flu-stage', AttrFluStage.NO).
-        set_rel(Site.AT,  sites['home']).
-        set_rel('home',   sites['home']).
-        set_rel('school', sites[f'school-{s.name}']).
-        commit()
-    )
+# p_inf_lst = [0.05, 0.1]
+p_inf_lst = np.arange(0.01, 0.1, 0.025).tolist()
 
-(sim.
-    add_rule(ResetSchoolDayRule(TimePoint(7))).
-    add_rule(AttendSchoolFluRule()).
-    add_rule(ProgressAndTransmitFluRule()).
-    add_probes(probes_grp_size_flu_school).
-    run()
-)
+flu_rule = ProgressAndTransmitFluRule()
+
+def run_sim(p_lst):
+    for p in p_lst:
+        sim = Simulation(6,1,24 * sim_dur_days, rand_seed=rand_seed)
+        for s in specs:
+            (sim.new_group(s.name, s.n).
+                set_attr('is-student', True).
+                set_attr('flu-stage', AttrFluStage.NO).
+                set_rel(Site.AT,  sites['home']).
+                set_rel('home',   sites['home']).
+                set_rel('school', sites[f'school-{s.name}']).
+                commit()
+            )
+
+        setattr(flu_rule, 'p_infection_min', p)
+        for p in probes_grp_size_flu_school:
+            p.set_consts([Probe.Const('p_inf_min', 'float', str(flu_rule.p_infection_min))])
+            p.set_persistance(probe_persistance)
+
+        (sim.
+            add_rule(ResetSchoolDayRule(TimePoint(7))).
+            add_rule(AttendSchoolFluRule()).
+            add_rule(flu_rule).
+            add_probes(probes_grp_size_flu_school).
+            run()
+        )
+
+# run_sim(p_inf_lst)
+
+# import cProfile
+# cProfile.run('run_sim(p_inf_lst)', 'restats')
+
+import pstats
+p = pstats.Stats('restats')
+p.sort_stats('time', 'cumulative').print_stats(20)
+# p.sort_stats('time', 'cumulative').print_stats(.5, 'init')

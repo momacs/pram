@@ -15,8 +15,6 @@ class AgentPopulation(object):
 
 
 class GroupPopulation(object):
-    DEBUG_LVL = 0  # 0=none, 1=normal, 2=full
-
     def __init__(self):
         self.groups = {}
         self.sites = {}
@@ -27,9 +25,6 @@ class GroupPopulation(object):
 
     def __str__(self):
         pass
-
-    def _debug(self, msg):
-        if self.DEBUG_LVL >= 1: print(msg)
 
     def add_group(self, group):
         '''
@@ -126,12 +121,10 @@ class GroupPopulation(object):
 
             # The group already exists:
             if g02 is not None:
-                self._debug('group found    : {:16}  {:8} --> {:8}'.format(g02.name, g02.n, (g02.n + g01.n)))
                 g02.n += g01.n
 
             # The group does not exist:
             else:
-                self._debug('group not found: {:16}  {:8}'.format(g01.name, g01.n))
                 self.add_group(g01)
 
         # Notify sites of mass redistribution:

@@ -64,8 +64,6 @@ class EntityType(IntEnum):
 
 
 class Entity(ABC):
-    DEBUG_LVL = 1  # 0=none, 1=normal, 2=full
-
     __slots__ = ('type', 'id')
 
     def __init__(self, type, id):
@@ -77,9 +75,6 @@ class Entity(ABC):
 
     def __str__(self):
         return '{}  type: {}   id: {}'.format(self.__class__, self.type.name, self.id)
-
-    def _debug(self, msg):
-        if self.DEBUG_LVL >= 1: print(msg)
 
 
 class Site(Entity):

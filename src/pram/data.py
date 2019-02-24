@@ -3,14 +3,22 @@ import sqlite3
 
 from abc         import abstractmethod, ABC
 from collections import namedtuple
-from enum        import Flag, auto
+from enum        import IntEnum, Flag, auto
 
 from .entity import GroupQry
 from .util   import DB
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+class ProbePersistanceMode(IntEnum):
+    APPEND    = 1
+    OVERWRITE = 2
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class ProbePersistance(ABC):
+    VAR_NAME_KEYWORD = ['id', 'ts', 'i', 't']
+
     @abstractmethod
     def persist(self):
         pass
@@ -22,7 +30,7 @@ class ProbePersistance(ABC):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbePersistanceFS(ProbePersistance):
-    def __init__(self, path, do_overwrite=False):
+    def __init__(self, path, mode=ProbePersistanceMode.APPEND):
         self.path = path
 
         # ...
@@ -39,18 +47,14 @@ class ProbePersistanceFS(ProbePersistance):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbePersistanceDB(ProbePersistance):
-    def __init__(self, fpath, do_id=True, do_ts=True, do_overwrite=False):
+    def __init__(self, fpath, mode=ProbePersistanceMode.APPEND):
         self.probes = set()  # to identify duplicates
         self.conn   = None
         self.fpath  = fpath
-        self.do_id  = do_id  # flag: use id column?
-        self.do_ts  = do_ts  # flag: use timestamp column?
+        self.mode   = mode
 
-        if os.path.isfile(self.fpath):
-            if do_overwrite:
-                os.remove(self.fpath)
-            else:
-                raise ValueError(f'The database already exists: {self.fpath}')
+        if os.path.isfile(self.fpath) and mode == ProbePersistanceMode.OVERWRITE:
+            os.remove(self.fpath)
 
         self.conn_open()
 
@@ -73,27 +77,31 @@ class ProbePersistanceDB(ProbePersistance):
     def persist(self, probe, vals, iter ,t):
         name_db = DB.str_to_name(probe.name)
         with self.conn as c:
-            c.execute(f"INSERT INTO {name_db} ({','.join(['i','t'] + [v.name for v in probe.vars])}) VALUES ({','.join(['?','?'] + ['?' for _ in vals])})", [iter,t] + vals)
+            c.execute(
+                f"INSERT INTO {name_db} ({','.join(['i','t'] + [c.name for c in probe.consts] + [v.name for v in probe.vars])}) " +
+                f"VALUES ({','.join(['?'] * (2 + len(probe.consts) + len(vals)))})",
+                [iter,t] + [c.val for c in probe.consts] + vals
+            )
 
-    def reg_probe(self, probe):
+    def reg_probe(self, probe, do_overwrite=False):
         name_db = DB.str_to_name(probe.name)
 
-        if name_db in self.probes:
+        if name_db in self.probes and not do_overwrite:
             raise ValueError(f"The probe '{probe.name}' has already been registered.")
 
         self.probes.add(name_db)
 
-        cols = []
-        if self.do_id: cols.append('id INTEGER PRIMARY KEY AUTOINCREMENT')
-        if self.do_ts: cols.append('ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL')  # (datetime('now'))
-        cols.append('i INTEGER NOT NULL')
-        cols.append('t REAL NOT NULL')
-
-        for v in probe.vars:
-            cols.append(f'{v.name} {v.type}')  # name and type need to be DB-compliant at this point
+        cols = [
+            'id INTEGER PRIMARY KEY AUTOINCREMENT',
+            'ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL',  # (datetime('now'))
+            'i INTEGER NOT NULL',
+            't REAL NOT NULL'
+        ] + \
+        [ f'{c.name} {DB.str_to_type(c.type)}' for c in probe.consts ] + \
+        [ f'{v.name} {DB.str_to_type(v.type)}' for v in probe.vars ]
 
         with self.conn as c:
-            c.execute(f'CREATE TABLE {name_db} (' + ','.join(cols) + ');')
+            c.execute(f'CREATE TABLE IF NOT EXISTS {name_db} (' + ','.join(cols) + ');')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -103,13 +111,11 @@ class ProbeMsgMode(Flag):
 
 
 class Probe(ABC):
-    __slots__ = ('name', 'persist', 'msg_mode','pop', 'memo', 'msg')
+    Var   = namedtuple('Var', ['name', 'type'])
+    Const = namedtuple('Const', ['name', 'type', 'val'])
 
-    Var = namedtuple('Var', ['name', 'type'])
-
-    def __init__(self, name, persist=None, msg_mode=0, pop=None, memo=None):
+    def __init__(self, name, msg_mode=0, pop=None, memo=None):
         self.name = name
-        self.persist = persist
         self.msg_mode = msg_mode
         self.pop = pop  # pointer to the population (can be set elsewhere too)
         self.memo = memo
@@ -137,18 +143,18 @@ class Probe(ABC):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class GroupSizeProbe(Probe):
-    __slots__ = ('queries', 'qry_tot', 'vars')
-
-    def __init__(self, name, queries, var_names=None, qry_tot=None, persist=None, msg_mode=0, pop=None, memo=None):
+    def __init__(self, name, queries, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
         '''
         queries: iterable of GroupQry
         '''
 
-        super().__init__(name, persist, msg_mode, pop, memo)
+        super().__init__(name, msg_mode, pop, memo)
 
         self.queries = queries
         self.qry_tot = qry_tot
+        self.consts = None
         self.vars = []
+        self.persistance = None
 
         if var_names is None:
             self.vars = \
@@ -161,30 +167,30 @@ class GroupSizeProbe(Probe):
 
             vn_db_used = set()  # to identify duplicates
             for vn in var_names:
-                if vn == 'id' or vn == 'ts':
-                    raise ValueError(f"Variable name error: Names 'id', and 'ts' are restricted.")
+                if vn in ProbePersistance.VAR_NAME_KEYWORD:
+                    raise ValueError(f"The following variable names are restricted: {ProbePersistance.VAR_NAME_KEYWORD}")
 
                 vn_db = DB.str_to_name(vn)
                 if vn_db in vn_db_used:
                     raise ValueError(f"Variable name error: Name '{vn}' translates into a database name '{vn_db}' which already exists.")
 
                 vn_db_used.add(vn_db)
-                self.vars.append(Probe.Var(vn_db, DB.str_to_type('float')))
+                self.vars.append(Probe.Var(vn_db, 'float'))
 
-        if self.persist is not None:
-            self.persist.reg_probe(self)
+        self.set_consts(consts)
+        self.set_persistance(persistance)
 
     @classmethod
-    def by_attr(cls, probe_name, attr_name, attr_values, var_names=None, qry_tot=None, persist=None, msg_mode=0, pop=None, memo=None):
+    def by_attr(cls, probe_name, attr_name, attr_values, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
         ''' Generates QueryGrp objects automatically for the attribute name and values specified. '''
 
-        return cls(probe_name, [GroupQry(attr={ attr_name: v }) for v in attr_values], var_names, qry_tot, persist, msg_mode, pop, memo)
+        return cls(probe_name, [GroupQry(attr={ attr_name: v }) for v in attr_values], qry_tot, var_names, consts, persistance, msg_mode, pop, memo)
 
     @classmethod
-    def by_rel(cls, probe_name, rel_name, rel_values, var_names=None, qry_tot=None, persist=None, msg_mode=0, pop=None, memo=None):
+    def by_rel(cls, probe_name, rel_name, rel_values, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
         ''' Generates QueryGrp objects automatically for the relation name and values specified. '''
 
-        return cls(probe_name, [GroupQry(rel={ rel_name: v }) for v in rel_values], var_names, qry_tot, persist, msg_mode, pop, memo)
+        return cls(probe_name, [GroupQry(rel={ rel_name: v }) for v in rel_values], qry_tot, var_names, consts, persistance, msg_mode, pop, memo)
 
     def __repr__(self):
         return '{}()'.format(self.__class__.__name__)
@@ -193,7 +199,7 @@ class GroupSizeProbe(Probe):
         return 'Probe  name: {:16}  query-cnt: {:>3}'.format(self.name, len(self.queries))
 
     def run(self, iter, t):
-        if self.msg_mode != 0 or self.persist is not None:
+        if self.msg_mode != 0 or self.persistance is not None:
             n_tot = sum([g.n for g in self.pop.get_groups(self.qry_tot)])  # TODO: If the total mass never changed, we could memoize this (likely in GroupPopulation).
             n_qry = [sum([g.n for g in self.pop.get_groups(q)]) for q in self.queries]
 
@@ -217,11 +223,36 @@ class GroupSizeProbe(Probe):
                 self.msg.append(''.join(msg))
 
         # Persistance:
-        if self.persist is not None:
+        if self.persistance is not None:
             vals_p = []
             vals_n = []
             for n in n_qry:
                 vals_p.append(n / n_tot)
                 vals_n.append(n)
 
-            self.persist.persist(self, vals_p + vals_n, iter, t)
+            self.persistance.persist(self, vals_p + vals_n, iter, t)
+
+    def set_consts(self, consts):
+        consts = consts or []
+
+        cn_db_used = set()  # to identify duplicates
+
+        for c in consts:
+            if c.name in ProbePersistance.VAR_NAME_KEYWORD:
+                raise ValueError(f"The following constant names are restricted: {ProbePersistance.VAR_NAME_KEYWORD}")
+
+            cn_db = DB.str_to_name(c.name)
+            if cn_db in cn_db_used:
+                raise ValueError(f"Variable name error: Name '{c.name}' translates into a database name '{cn_db}' which already exists.")
+
+            cn_db_used.add(cn_db)
+
+        self.consts = consts or []
+
+    def set_persistance(self, persistance):
+        if self.persistance == persistance:
+            return
+
+        self.persistance = persistance
+        if self.persistance is not None:
+            self.persistance.reg_probe(self)

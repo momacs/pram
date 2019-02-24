@@ -41,10 +41,6 @@ class Rule(ABC):
     a group of city buses.  Each rule knows how to recognize a compatible group.
     '''
 
-    __slots__ = ('name', 't', 'memo')
-
-    DEBUG_LVL = 0  # 0=none, 1=normal, 2=full
-
     pop = None
 
     def __init__(self, name, t, memo=None):
@@ -71,9 +67,6 @@ class Rule(ABC):
 
         if isinstance(self.t, TimeInt):
             return 'Rule  name: {:16}  t: ({:>4},{:>4})'.format(self.name, round(self.t.t0, 1), round(self.t.t1, 1))
-
-    def _debug(self, msg):
-        if self.DEBUG_LVL >= 1: print(msg)
 
     @abstractmethod
     def apply(self, pop, group, iter, t):
@@ -128,8 +121,6 @@ class GotoRule(Rule):
     Example uses:
         - Compel agents that are at 'home' go to 'work' or vice versa
     '''
-
-    __slots__ = ('p', 'rel_from', 'rel_to')
 
     def __init__(self, t, p, rel_from, rel_to, memo=None):
         super().__init__('goto', t, memo)

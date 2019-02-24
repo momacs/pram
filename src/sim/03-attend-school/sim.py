@@ -17,8 +17,6 @@ from pram.sim    import Simulation
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ResetSchoolDayRule(Rule):
-    __slots__ = ()
-
     def __init__(self, t, memo=None):
         super().__init__('reset-day', t, memo)
 
@@ -31,8 +29,6 @@ class ResetSchoolDayRule(Rule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class AttendSchoolRule(Rule):
-    __slots__ = ()
-
     def __init__(self, t=TimeInt(8,16), memo=None):
         super().__init__('attend-school', t, memo)
 

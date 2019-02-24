@@ -356,8 +356,6 @@ class Simulation(object):
 
     __slots__ = ('t', 't_step_size', 't_step_cnt', 'rand_seed', 'pop', 'rules', 'probes', 'is_setup_done', 'do_disp_t')
 
-    DEBUG_LVL = 0  # 0=none, 1=normal, 2=full
-
     def __init__(self, t=0, t_step_size=1, t_step_cnt=0, do_disp_t=False, rand_seed=None):
         '''
         One interpretation of 't=4' is that the simulation starts at 4am.  Similarily, 't_step_size=1' could mean that
@@ -384,10 +382,6 @@ class Simulation(object):
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.t}, {self.t_step_size}, {self.t_step_cnt}, {self.rand_seed})'
-
-    def _debug(self, msg):
-        if self.DEBUG_LVL >= 1:
-            print(msg)
 
     def add_group(self, group):
         self.pop.add_site(group)
@@ -457,8 +451,6 @@ class Simulation(object):
             self.t_step_cnt = t_step_cnt
 
         for i in range(self.t_step_cnt):
-            self._debug(f't: {self.t}')
-
             if self.do_disp_t: print(f't:{self.t}')
 
             self.pop.apply_rules(self.rules, i, self.t)
