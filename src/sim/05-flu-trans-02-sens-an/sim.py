@@ -147,7 +147,7 @@ class ProgressAndTransmitFluRule(Rule):
 # (1) Init, sites, and probes:
 
 rand_seed = 1928
-sim_dur_days = 1
+sim_dur_days = 7
 
 Spec = namedtuple('Spec', ('name', 'n'))
 specs = [
@@ -166,7 +166,7 @@ fpath_db = os.path.join(dir, f'probes-{sim_dur_days}d.sqlite3')
 if os.path.isfile(fpath_db):
     os.remove(fpath_db)
 
-probe_persistance = ProbePersistanceDB(fpath_db, True)
+probe_persistance = ProbePersistanceDB(fpath_db, flush_every=16)
 
 probes_grp_size_flu_school = []
 
@@ -202,7 +202,6 @@ probe_grp_size_site = GroupSizeProbe.by_rel ('site', Site.AT,    sites.values(),
 # ----------------------------------------------------------------------------------------------------------------------
 # (2) Simulation:
 
-# p_inf_lst = [0.05, 0.1]
 p_inf_lst = np.arange(0.01, 0.1, 0.025).tolist()
 
 flu_rule = ProgressAndTransmitFluRule()
@@ -235,10 +234,16 @@ def run_sim(p_lst):
 
 # run_sim(p_inf_lst)
 
-# import cProfile
-# cProfile.run('run_sim(p_inf_lst)', 'restats')
 
-import pstats
-p = pstats.Stats('restats')
-p.sort_stats('time', 'cumulative').print_stats(20)
-# p.sort_stats('time', 'cumulative').print_stats(.5, 'init')
+# ----------------------------------------------------------------------------------------------------------------------
+# (3) Profile:
+
+# import cProfile
+# cProfile.run('run_sim(p_inf_lst)', f'restats-{sim_dur_days}d')
+
+# import pstats
+# pstats.Stats('restats-7d-flush-every-1'). sort_stats('time', 'cumulative').print_stats(10)
+# pstats.Stats('restats-7d-flush-every-10').sort_stats('time', 'cumulative').print_stats(20)
+# pstats.Stats('restats-7d-flush-every-16').sort_stats('time', 'cumulative').print_stats(20)
+# pstats.Stats('restats-7d-flush-every-25').sort_stats('time', 'cumulative').print_stats(20)
+# pstats.Stats('restats-7d-flush-every-50').sort_stats('time', 'cumulative').print_stats(20)

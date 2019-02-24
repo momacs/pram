@@ -2,6 +2,7 @@ import os
 import sqlite3
 
 from abc         import abstractmethod, ABC
+from attr        import attrs, attrib, converters, validators
 from collections import namedtuple
 from enum        import IntEnum, Flag, auto
 
@@ -13,6 +14,13 @@ from .util   import DB
 class ProbePersistanceMode(IntEnum):
     APPEND    = 1
     OVERWRITE = 2
+
+
+@attrs(slots=True)
+class ProbePersistanceDBItem(object):
+    name    : str  = attrib()
+    ins_qry : str  = attrib()
+    ins_val : list = attrib(factory=list, converter=converters.default_if_none(factory=list))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -30,6 +38,10 @@ class ProbePersistance(ABC):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbePersistanceFS(ProbePersistance):
+    '''
+    Persists probe results to a filesystem.
+    '''
+
     def __init__(self, path, mode=ProbePersistanceMode.APPEND):
         self.path = path
 
@@ -47,11 +59,22 @@ class ProbePersistanceFS(ProbePersistance):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbePersistanceDB(ProbePersistance):
-    def __init__(self, fpath, mode=ProbePersistanceMode.APPEND):
-        self.probes = set()  # to identify duplicates
-        self.conn   = None
-        self.fpath  = fpath
-        self.mode   = mode
+    '''
+    Persists probe results to a database.
+
+    Database inserts are cached and flushed when the buffer fills up.  The buffer size is under the user's control.
+    The default size of 16 decreases the time spent persisting data to the database about 15 times.  Higher values
+    can be used to achieve even better results.  The cost of the memory used needs to be considered as well.
+    '''
+
+    FLUSH_EVERY = 16
+
+    def __init__(self, fpath, mode=ProbePersistanceMode.APPEND, flush_every=FLUSH_EVERY):
+        self.probes = {}
+        self.conn = None
+        self.fpath = fpath
+        self.mode = mode
+        self.flush_every = flush_every
 
         if os.path.isfile(self.fpath) and mode == ProbePersistanceMode.OVERWRITE:
             os.remove(self.fpath)
@@ -65,6 +88,7 @@ class ProbePersistanceDB(ProbePersistance):
         if self.conn is None:
             return
 
+        self.flush()
         self.conn.close()
         self.conn = None
 
@@ -74,14 +98,25 @@ class ProbePersistanceDB(ProbePersistance):
 
         self.conn = sqlite3.connect(self.fpath, check_same_thread=False)
 
-    def persist(self, probe, vals, iter ,t):
-        name_db = DB.str_to_name(probe.name)
+    def flush(self):
         with self.conn as c:
-            c.execute(
-                f"INSERT INTO {name_db} ({','.join(['i','t'] + [c.name for c in probe.consts] + [v.name for v in probe.vars])}) " +
-                f"VALUES ({','.join(['?'] * (2 + len(probe.consts) + len(vals)))})",
-                [iter,t] + [c.val for c in probe.consts] + vals
-            )
+            for p in self.probes.values():
+                if len(p.ins_val) > 0:
+                    c.executemany(p.ins_qry, p.ins_val)
+                    p.ins_val = []
+
+    def persist(self, probe, vals, iter, t):
+        probe_item = self.probes[DB.str_to_name(probe.name)]
+
+        if self.flush_every <= 1:
+            with self.conn as c:
+                c.execute(probe_item.ins_qry, [iter,t] + [c.val for c in probe.consts] + vals)
+        else:
+            probe_item.ins_val.append([iter,t] + [c.val for c in probe.consts] + vals)
+            if len(probe_item.ins_val) >= self.flush_every:
+                with self.conn as c:
+                    c.executemany(probe_item.ins_qry, probe_item.ins_val)
+                probe_item.ins_val = []
 
     def reg_probe(self, probe, do_overwrite=False):
         name_db = DB.str_to_name(probe.name)
@@ -89,8 +124,7 @@ class ProbePersistanceDB(ProbePersistance):
         if name_db in self.probes and not do_overwrite:
             raise ValueError(f"The probe '{probe.name}' has already been registered.")
 
-        self.probes.add(name_db)
-
+        # Create the table:
         cols = [
             'id INTEGER PRIMARY KEY AUTOINCREMENT',
             'ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL',  # (datetime('now'))
@@ -102,6 +136,14 @@ class ProbePersistanceDB(ProbePersistance):
 
         with self.conn as c:
             c.execute(f'CREATE TABLE IF NOT EXISTS {name_db} (' + ','.join(cols) + ');')
+
+        # Store probe:
+        ins_qry = \
+            f"INSERT INTO {name_db} " + \
+            f"({','.join(['i','t'] + [c.name for c in probe.consts] + [v.name for v in probe.vars])}) " + \
+            f"VALUES ({','.join(['?'] * (len(cols) - 2))})"
+
+        self.probes[name_db] = ProbePersistanceDBItem(name_db, ins_qry)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

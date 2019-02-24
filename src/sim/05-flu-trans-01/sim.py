@@ -157,7 +157,7 @@ class ProgressAndTransmitFluRule(Rule):
 # (1) Init, sites, and probes:
 
 rand_seed = 1928
-sim_dur_days = 7
+sim_dur_days = 1
 
 Spec = namedtuple('Spec', ('name', 'n'))
 specs = [
@@ -173,7 +173,7 @@ specs = [
 dir = os.path.dirname(__file__)
 fpath_db = os.path.join(dir, f'probes-{sim_dur_days}d.sqlite3')
 
-probe_persistance = ProbePersistanceDB(fpath_db, True)
+probe_persistance = ProbePersistanceDB(fpath_db)
 
 probes_grp_size_flu_school = []
 
