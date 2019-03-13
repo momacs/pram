@@ -1,5 +1,5 @@
-# ----------------------------------------------------------------------------------------------------------------------
 #
+# ----------------------------------------------------------------------------------------------------------------------
 # PRAM - Probabilitistic Relational Agent-based Models
 #
 # BSD 3-Clause License
@@ -16,6 +16,8 @@
 #
 # TODO
 #     Quick
+#         - Store school info (e.g., size) in the probe DB and associate with the probes
+#         - Allow simulation to output warning to a file or a database
 #         - Abstract the single-group group splitting mechanism as a dedicated method.  Currently, that is used in
 #           ResetDayRule.apply() and AttendSchoolRule.setup() methods.
 #         Allow executing rule sets in the order provided
@@ -338,13 +340,27 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 
+import gc
+import gzip
 import numpy as np
+import os
+import pickle
+
+from collections import namedtuple
+from dotmap import DotMap
 
 from .data   import GroupSizeProbe
-from .entity import Agent, Group, GroupQry, Home, Site
+from .entity import Agent, Group, GroupQry, Site
 from .pop    import GroupPopulation
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+class SimulationConstructionError(Exception): pass
+
+class SimulationConstructionWarning(Warning): pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class Simulation(object):
     '''
     A PRAM simulation.
@@ -352,17 +368,18 @@ class Simulation(object):
     The discrete time is unitless; it is the simulation context that defines the appropriate granularity.  For
     instance, million years (myr) might be appropriate for geological processes while Plank time might be appropriate
     for modeling quantum phenomena.
+
+    Each simulation stores certain statistics related to the most recent of its runs (in the 'self.last_run' DotMap).
     '''
 
-    __slots__ = ('t', 't_step_size', 't_step_cnt', 'rand_seed', 'pop', 'rules', 'probes', 'is_setup_done', 'do_disp_t')
-
-    def __init__(self, t=0, t_step_size=1, t_step_cnt=0, do_disp_t=False, rand_seed=None):
+    def __init__(self, t0=0, t_step_size=1, t_step_cnt=0, rand_seed=None):
         '''
         One interpretation of 't=4' is that the simulation starts at 4am.  Similarily, 't_step_size=1' could mean that
         the simulation time increments in one-hour intervals.
         '''
 
-        self.t = t
+        self.t0 = t0
+        self.t = t0
         self.t_step_size = t_step_size
         self.t_step_cnt = t_step_cnt
 
@@ -378,17 +395,27 @@ class Simulation(object):
             # ensures simulation setup is performed only once while enabling multiple incremental simulation runs of
             # arbitrary length thus promoting user-interactivity
 
-        self.do_disp_t = do_disp_t
+        self.last_run = DotMap()  # dict of the most recent run
+
+        self.pragma = DotMap()
+        self.pragma.analyze = True            # analyze the simulation and show improvement suggestions
+        self.pragma.autoprune_groups = False  # remove attributes and relations not referenced by rules
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.t}, {self.t_step_size}, {self.t_step_cnt}, {self.rand_seed})'
 
     def add_group(self, group):
-        self.pop.add_site(group)
+        if len(self.rules) == 0:
+            raise SimulationConstructionError('A group is being added but no rules are present; rules need to be added before groups.')
+
+        self.analyze_rules_pre_run()
+
+        self.pop.add_group(group)
         return self
 
     def add_groups(self, groups):
-        self.pop.add_groups(groups)
+        for g in groups:
+            self.add_group(g)
         return self
 
     def add_probe(self, probe):
@@ -402,6 +429,9 @@ class Simulation(object):
         return self
 
     def add_rule(self, rule):
+        if len(self.pop.groups) > 0:
+            raise SimulationConstructionError('A rule is being added but groups already exist; rules need be added before groups.')
+
         self.rules.append(rule)
         return self
 
@@ -413,6 +443,56 @@ class Simulation(object):
         self.pop.add_sites(sites)
         return self
 
+    def analyze_rules_pre_run(self):
+        '''
+        Analyze rule conditioning prior to running the simulation.  This is a weak way of determining which group
+        attributes and relations the rules condition on.
+        '''
+
+        if len(self.pop.groups) != 1:
+            return self
+
+        # TODO: Implement.
+
+        return self
+
+    def analyze_rules_post_run(self):
+        '''
+        Analyze rule conditioning after running the simulation.  This is the strongest way of determining which group
+        attributes and relations the rules condition on.
+        '''
+
+        lr = self.last_run
+        lr.clear()
+
+        lr.attr_used = getattr(Group, 'attr_used')  # attributes conditioned on by at least one rule
+        lr.rel_used  = getattr(Group, 'rel_used')   # ^ (relations)
+
+        lr.attr_groups = set()  # attributes defining groups
+        lr.rel_groups  = set()  # ^ (relations)
+        for g in self.pop.groups.values():
+            for ga in g.attr.keys(): lr.attr_groups.add(ga)
+            for gr in g.rel.keys():  lr.rel_groups. add(gr)
+
+        lr.attr_unused = lr.attr_groups - lr.attr_used  # attributes not conditioned on by even one rule
+        lr.rel_unused  = lr.rel_groups  - lr.rel_used   # ^ (relations)
+
+        if self.pragma.analyze and (len(lr.attr_unused) > 0 or len(lr.rel_unused) > 0):
+            if len(lr.attr_unused) > 0 and len(lr.rel_unused) == 0:
+                print('Based on the most recent simulation run, the following group attributes are superfluous:')
+                print(f'    {list(lr.attr_unused)}')
+
+            if len(lr.attr_unused) == 0 and len(lr.rel_unused) > 0:
+                print('Based on the most recent simulation run, the following group relations are superfluous:')
+                print(f'    {list(lr.rel_unused)}')
+
+            if len(lr.attr_unused) > 0 and len(lr.rel_unused) > 0:
+                print('Based on the most recent simulation run, the following group attributes A and relations R are superfluous:')
+                print(f'    A: {list(lr.attr_unused)}')
+                print(f'    R: {list(lr.rel_unused )}')
+
+        return self
+
     def clear_probes(self):
         self.probes.clear()
         return self
@@ -422,12 +502,61 @@ class Simulation(object):
         return self
 
     def commit_group(self, group):
-        self.pop.add_group(group)
+        self.add_group(group)
         return self
 
-    def create_group(self, n, attr=None, rel=None):
-        self.pop.create_group(n, attr, rel)
+    def gen_groups_from_db(self, fpath_db, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0, fpath=None, is_verbose=False):
+        groups = None
+
+        # Load:
+        if fpath is not None and os.path.isfile(fpath):
+            if is_verbose: print('Loading groups... ', end='')
+            with gzip.GzipFile(fpath, 'rb') as f:
+                gc.disable()
+                groups = pickle.load(f)
+                gc.enable()
+            if is_verbose: print('done.')
+
+        # Generate:
+        else:
+            if is_verbose: print('Generating groups... ', end='')
+            groups = Group.gen_from_db(fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
+            if is_verbose: print('done.')
+
+            if fpath is not None:
+                if is_verbose: print('Saving groups... ', end='')
+                with gzip.GzipFile(fpath, 'wb') as f:
+                    pickle.dump(groups, f)
+                if is_verbose: print('done.')
+
+        self.add_groups(groups)
         return self
+
+    def gen_sites_from_db(self, fpath_db, fn_gen=None, fpath=None, is_verbose=False):
+        sites = None
+
+        # Load:
+        if fpath is not None and os.path.isfile(fpath):
+            if is_verbose: print('Loading sites... ', end='')
+            with gzip.GzipFile(fpath, 'rb') as f:
+                gc.disable()
+                sites = pickle.load(f)
+                gc.enable()
+            if is_verbose: print('done.')
+
+        # Generate:
+        elif fn_gen is not None:
+            if is_verbose: print('Generating sites... ', end='')
+            sites = fn_gen(fpath_db)
+            if is_verbose: print('done.')
+
+            if fpath is not None:
+                if is_verbose: print('Saving sites... ', end='')
+                with gzip.GzipFile(fpath, 'wb') as f:
+                    pickle.dump(sites, f)
+                if is_verbose: print('done.')
+
+        return sites
 
     def new_group(self, name=None, n=0.0):
         return Group(name or self.pop.get_next_group_name(), n, callee=self)
@@ -440,72 +569,91 @@ class Simulation(object):
         self.rules.discard(rule)
         return self
 
-    def run(self, t_step_cnt=0):
+    def run(self, t_step_cnt=0, do_disp_t=False):
+        '''
+        One by-product of running the simulation is that the simulation stores all group attributes and relations that
+        are conditioned on by at least one rule.  After the run is over, a set of unused attributes and relations is
+        produced, unless silenced.  That output may be useful for making future simulations more efficient by allowing
+        the modeller to remove the unused bits which unnecesarily partition the group space.
+        '''
+
+        # Rule conditioning 01 -- Init:
+        setattr(Group, 'attr_used', set())
+        setattr(Group, 'rel_used',  set())
+
         # Do setup:
         if not self.is_setup_done:
-            self.pop.apply_rules(self.rules, self.t, True)
+            self.pop.apply_rules(self.rules, 0, self.t, True)
             self.is_setup_done = True
 
-        # Run the simulation
-        if t_step_cnt > 0:
-            self.t_step_cnt = t_step_cnt
+        # Run the simulation:
+        t_step_cnt = t_step_cnt if t_step_cnt > 0 else self.t_step_cnt
 
-        for i in range(self.t_step_cnt):
-            if self.do_disp_t: print(f't:{self.t}')
+        for i in range(t_step_cnt):
+            if do_disp_t: print(f't:{self.t}')
 
             self.pop.apply_rules(self.rules, i, self.t)
 
             for p in self.probes:
                 p.run(i, self.t)
 
-            # Population size by location:
-            # print('{:2}  '.format(self.t), end='')
-            # for s in self.pop.sites.values():
-            #     print('{}: {:>7}  '.format(s.name, round(s.get_pop_size(), 1)), end='')
-            # print('')
-
-            # Groups by location:
-            # print('{:2}  '.format(self.t), end='')
-            # for s in self.pop.sites.values():
-            #     print('{}: ( '.format(s.name), end='')
-            #     for g in s.get_groups_here():
-            #         print('{} '.format(g.name), end='')
-            #     print(')  ', end='')
-            # print('')
-
             self.t = (self.t + self.t_step_size) % 24
+
+        # Rule conditioning 02 -- Analyze and deinit:
+        self.analyze_rules_post_run()
+
+        getattr(Group, 'attr_used').clear()
+        getattr(Group, 'rel_used' ).clear()
 
         return self
 
-    def summary(self, part=(True, False, False, False, False), end_line_cnt=(0,0)):
-        ''' Prints the simulation summary. '''
+    def set_pragma_analyze(self, value):
+        self.pragma.analyze = value
+        return self
+
+    def set_pragma_autoprune_groups(self, value):
+        self.pragma.autoprune_groups = value
+        return self
+
+    def summary(self, do_header=True, n_groups=8, n_sites=8, n_rules=8, n_probes=8, end_line_cnt=(0,0)):
+        '''
+        Prints the simulation summary.  The summary can be printed at any stage of a simulation (i.e., including at
+        the very beginning and end) and parts of the summary can be shown and hidden and have their length specified.
+        '''
 
         print('\n' * end_line_cnt[0], end='')
 
-        if part[0]:
+        if do_header:
             print( 'Simulation')
             print(f'    Random seed: {self.rand_seed}')
             print( '    Timer')
-            print(f'        Start      : {self.t}')
-            print(f'        Step size  : {self.t_step_size}')
-            print(f'        Iterations : {self.t_step_cnt}')
-            print(f'        Sequence   : {[self.t + self.t_step_size * i for i in range(5)]}')
+            print(f'        Start      : {"{:,}".format(self.t0)}')
+            print(f'        Step size  : {"{:,}".format(self.t_step_size)}')
+            print(f'        Iterations : {"{:,}".format(self.t_step_cnt)}')
+            print(f'        Sequence   : {[self.t0 + self.t_step_size * i for i in range(5)]}')
             print( '    Population')
-            print(f'        Size        : {round(self.pop.get_size(), 1)}')
-            print(f'        Groups      : {self.pop.get_group_cnt()}')
-            print(f'        Groups (ne) : {self.pop.get_group_cnt(True)}')
-            print(f'        Sites       : {self.pop.get_site_cnt()}')
-            print(f'        Rules       : {len(self.rules)}')
-            print(f'        Probes      : {len(self.probes)}')
+            print(f'        Size        : {"{:,.2f}".format(round(self.pop.get_size(), 1))}')
+            print(f'        Groups      : {"{:,}".format(self.pop.get_group_cnt())}')
+            print(f'        Groups (ne) : {"{:,}".format(self.pop.get_group_cnt(True))}')
+            print(f'        Sites       : {"{:,}".format(self.pop.get_site_cnt())}')
+            print(f'        Rules       : {"{:,}".format(len(self.rules))}')
+            print(f'        Probes      : {"{:,}".format(len(self.probes))}')
 
-        if part[1]:
-            if len(self.pop.groups) > 0: print(f'    Groups ({len(self.pop.groups)})\n' + '\n'.join(['        {}'.format(g) for g in self.pop.groups.values()]))
-        if part[2]:
-            if len(self.pop.sites)  > 0: print(f'    Sites ({len(self.pop.sites)})\n'   + '\n'.join(['        {}'.format(s) for s in self.pop.sites.values()]))
-        if part[3]:
-            if len(self.rules)      > 0: print(f'    Rules ({len(self.rules)})\n'       + '\n'.join(['        {}'.format(r) for r in self.rules]))
-        if part[4]:
-            if len(self.probes)     > 0: print(f'    Probes ({len(self.probes)})\n'     + '\n'.join(['        {}'.format(p) for p in self.probes]))
+        if n_groups > 0:
+            if len(self.pop.groups) > 0: print(f'    Groups ({"{:,}".format(len(self.pop.groups))})\n' + '\n'.join(['        {}'.format(g) for g in list(self.pop.groups.values())[:n_groups]]))
+            if len(self.pop.groups) > n_groups: print('        ...')
+
+        if n_sites > 0:
+            if len(self.pop.sites)  > 0: print(f'    Sites ({"{:,}".format(len(self.pop.sites))})\n'   + '\n'.join(['        {}'.format(s) for s in list(self.pop.sites.values())[:n_sites]]))
+            if len(self.pop.sites) > n_sites: print('        ...')
+
+        if n_rules > 0:
+            if len(self.rules)      > 0: print(f'    Rules ({"{:,}".format(len(self.rules))})\n'       + '\n'.join(['        {}'.format(r) for r in self.rules[:n_rules]]))
+            if len(self.rules) > n_rules: print('        ...')
+
+        if n_probes > 0:
+            if len(self.probes)     > 0: print(f'    Probes ({"{:,}".format(len(self.probes))})\n'     + '\n'.join(['        {}'.format(p) for p in self.probes[:n_probes]]))
+            if len(self.probes) > n_probes: print('        ...')
 
         print('\n' * end_line_cnt[1], end='')
 

@@ -1,0 +1,52 @@
+Simulation
+    Random seed: 1928
+    Timer
+        Start      : 7
+        Step size  : 1
+        Iterations : 10
+        Sequence   : [7, 8, 9, 10, 11]
+    Population
+        Size        : 200,169.00
+        Groups      : 164,459
+        Groups (ne) : 164,459
+        Sites       : 117,982
+        Rules       : 2
+        Probes      : 1
+    Groups (164,459)
+        Group  name: .                 n:      1.0  attr: {}  rel: {'home': Site(11815531 11815531 {'hh_income': 29300}), 'school': Site(450086847 450086847 {}), '__at__': Site(11815531 11815531 {'hh_income': 29300})}
+        Group  name: .                 n:      1.0  attr: {}  rel: {'home': Site(11815536 11815536 {'hh_income': 40000}), 'school': Site(450144545 450144545 {}), '__at__': Site(11815536 11815536 {'hh_income': 40000})}
+        Group  name: .                 n:      1.0  attr: {}  rel: {'home': Site(11815540 11815540 {'hh_income': 92000}), 'school': Site(450067678 450067678 {}), '__at__': Site(11815540 11815540 {'hh_income': 92000})}
+        Group  name: .                 n:      1.0  attr: {}  rel: {'home': Site(11815540 11815540 {'hh_income': 92000}), 'school': Site(450149286 450149286 {}), '__at__': Site(11815540 11815540 {'hh_income': 92000})}
+        Group  name: .                 n:      1.0  attr: {}  rel: {'home': Site(11815543 11815543 {'hh_income': 86500}), 'school': Site(450063645 450063645 {}), '__at__': Site(11815543 11815543 {'hh_income': 86500})}
+        Group  name: .                 n:      1.0  attr: {}  rel: {'home': Site(11815543 11815543 {'hh_income': 86500}), 'school': Site(450075546 450075546 {}), '__at__': Site(11815543 11815543 {'hh_income': 86500})}
+        Group  name: .                 n:      1.0  attr: {}  rel: {'home': Site(11815548 11815548 {'hh_income': 68200}), 'school': Site(450149286 450149286 {}), '__at__': Site(11815548 11815548 {'hh_income': 68200})}
+        Group  name: .                 n:      2.0  attr: {}  rel: {'home': Site(11815548 11815548 {'hh_income': 68200}), 'school': Site(450149304 450149304 {}), '__at__': Site(11815548 11815548 {'hh_income': 68200})}
+        ...
+    Sites (117,982)
+        Site  name:         11815531  hash: 11815531  attr: {'hh_income': 29300}
+        Site  name:        450086847  hash: 450086847  attr: {}
+        Site  name:         11815536  hash: 11815536  attr: {'hh_income': 40000}
+        Site  name:        450144545  hash: 450144545  attr: {}
+        Site  name:         11815540  hash: 11815540  attr: {'hh_income': 92000}
+        Site  name:        450067678  hash: 450067678  attr: {}
+        Site  name:        450149286  hash: 450149286  attr: {}
+        Site  name:         11815543  hash: 11815543  attr: {'hh_income': 86500}
+        ...
+    Rules (2)
+        Rule  name: reset-day         t:  7.0
+        Rule  name: attend-school     t: ( 8.0,16.0)
+    Probes (1)
+        Probe  name: school-pop-size   query-cnt: 350
+t:7
+t:8
+t:9
+t:10
+t:11
+t:12
+t:13
+t:14
+t:15
+t:16
+
+----
+02:21:23  (8483s)

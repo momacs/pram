@@ -7,6 +7,7 @@ A simulation framework that fuses relational probabilistic models and agent-base
 - [Python 3.6](https://python.org)
 - [attrs](https://github.com/python-attrs/attrs)
 - [numpy](https://www.numpy.org)
+- [dotmap](https://pypi.org/project/dotmap)
 
 
 ## Setup

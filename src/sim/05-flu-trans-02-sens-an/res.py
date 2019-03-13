@@ -39,7 +39,9 @@ def get_data(var, val):
         raise ValueError(f'Database does not exist: {fpath_db}')
 
     qry01 = [f't{specs[0].name}.{var}'] + [f'(t{s.name}.pa + t{s.name}.ps) AS p_inf_{s.name}' for s in specs]
-    qry02 = [f'FROM flu_{specs[0].name} t{specs[0].name}'] + [f'INNER JOIN flu_{s.name} t{s.name} on (t{s.name}.{var} = t{specs[0].name}.{var} AND t{s.name}.i = t{specs[0].name}.i)' for s in specs[1:]]
+    qry02 = \
+        [f'FROM flu_{specs[0].name} t{specs[0].name}'] + \
+        [f'INNER JOIN flu_{s.name} t{s.name} on (t{s.name}.{var} = t{specs[0].name}.{var} AND t{s.name}.i = t{specs[0].name}.i)' for s in specs[1:]]
     qry = \
         f'SELECT t{specs[0].name}.i, ' + ', '.join(qry01) + '\n' + '\n'.join(qry02) + \
         f' WHERE t{specs[0].name}.{var} = {val} AND t{specs[0].name}.i <= {24 * sim_dur_days_plot}'
@@ -82,10 +84,3 @@ ax.set_zlabel('min p(infection)')
 ax.set_xticks(range(sim_dur_days_plot + 1))
 plt.grid(alpha=0.25, antialiased=True)
 fig.savefig(fpath_plot)
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-# (3) Conclusions:
-
-'''
-'''

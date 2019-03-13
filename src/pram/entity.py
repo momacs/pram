@@ -7,13 +7,18 @@ import sqlite3
 
 from abc import ABC
 from attr import attrs, attrib, converters, validators
+from collections.abc import Iterable
 from enum import IntEnum
 from scipy.stats import rv_continuous
 
 from .util import Err, DB
 
 
-# ======================================================================================================================
+# ----------------------------------------------------------------------------------------------------------------------
+class GroupFrozenError(Exception): pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class AttrSex(IntEnum):
     F = 1
     M = 2
@@ -77,6 +82,7 @@ class Entity(ABC):
         return '{}  type: {}   id: {}'.format(self.__class__, self.type.name, self.id)
 
 
+# ----------------------------------------------------------------------------------------------------------------------
 class Site(Entity):
     '''
     A physical site (e.g., a school or a store) agents can reside at.
@@ -160,20 +166,13 @@ class Site(Entity):
             return groups
 
     def get_pop_size(self, qry=None):
-        return sum([g.n for g in self.get_groups_here(qry)])
+        return sum(g.n for g in self.get_groups_here(qry))
 
     def invalidate_pop(self):
         self.groups = None
 
     def set_pop(self, pop):
         self.pop = pop
-
-
-class Home(Site):
-    __slots__ = ()
-
-    def __init__(self):
-        super().__init__('home')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -387,7 +386,7 @@ class GroupSplitSpec(object):
             raise ValueError("The probability 'p' must be in [0,1] range.")
 
 
-@attrs(slots=True)
+@attrs()
 class GroupDBRelSpec(object):
     name     : str  = attrib()
     col      : str  = attrib()
@@ -396,7 +395,10 @@ class GroupDBRelSpec(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Group(Entity):
-    __slots__ = ('name', 'n', 'attr', 'rel', '_hash', '_callee')
+    __slots__ = ('name', 'n', 'attr', 'rel', 'is_frozen', 'hash', 'callee')
+
+    attr_used = None  # a set of attribute that has been conditioned on by at least one rule
+    rel_used  = None  # ^ for relations
 
     def __init__(self, name=None, n=0.0, attr={}, rel={}, callee=None):
         super().__init__(EntityType.GROUP, '')
@@ -406,9 +408,9 @@ class Group(Entity):
         self.attr = attr or {}
         self.rel  = rel  or {}
 
-        self._hash = None  # computed lazily
-
-        self._callee = callee  # used only throughout the process of creating group; unset by commit()
+        self.is_frozen = False
+        self.hash = None  # computed lazily
+        self.callee = callee  # used only throughout the process of creating group; unset by commit()
 
     def __eq__(self, other):
         '''
@@ -425,10 +427,10 @@ class Group(Entity):
         return isinstance(self, type(other)) and (self.attr == other.attr) and (self.rel == other.rel)
 
     def __hash__(self):
-        if self._hash is None:
-            self._hash = Group.gen_hash(self.attr, self.rel)
+        if self.hash is None:
+            self.hash = Group.gen_hash(self.attr, self.rel)
 
-        return self._hash
+        return self.hash
 
     def __repr__(self):
         return '{}(name={}, n={}, attr={}, rel={})'.format(__class__.__name__, self.name, self.n, self.attr, self.rel)
@@ -437,7 +439,7 @@ class Group(Entity):
         return '{}  name: {:16}  n: {:8}  attr: {}  rel: {}'.format(self.__class__.__name__, self.name, round(self.n, 2), self.attr, self.rel)
 
     @staticmethod
-    def _has(d, qry):
+    def _has(d, qry, used_set):
         '''
         Compares the dictionary 'd' against 'qry' which can be a dictionary, an iterable (excluding a string), and a
         string.  Depending on the type of 'qry', the method performs the following checks:
@@ -445,18 +447,27 @@ class Group(Entity):
             string: 'qry' must be a key in 'd'
             iterable: all items in 'qry' must be keys in 'd'
             dictionary: all items in 'qry' must exist in 'd'
+
+        The 'used_set' is a set of attributes or relations that stores the ones that have been conditioned upon by the
+        simulation rules.
         '''
 
         if isinstance(qry, dict):
+            if used_set is not None:
+                used_set.update(qry.keys())
             return qry.items() <= d.items()
 
-        if isinstance(qry, set) or isinstance(qry, list) or isinstance(qry, tuple):
-            return all(i in list(d.keys()) for i in qry)
-
-        if isinstance(qry, str):
+        if isinstance(qry, str):  # needs to be above the Iterable check because a string is an Iterable
+            if used_set is not None:
+                used_set.add(qry)
             return qry in d.keys()
 
-        raise TypeError(Err.type('qry', 'dictionary, set, list, tuple, or string'))
+        if isinstance(qry, Iterable):
+            if used_set is not None:
+                used_set.update(qry)
+            return all(i in list(d.keys()) for i in qry)
+
+        raise TypeError(Err.type('qry', 'dictionary, Iterable, or string'))
 
     def apply_rules(self, pop, rules, iter, t, is_setup=False):
         '''
@@ -501,14 +512,16 @@ class Group(Entity):
     def commit(self):
         ''' Ends creating the group by notifing the callee that has begun the group creation. '''
 
-        if self._callee is None:
+        if self.callee is None:
             return None
 
-        c = self._callee
-        # print(self)
-        self._callee.commit_group(self)
-        self._callee = None
+        c = self.callee
+        self.callee.commit_group(self)
+        self.callee = None
         return c
+
+    def freeze(self):
+        self.is_frozen = True
 
     @staticmethod
     def gen_hash(attr, rel):
@@ -535,29 +548,34 @@ class Group(Entity):
         return hash(tuple([frozenset(attr.items()), frozenset(rel.items())]))
 
     @classmethod
-    def gen_from_db(cls, db_fpath, tbl, attr=[], rel=[], rel_at=None, limit=0):
+    def gen_from_db(cls, db_fpath, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0):
         if not os.path.isfile(db_fpath):
             raise ValueError(f'The database does not exist: {db_fpath}')
 
         qry = 'SELECT COUNT(*) AS n{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
             tbl=tbl,
-            cols=', '.join(attr + [r.col for r in rel]),
-            cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr + [r.col for r in rel]]),
-            comma='' if len(attr + [r.col for r in rel]) == 0 else ', ',
+            cols=', '.join(attr_db + [r.col for r in rel_db]),
+            cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr_db + [r.col for r in rel_db]]),
+            comma='' if len(attr_db + [r.col for r in rel_db]) == 0 else ', ',
             limit='' if limit <= 0 else f' LIMIT {limit}'
         )
 
         groups = []
         with DB.open_conn(db_fpath) as c:
             for row in c.execute(qry).fetchall():
-                g = cls(
-                    n=row['n'],
-                    attr={ a: row[a] for a in attr },
-                    rel={ spec.name: spec.entities[row[spec.col]] for spec in rel }
-                )
+                g_attr = {}
+                g_rel  = {}
+
+                g_attr.update(attr)
+                g_rel.update(rel)
+
+                g_attr.update({ a: row[a] for a in attr_db })
+                g_rel.update({ spec.name: spec.entities[row[spec.col]] for spec in rel_db })
+
                 if rel_at is not None:
-                    g.set_rel(Site.AT, g.get_rel(rel_at))
-                groups.append(g)
+                    g_rel.update({ Site.AT: g_rel.get(rel_at) })
+
+                groups.append(cls(n=row['n'], attr=g_attr, rel=g_rel))
 
         return groups
 
@@ -569,7 +587,6 @@ class Group(Entity):
 
         A shallow copy of the dictionary is returned at this point.  That is to avoid creating unnecessary copies of
         entities that might be stored as relations.  A more adaptive mechanism can be implemented later if needed.
-        This part is still being developed.
         '''
 
         # TODO: Consider: https://stackoverflow.com/questions/38987/how-to-merge-two-dictionaries-in-a-single-expression
@@ -581,41 +598,58 @@ class Group(Entity):
 
         if k_del is not None:
             for k in k_del:
-                if k in ret: del ret[k]
+                if k in ret:
+                    del ret[k]
 
         return ret
 
     def get_attr(self, name=None):
+        if name is not None:
+            self.attr_used.add(name)
+
         return self.attr[name] if name is not None else self.attr
 
     def get_hash(self):
         return self.__hash__()
 
     def get_rel(self, name=None):
+        if name is not None:
+            self.rel_used.add(name)
+
         return self.rel[name] if name is not None else self.rel
 
     def get_size(self):
         return self.n
 
     def has_attr(self, qry):
-        return Group._has(self.attr, qry)
+        return Group._has(self.attr, qry, self.attr_used)
 
     def has_rel(self, qry):
-        return Group._has(self.rel, qry)
+        return Group._has(self.rel, qry, self.rel_used)
 
     def set_attr(self, name, value, do_force=True):
-        if self.attr.get(name) is not None and not do_force:
-            raise ValueError("Group '{}' already has the attribute '{}'.".format(self.name, name))
+        # if self.is_frozen:
+        #     raise GroupFrozenError('Attempting to set an attribute of a frozen group.')
+        #
+        # if self.attr.get(name) is not None and not do_force:
+        #     raise ValueError("Group '{}' already has the attribute '{}'.".format(self.name, name))
 
         self.attr[name] = value
-        self._hash = None
+        self.hash = None
 
         return self
 
     def set_attrs(self, attr, do_force=True):
-        pass
+        if self.is_frozen:
+            raise GroupFrozenError('Attempting to set attributes of a frozen group.')
+
+        raise Error('Not implemented yet')
+
 
     def set_rel(self, name, value, do_force=True):
+        if self.is_frozen:
+            raise GroupFrozenError('Attempting to set a relation of a frozen group.')
+
         # if name == Site.AT:
         #     raise ValueError("Relation name '{}' is restricted for internal use.".format(Site.AT))
 
@@ -623,12 +657,15 @@ class Group(Entity):
             raise ValueError("Group '{}' already has the relation '{}'.".format(self.name, name))
 
         self.rel[name] = value
-        self._hash = None
+        self.hash = None
 
         return self
 
     def set_rels(self, rel, do_force=True):
-        pass
+        if self.is_frozen:
+            raise GroupFrozenError('Attempting to set relations of a frozen group.')
+
+        raise Error('Not implemented yet')
 
     def split(self, specs):
         '''
@@ -653,12 +690,10 @@ class Group(Entity):
             if i == len(specs) - 1:  # last group spec
                 p = 1 - p_sum        # complement the probability
                 n = self.n - n_sum   # make sure we're not missing anybody due to floating-point arithmetic
-                # print('        (1) {} {}'.format(p, n))
             else:
                 p = s.p
                 n = self.n * p
                 # n = math.floor(self.n * p)  # conservative floor() use to make sure we don't go over due to rounding
-                # print('        (2) {} {}'.format(p, n))
 
             p_sum += p
             n_sum += n
@@ -675,6 +710,9 @@ class Group(Entity):
             groups.append(g)
 
         return groups
+
+    def unfreeze(self):
+        self.is_frozen = False
 
 
 # ----------------------------------------------------------------------------------------------------------------------

@@ -23,6 +23,11 @@ __pycache__/
 /dist/
 /*.egg-info
 
+*.pickle.gz
+*.pickle
+*.sqlite3
+*.png
+
 .RData
 .Rhistory
 

@@ -1,3 +1,11 @@
+'''
+The first simulation testing constructing a simulation from a database.  The population of interst is the synthetic
+population of the Allegheny county.  The simulation reuses school-attending rules developed earlier (see below) to
+demonstrate that they scale to this more realistic scenario.
+
+Based on: sim/03-attend-school
+'''
+
 import gc
 import gzip
 import os
@@ -8,6 +16,7 @@ import os
 import sys
 from inspect import getsourcefile
 
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
@@ -17,69 +26,12 @@ from pram.rule   import GotoRule, Rule, TimeInt, TimePoint
 from pram.sim    import Simulation
 from pram.util   import Size
 
+from rules import ResetSchoolDayRule, AttendSchoolRule
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 def inf(name, o, do_calc_size=False):
-    print(f'{name}: {len(o)}  ({Size.bytes2human(Size.get_size(o)) if do_calc_size else "."})')
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-class ResetDayRule(Rule):
-    __slots__ = ()
-
-    def __init__(self, t, memo=None):
-        super().__init__('reset-day', t, memo)
-
-    def apply(self, pop, group, t):
-        return [GroupSplitSpec(p=1.0, attr_set={ 'did-attend-school-today': False })]  # attr_del=['t-at-school'],
-
-    def is_applicable(self, group, t):
-        return super().is_applicable(t)
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-class AttendSchoolRule(Rule):
-    __slots__ = ()
-
-    def __init__(self, t=TimeInt(8,16), memo=None):
-        super().__init__('attend-school', t, memo)
-
-    def apply(self, pop, group, t):
-        if group.has_rel({ Site.AT: group.get_rel('home') }) and (not group.has_attr('did-attend-school-today') or group.has_attr({ 'did-attend-school-today': False })):
-            return self.apply_at_home(group, t)
-
-        if group.has_rel({ Site.AT:  group.get_rel('school') }):
-            return self.apply_at_school(group, t)
-
-    def apply_at_home(self, group, t):
-        p = { 8:0.50, 9:0.50, 10:0.50, 11:0.50, 12:1.00 }.get(t, 0.00)  # TODO: Provide these as a CDF
-            # prob of going to school = f(time of day)
-
-        return [
-            GroupSplitSpec(p=p, attr_set={ 'did-attend-school-today': True, 't-at-school': 0 }, rel_set={ Site.AT: group.get_rel('school') }),
-            GroupSplitSpec(p=1 - p)
-        ]
-
-    def apply_at_school(self, group, t):
-        t_at_school = group.get_attr('t-at-school')
-        p = { 0: 0.00, 1:0.05, 2:0.05, 3:0.25, 4:0.50, 5:0.70, 6:0.80, 7:0.90, 8:1.00 }.get(t_at_school, 1.00) if t < self.t.t1 else 1.00
-            # prob of going home = f(time spent at school)
-
-        return [
-            GroupSplitSpec(p=p, attr_set={ 't-at-school': (t_at_school + 1) }, rel_set={ Site.AT: group.get_rel('home') }),
-            GroupSplitSpec(p=1 - p, attr_set={ 't-at-school': (t_at_school + 1) })
-        ]
-
-        # TODO: Give timer information to the rule so it can appropriate determine time passage (e.g., to add it to 't-at-school' above).
-
-    def is_applicable(self, group, t):
-        return (
-            super().is_applicable(t) and
-            group.has_rel(['home', 'school']))
-
-    @staticmethod
-    def setup(pop, group):
-        return [GroupSplitSpec(p=1.0, attr_set={ 'did-attend-school-today': False })]  # attr_del=['t-at-school'],
+    print(f'{name}: {len(o)}  {"(" + Size.bytes2human(Size.get_size(o)) + ")" if do_calc_size else ""}')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -88,9 +40,10 @@ class AttendSchoolRule(Rule):
 rand_seed = 1928
 
 dpath_res    = os.path.join(os.sep, 'Volumes', 'd', 'pitt', 'sci', 'pram', 'res', 'fred')
-fpath_db     = os.path.join(dpath_res, 'flu.sqlite3')
-fpath_sites  = os.path.join(dpath_res, 'flu-sites.pickle.gz')
-fpath_groups = os.path.join(dpath_res, 'flu-groups.pickle.gz')
+dpath_cwd    = os.path.dirname(__file__)
+fpath_db     = os.path.join(dpath_res, 'allegheny.sqlite3')
+fpath_sites  = os.path.join(dpath_cwd, 'allegheny-sites.pickle.gz')
+fpath_groups = os.path.join(dpath_cwd, 'allegheny-groups.pickle.gz')
 
 do_remove_file_sites  = False
 do_remove_file_groups = False
@@ -233,8 +186,10 @@ else:
     groups = Group.gen_from_db(
         fpath_db,
         tbl='people',
-        attr=[],
-        rel=[
+        attr={},
+        rel={},
+        attr_db=[],
+        rel_db=[
             GroupDBRelSpec('home', 'sp_hh_id', sites['home']),
             GroupDBRelSpec('school', 'school_id', sites['school'])
         ],
@@ -260,13 +215,12 @@ inf('groups', groups, do_calc_size_groups)
 n_schools = 8
 few_schools = [sites['school'][k] for k in list(sites['school'].keys())[:n_schools]]
 
-probe_grp_size_schools = GroupSizeProbe('school', [GroupQry(rel={ Site.AT: v }) for v in few_schools], msg_mode=ProbeMsgMode.DISP)
-# probe_grp_size_schools = GroupSizeProbe.by_rel('school', Site.AT, few_schools, msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across few schools')
+probe_grp_size_schools = GroupSizeProbe('school', [GroupQry(rel={ Site.AT: s }) for s in few_schools], msg_mode=ProbeMsgMode.DISP)
 
-(Simulation(6,1,16, rand_seed=rand_seed).
-    add_groups(groups).
-    add_rule(ResetDayRule(TimePoint(7))).
+(Simulation(7,1,10, rand_seed=rand_seed).
+    add_rule(ResetSchoolDayRule(TimePoint(7))).
     add_rule(AttendSchoolRule()).
     add_probe(probe_grp_size_schools).
+    add_groups(groups).
     run()
 )

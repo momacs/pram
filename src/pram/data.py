@@ -99,6 +99,8 @@ class ProbePersistanceDB(ProbePersistance):
         self.conn = sqlite3.connect(self.fpath, check_same_thread=False)
 
     def flush(self):
+        ''' Flush all remaining buffered items. '''
+
         with self.conn as c:
             for p in self.probes.values():
                 if len(p.ins_val) > 0:
@@ -127,7 +129,7 @@ class ProbePersistanceDB(ProbePersistance):
         # Create the table:
         cols = [
             'id INTEGER PRIMARY KEY AUTOINCREMENT',
-            'ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL',  # (datetime('now'))
+            'ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL',
             'i INTEGER NOT NULL',
             't REAL NOT NULL'
         ] + \
@@ -156,7 +158,7 @@ class Probe(ABC):
     Var   = namedtuple('Var', ['name', 'type'])
     Const = namedtuple('Const', ['name', 'type', 'val'])
 
-    def __init__(self, name, msg_mode=0, pop=None, memo=None):
+    def __init__(self, name, msg_mode=ProbeMsgMode.DISP, pop=None, memo=None):
         self.name = name
         self.msg_mode = msg_mode
         self.pop = pop  # pointer to the population (can be set elsewhere too)
@@ -203,9 +205,12 @@ class GroupSizeProbe(Probe):
                 [Probe.Var(f'p{i}', 'float') for i in range(len(self.queries))] + \
                 [Probe.Var(f'n{i}', 'float') for i in range(len(self.queries))]
                 # proportions and numbers
+            # self.vars = [Probe.Var(f'v{i}', 'float') for i in range(len(self.queries))]
         else:
             if len(var_names) != (len(self.queries) * 2):
                 raise ValueError(f'Incorrect number of variable names: {len(var_names)} supplied, {len(self.queries) * 2} expected (i.e., {len(self.queries)} for proportions and numbers each).')
+            # if len(var_names) != len(self.queries):
+            #     raise ValueError(f'Incorrect number of variable names: {len(var_names)} supplied, {len(self.queries)} expected.')
 
             vn_db_used = set()  # to identify duplicates
             for vn in var_names:

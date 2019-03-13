@@ -1,0 +1,52 @@
+Simulation
+    Random seed: 1928
+    Timer
+        Start      : 7
+        Step size  : 1
+        Iterations : 10
+        Sequence   : [7, 8, 9, 10, 11]
+    Population
+        Size        : 200,169.00
+        Groups      : 350
+        Groups (ne) : 350
+        Sites       : 351
+        Rules       : 2
+        Probes      : 1
+    Groups (350)
+        Group  name: .                 n:    179.0  attr: {}  rel: {'home': Site(home 2051466950944555546 {}), 'school': Site(450048503 450048503 {}), '__at__': Site(home 2051466950944555546 {})}
+        Group  name: .                 n:    268.0  attr: {}  rel: {'home': Site(home 2051466950944555546 {}), 'school': Site(450048530 450048530 {}), '__at__': Site(home 2051466950944555546 {})}
+        Group  name: .                 n:    300.0  attr: {}  rel: {'home': Site(home 2051466950944555546 {}), 'school': Site(450048655 450048655 {}), '__at__': Site(home 2051466950944555546 {})}
+        Group  name: .                 n:    151.0  attr: {}  rel: {'home': Site(home 2051466950944555546 {}), 'school': Site(450048751 450048751 {}), '__at__': Site(home 2051466950944555546 {})}
+        Group  name: .                 n:    586.0  attr: {}  rel: {'home': Site(home 2051466950944555546 {}), 'school': Site(450049316 450049316 {}), '__at__': Site(home 2051466950944555546 {})}
+        Group  name: .                 n:    141.0  attr: {}  rel: {'home': Site(home 2051466950944555546 {}), 'school': Site(450049493 450049493 {}), '__at__': Site(home 2051466950944555546 {})}
+        Group  name: .                 n:    184.0  attr: {}  rel: {'home': Site(home 2051466950944555546 {}), 'school': Site(450049606 450049606 {}), '__at__': Site(home 2051466950944555546 {})}
+        Group  name: .                 n:     65.0  attr: {}  rel: {'home': Site(home 2051466950944555546 {}), 'school': Site(450049968 450049968 {}), '__at__': Site(home 2051466950944555546 {})}
+        ...
+    Sites (351)
+        Site  name: home              hash: 2051466950944555546  attr: {}
+        Site  name:        450048503  hash: 450048503  attr: {}
+        Site  name:        450048530  hash: 450048530  attr: {}
+        Site  name:        450048655  hash: 450048655  attr: {}
+        Site  name:        450048751  hash: 450048751  attr: {}
+        Site  name:        450049316  hash: 450049316  attr: {}
+        Site  name:        450049493  hash: 450049493  attr: {}
+        Site  name:        450049606  hash: 450049606  attr: {}
+        ...
+    Rules (2)
+        Rule  name: reset-day         t:  7.0
+        Rule  name: attend-school     t: ( 8.0,16.0)
+    Probes (1)
+        Probe  name: school-pop-size   query-cnt: 350
+t:7
+t:8
+t:9
+t:10
+t:11
+t:12
+t:13
+t:14
+t:15
+t:16
+
+----
+21.44  (385x faster)

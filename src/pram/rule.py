@@ -5,6 +5,7 @@ from .entity import GroupQry, GroupSplitSpec, Site
 from .util import Err
 
 
+# ----------------------------------------------------------------------------------------------------------------------
 @attrs(slots=True)
 class Time(object):
     pass
@@ -42,6 +43,7 @@ class Rule(ABC):
     '''
 
     pop = None
+    compile_spec = None
 
     def __init__(self, name, t, memo=None):
         '''
@@ -145,12 +147,13 @@ class GotoRule(Rule):
         ]
 
     def is_applicable(self, group, iter, t):
-        if not super().is_applicable(iter, t): return False
+        if not super().is_applicable(iter, t):
+            return False
 
         # Moving from the designated location:
         if self.rel_from is not None:
             return (
-                group.has_rel(self.rel_to) and Err.type(group.get_rel(self.rel_to), 'self.rel_to', Site) and
+                group.has_rel(self.rel_to)   and Err.type(group.get_rel(self.rel_to),   'self.rel_to',   Site) and
                 group.has_rel(self.rel_from) and Err.type(group.get_rel(self.rel_from), 'self.rel_from', Site) and
                 group.get_rel(Site.AT) == group.get_rel(self.rel_from))
         # Moving from any location:

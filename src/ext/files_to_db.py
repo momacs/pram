@@ -18,8 +18,8 @@ class FilesToDB(object):
     PATT_VALID_DB_NAME = re.compile('^[a-zA-Z][a-zA-Z0-9_]*$')
     TBL_TMP_SUFF = '__tmp'
 
-    File = namedtuple('File', ['path', 'missing_values', 'tbl', 'refs'])
-    Ref  = namedtuple('Ref', ['src_col', 'dst_tbl', 'dst_col'])
+    File = namedtuple('File', ('path', 'missing_values', 'tbl', 'refs'))
+    Ref  = namedtuple('Ref', ('src_col', 'dst_tbl', 'dst_col'))
 
     def __init__(self, fpath_db, dpath_files):
         self.conn = None

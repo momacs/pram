@@ -30,6 +30,9 @@ class GroupPopulation(object):
         '''
         Add a group if it doesn't exist and update the size if it does. This method also adds all Site objects from
         the group's relations so there is no need for the user to do this manually.
+
+        All groups added to the population become frozen to prevent the user from changing their attribute and relations
+        directly; doing it via group splitting is the proper way.
         '''
 
         g = self.groups.get(group.get_hash())
@@ -39,6 +42,7 @@ class GroupPopulation(object):
             self.groups[group.get_hash()] = group
             self.add_sites    ([v for (_,v) in group.get_rel().items() if isinstance(v, Site)])
             self.add_resources([v for (_,v) in group.get_rel().items() if isinstance(v, Resource)])
+            group.freeze()
 
         return self
 
@@ -97,13 +101,6 @@ class GroupPopulation(object):
             return self
 
         return self.distribute_mass(upd_group_hashes, new_groups)
-
-    def create_group(self, n, attr, rel):
-        ''' This method uses auto-incrementing group names. '''
-
-        g = Group(self.get_next_group_name(), n, attr, rel)
-        self.add_group(g)
-        return g
 
     def distribute_mass(self, upd_group_hashes, new_groups):
         '''
@@ -170,11 +167,13 @@ class GroupPopulation(object):
         # for g in self.groups.values():
         #     if (set(g.attr.items()) & attr_set == attr_set) and (set(g.rel.items()) & rel_set == rel_set):
         #         ret.append(g)
+        #
+        # return ret
 
-        qry = qry or GroupQry()
+        if qry is None:
+            return self.groups.values()
+
         return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items())]
-
-        return ret
 
     def get_next_group_name(self):
         return f'g.{len(self.groups)}'
