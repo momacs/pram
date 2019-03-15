@@ -159,3 +159,37 @@ class GotoRule(Rule):
         # Moving from any location:
         else:
             return group.has_rel(self.rel_to) and Err.type(group.get_rel(self.rel_to), 'self.rel_to', Site)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class RuleAnalyzerTestRule(Rule):
+    def __init__(self, t=TimeInt(8,20), memo=None):
+        super().__init__('progress-flu', t, memo)
+
+    def an(self, s): return f'b{s}'  # attribute name
+    def rn(self, s): return f's{s}'  # relation  name
+
+    def apply(self, group, iter, t):
+        if group.has_attr({ 'flu-stage': AttrFluStage.NO }):
+            pass
+        elif group.has_attr({ 'flu-stage': AttrFluStage.ASYMPT }):
+            pass
+        elif group.has_attr({ 'flu-stage': AttrFluStage.SYMPT }):
+            pass
+
+    def is_applicable(self, group, iter, t):
+        g = group
+        c01, c02, c03, c04, c05 = 'cc01', 'cc02', 'cc03', 'cc04', 'cc05'  # attribute names stored in local variables
+        s01, s02, s03, s04, s05 = 'ss01', 'ss02', 'ss03', 'ss04', 'ss05'  # ^ (relation)
+
+        return (
+            super().is_applicable(iter, t) and
+
+            g.has_attr('a01') and g.has_attr([ 'a02', 'a03' ]) and g.has_attr({ 'a04':1, 'a05':2 }) and
+            g.has_attr(c01) and g.has_attr([ c02, c03 ]) and g.has_attr({ c04:1, c05:2 }) and
+            g.has_attr(self.an('01')) and g.has_attr([ self.an('02'), self.an('03') ]) and g.has_attr({ self.an('04'):1, self.an('05'):2 }) and
+
+            g.has_rel('r01') and g.has_rel([ 'r02', 'r03' ]) and g.has_rel({ 'r04':1, 'r05':2 }) and
+            g.has_rel(s01) and g.has_rel([ s02, s03 ]) and g.has_rel({ s04:1, s05:2 }) and
+            g.has_rel(self.rn('01')) and g.has_rel([ self.rn('02'), self.rn('03') ]) and g.has_rel({ self.rn('04'):1, self.rn('05'):2 })
+        )

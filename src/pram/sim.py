@@ -340,13 +340,15 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 
+import ast
 import gc
 import gzip
+import inspect
 import numpy as np
 import os
 import pickle
 
-from collections import namedtuple
+from collections import namedtuple, Counter
 from dotmap import DotMap
 
 from .data   import GroupSizeProbe
@@ -356,8 +358,144 @@ from .pop    import GroupPopulation
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SimulationConstructionError(Exception): pass
-
 class SimulationConstructionWarning(Warning): pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class RuleAnalyzer(object):
+    '''
+    Analyzes the syntax (i.e., abstract syntax trees or ASTs) of rule objects to identify group attributes and
+    relations these rules condition on.
+
+    Apart from attempting to deduce the attributes and rules, this class keeps track of the numbers of recognized and
+    unrecognized attributes and relations (compartmentalized by method type, e.g., 'has_attr' and 'get_attr').
+
+    References
+        https://docs.python.org/3.6/library/dis.html
+        https://docs.python.org/3.6/library/inspect.html
+        https://docs.python.org/3.6/library/ast.html
+
+        https://github.com/hchasestevens/astpath
+        https://astsearch.readthedocs.io/en/latest
+    '''
+
+    def __init__(self):
+        self.attr = set()
+        self.rel  = set()
+
+        self.cnt_rec   = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # recognized
+        self.cnt_unrec = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # unrecognized
+
+    def _dump(self, node, annotate_fields=True, include_attributes=False, indent='  '):
+        '''
+        Source: https://bitbucket.org/takluyver/greentreesnakes/src/default/astpp.py?fileviewer=file-view-default
+        '''
+
+        if not isinstance(node, ast.AST):
+            raise TypeError('expected AST, got %r' % node.__class__.__name__)
+        return self._format(node, 0, annotate_fields, include_attributes, indent)
+
+    def _format(self, node, level=0, annotate_fields=True, include_attributes=False, indent='  '):
+        '''
+        Source: https://bitbucket.org/takluyver/greentreesnakes/src/default/astpp.py?fileviewer=file-view-default
+        '''
+
+        if isinstance(node, ast.AST):
+            fields = [(a, self._format(b, level, annotate_fields, include_attributes, indent)) for a, b in ast.iter_fields(node)]
+            if include_attributes and node._attributes:
+                fields.extend([(a, self._format(getattr(node, a), level, annotate_fields, include_attributes, indent))
+                               for a in node._attributes])
+            return ''.join([
+                node.__class__.__name__,
+                '(',
+                ', '.join(('%s=%s' % field for field in fields)
+                           if annotate_fields else
+                           (b for a, b in fields)),
+                ')'])
+        elif isinstance(node, list):
+            lines = ['[']
+            lines.extend((indent * (level + 2) + self._format(x, level + 2, annotate_fields, include_attributes, indent) + ','
+                         for x in node))
+            if len(lines) > 1:
+                lines.append(indent * (level + 1) + ']')
+            else:
+                lines[-1] += ']'
+            return '\n'.join(lines)
+        return repr(node)
+
+    def _analyze_test(self, node):
+        if isinstance(node, ast.AST):
+            fields = [(a, self._analyze_test(b)) for a,b in ast.iter_fields(node)]
+            return ''.join([node.__class__.__name__, '(', ', '.join((b for a,b in fields)), ')'])
+        elif isinstance(node, list):
+            lines = []
+            lines.extend((self._analyze_test(x) + ',' for x in node))
+            return '\n'.join(lines)
+        return repr(node)
+
+    def _analyze(self, node):
+        '''
+        Processe a node of the AST recursively looking for method calls that suggest group attribute and relation names
+        conditioned on by the rule.  It also updates counts of all known and unknown names (compartmentalized by the
+        method name).
+
+        References
+            https://docs.python.org/3.6/library/ast.html#abstract-grammar
+        '''
+
+        if isinstance(node, ast.AST):
+            for _,v in ast.iter_fields(node):
+                self._analyze(v)
+
+            if node.__class__.__name__ == 'Call':
+                call_args = list(ast.iter_fields(node))[1][1]
+
+                if list(ast.iter_fields(node))[0][1].__class__.__name__ == 'Attribute':
+                    attr = list(ast.iter_fields(node))[0][1]
+                    attr_name = list(ast.iter_fields(attr))[1][1]
+
+                    if attr_name in ('get_attr', 'get_rel', 'has_attr', 'has_rel'):
+                        call_args = call_args[0]
+                        if call_args.__class__.__name__ == 'Str':
+                            if attr_name in ('get_attr', 'has_attr'):
+                                self.attr.add(RuleAnalyzer.get_str(call_args))
+                            else:
+                                self.rel.add(RuleAnalyzer.get_str(call_args))
+                            self.cnt_rec[attr_name] += 1
+                        elif call_args.__class__.__name__ in ('List', 'Dict'):
+                            for i in list(ast.iter_fields(call_args))[0][1]:
+                                if i.__class__.__name__ == 'Str':
+                                    if attr_name in ('get_attr', 'has_attr'):
+                                        self.attr.add(RuleAnalyzer.get_str(i))
+                                    else:
+                                        self.rel.add(RuleAnalyzer.get_str(i))
+                                    self.cnt_rec[attr_name] += 1
+                                else:
+                                    self.cnt_unrec[attr_name] += 1
+                                    # print(list(ast.iter_fields(i)))
+        elif isinstance(node, list):
+            for i in node:
+                self._analyze(i)
+
+    def analyze(self, rule):
+        tree = ast.fix_missing_locations(ast.parse(inspect.getsource(rule.__class__)))
+
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef): continue  # skip non-classes
+
+            for node_fn in node.body:
+                if not isinstance(node_fn, ast.FunctionDef): continue  # skip non-methods
+                self._analyze(node_fn.body)
+
+                # if node_fn.name in ('is_applicable'): print(self._analyze_01(node_fn.body))
+
+    def dump(self, rule):
+        tree = ast.fix_missing_locations(ast.parse(inspect.getsource(rule.__class__)))
+        print(self._dump(tree))
+
+    @staticmethod
+    def get_str(node):
+        return list(ast.iter_fields(node))[0][1]
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -395,6 +533,8 @@ class Simulation(object):
             # ensures simulation setup is performed only once while enabling multiple incremental simulation runs of
             # arbitrary length thus promoting user-interactivity
 
+        self.rule_analyzer = RuleAnalyzer()
+
         self.last_run = DotMap()  # dict of the most recent run
 
         self.pragma = DotMap()
@@ -408,7 +548,8 @@ class Simulation(object):
         if len(self.rules) == 0:
             raise SimulationConstructionError('A group is being added but no rules are present; rules need to be added before groups.')
 
-        self.analyze_rules_pre_run()
+        if len(self.pop.groups) == 0:  # run when the first group is being added (because that marks the end of adding rules)
+            self.analyze_rules_pre_run()
 
         self.pop.add_group(group)
         return self
@@ -445,21 +586,30 @@ class Simulation(object):
 
     def analyze_rules_pre_run(self):
         '''
-        Analyze rule conditioning prior to running the simulation.  This is a weak way of determining which group
-        attributes and relations the rules condition on.
+        Analyze rule conditioning prior to running the simulation.  This is done by analyzing the syntax (i.e.,
+        abstract syntax trees or ASTs) of rule objects to identify group attributes and relations these rules condition
+        on.  This is a difficult problem and the current implementation leaves room for future improvement.  In fact,
+        the current algorithm works only if the names of attributes and relations are specified in the code of rules as
+        string literals.  For example, if an attribute name is stored in a variable or is a result of a method call, it
+        will not be captured by this algorithm.
+
+        As a consequence, it is not possible to perform error-free groups auto-pruning based on this analysis.
         '''
 
-        if len(self.pop.groups) != 1:
-            return self
-
-        # TODO: Implement.
+        for r in self.rules:
+            self.rule_analyzer.analyze(r)
 
         return self
 
     def analyze_rules_post_run(self):
         '''
-        Analyze rule conditioning after running the simulation.  This is the strongest way of determining which group
-        attributes and relations the rules condition on.
+        Analyze rule conditioning after running the simulation.  This is done by processing group attributes and
+        relations that the simulation has recorded as accessed by at least one rule.  The evidence of attributes and
+        relations having been actually accessed is a strong one.  However, as tempting as it may be to use this
+        information to prune groups, it's possible that further simulation iterations depend on other sets of
+        attributes and relations.
+
+        As a consequence, it is not possible to perform error-free groups auto-pruning based on this analysis.
         '''
 
         lr = self.last_run
@@ -613,6 +763,34 @@ class Simulation(object):
 
     def set_pragma_autoprune_groups(self, value):
         self.pragma.autoprune_groups = value
+        return self
+
+    def show_rule_analysis(self):
+        # Rule analyzer:
+        ra = self.rule_analyzer
+
+        print('Rule analyzer')
+        print('    Used')
+        print(f'        Attributes : {list(ra.attr)}')
+        print(f'        Relations  : {list(ra.rel)}')
+        print('    Counts')
+        print(f'        Recognized   : get_attr:{ra.cnt_rec["get_attr"]} get_rel:{ra.cnt_rec["get_rel"]} has_attr:{ra.cnt_rec["has_attr"]} has_rel:{ra.cnt_rec["has_rel"]}')
+        print(f'        Unrecognized : get_attr:{ra.cnt_unrec["get_attr"]} get_rel:{ra.cnt_unrec["get_rel"]} has_attr:{ra.cnt_unrec["has_attr"]} has_rel:{ra.cnt_unrec["has_rel"]}')
+
+        # Post-run:
+        lr = self.last_run
+
+        print('Most recent simulation run')
+        print('    Used')
+        print(f'       Attributes : {list(lr.attr_used)}')
+        print(f'       Relations  : {list(lr.rel_used)}')
+        print('    Groups')
+        print(f'       Attributes : {list(lr.attr_groups)}')
+        print(f'       Relations  : {list(lr.rel_groups)}')
+        print('    Superfluous')
+        print(f'       Attributes : {list(lr.attr_unused)}')
+        print(f'       Relations  : {list(lr.rel_unused)}')
+
         return self
 
     def summary(self, do_header=True, n_groups=8, n_sites=8, n_rules=8, n_probes=8, end_line_cnt=(0,0)):

@@ -1,6 +1,12 @@
+import ast
+import inspect
 import unittest
 
+from collections import Counter
+
 from pram.entity import AttrFluStage, AttrSex, EntityType, Group, Site
+from pram.rule   import Rule, RuleAnalyzerTestRule, TimeInt
+from pram.sim    import RuleAnalyzer
 
 
 class GroupTestCase(unittest.TestCase):
@@ -66,12 +72,26 @@ class SiteTestCase(unittest.TestCase):
         ne(Site('a'), Site('b'))  # different objects, different name
 
 
-class SimulationTestCase(unittest.TestCase):
-    def setUp(self):
-        pass
+class RuleAnalyzerTestCase(unittest.TestCase):
+    def test_the_test_rule(self):
+        eq = self.assertEqual
+        ne = self.assertNotEqual
 
-    def test_(self):
-        pass
+        ra = RuleAnalyzer()
+        ra.analyze(RuleAnalyzerTestRule())
+
+        eq(ra.attr, {'flu-stage', 'a04', 'a05', 'a02', 'a03', 'a01'})                          # attributes deduced
+        eq(ra.rel, {'r01', 'r03', 'r02', 'r05', 'r04'})                                        # relations  deduced
+        eq(ra.cnt_rec, Counter({'has_attr': 8, 'has_rel': 5, 'get_attr': 0, 'get_rel': 0}))    # counts of recognized
+        eq(ra.cnt_unrec, Counter({'has_attr': 8, 'has_rel': 8, 'get_attr': 0, 'get_rel': 0}))  # counts of unrecognized
+
+
+# class SimulationTestCase(unittest.TestCase):
+#     def setUp(self):
+#         pass
+#
+#     def test_(self):
+#         pass
 
 
 if __name__ == '__main__':

@@ -34,7 +34,7 @@ class AttendSchoolRule(Rule):
         if group.has_rel({ Site.AT: group.get_rel('home') }) and (not group.has_attr('did-attend-school-today') or group.has_attr({ 'did-attend-school-today': False })):
             return self.apply_at_home(group, iter, t)
 
-        if group.has_rel({ Site.AT:  group.get_rel('school') }):
+        if group.has_rel({ Site.AT: group.get_rel('school') }):
             return self.apply_at_school(group, iter, t)
 
     def apply_at_home(self, group, iter, t):
