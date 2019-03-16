@@ -4,7 +4,6 @@ A simulation implementing the flu progression model.  This version tests probe d
 
 import os
 import sys
-from inspect import getsourcefile
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
