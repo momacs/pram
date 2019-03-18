@@ -36,8 +36,6 @@ class TERule(Rule):
     Think-and-Eat rule (or "What do philosophers do when they're not asleep?").
     '''
 
-    __slots__ = ('p_think', 'p_eat', 'is_verbose')
-
     STATE = 'state'
     FORK_L = 'fork.l'
     FORK_R = 'fork.r'
