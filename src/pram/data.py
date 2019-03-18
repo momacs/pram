@@ -28,6 +28,10 @@ class ProbePersistance(ABC):
     VAR_NAME_KEYWORD = ['id', 'ts', 'i', 't']
 
     @abstractmethod
+    def flush(self):
+        pass
+
+    @abstractmethod
     def persist(self):
         pass
 
