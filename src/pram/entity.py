@@ -83,99 +83,6 @@ class Entity(ABC):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class Site(Entity):
-    '''
-    A physical site (e.g., a school or a store) agents can reside at.
-
-    A site has a sensible interface which makes it useful.  For example, it makes sense to ask about the size and
-    composition of population (e.g., groups) that are at that location.  However, because this information (and other,
-    similar pieces of information) may be desired at arbitrary times, it makes most sense to compute it lazily and
-    memoize it.  For that reason, a site stores a link to the population it is associated with; it queries that
-    population to compute quantities of interested when they are needed.  An added benefit of this design is fostering
-    proper composition; that is, updating the state of a site should be done by a site, not the population.
-    '''
-
-    AT = '__at__'  # relation name for the group's current location
-
-    __slots__ = ('name', 'attr', 'rel_name', 'pop', 'groups')
-
-    def __init__(self, name, attr=None, rel_name=AT, pop=None):
-        super().__init__(EntityType.SITE, '')
-
-        self.name = name
-        self.rel_name = rel_name  # name of the relation the site is the object of
-        self.attr = attr or {}
-        self.pop = pop  # pointer to the population (can be set elsewhere too)
-        self.groups = None  # None indicates the groups at the site might have changed and need to be retrieved again from the population
-
-    def __eq__(self, other):
-        '''
-        We will make two sites identical if their keys are equal (i.e., object identity is not necessary).  This will
-        let us recognize sites even if they are instantiated multiple times.
-        '''
-
-        return isinstance(self, type(other)) and (self.__key() == other.__key())
-
-    def __hash__(self):
-        return hash(self.__key())
-
-    def __repr__(self):
-        return '{}({} {} {})'.format(self.__class__.__name__, self.name, self.__hash__(), self.attr)
-
-    def __str__(self):
-        return '{}  name: {:16}  hash: {}  attr: {}'.format(self.__class__.__name__, self.name, self.__hash__(), self.attr)
-
-    def __key(self):
-        return (self.name)
-
-    @classmethod
-    def gen_from_db(cls, db_fpath, tbl, name_col, rel_name, attr=[], limit=0):
-        if not os.path.isfile(db_fpath):
-            raise ValueError(f'The database does not exist: {db_fpath}')
-
-        sites = {}
-        with DB.open_conn(db_fpath) as c:
-            for row in c.execute('SELECT {} FROM {}{}'.format(','.join(attr + [name_col]), tbl, '' if limit <= 0 else f' LIMIT {limit}')).fetchall():
-                s = cls(row[name_col], { a: row[a] for a in attr }, rel_name=rel_name)
-                sites[s.get_hash()] = s
-
-        return sites
-
-    def get_hash(self):
-        return self.__hash__()
-
-    def get_groups_here(self, qry=None, non_empty_only=True):
-        '''
-        Returns groups which currently are at this site.
-
-        qry: GroupQry
-        '''
-
-        # TODO: Implement memoization (probably of only all the groups, i.e., not account for the 'qry').
-
-        # if self.groups is None:
-
-        qry = qry or GroupQry()
-        # qry.rel.update({ self.rel_name: self.get_hash() })
-        qry.rel.update({ self.rel_name: self })
-        groups = self.pop.get_groups(qry)
-
-        if non_empty_only:
-            return [g for g in groups if g.n > 0]
-        else:
-            return groups
-
-    def get_pop_size(self, qry=None):
-        return sum(g.n for g in self.get_groups_here(qry))
-
-    def invalidate_pop(self):
-        self.groups = None
-
-    def set_pop(self, pop):
-        self.pop = pop
-
-
-# ----------------------------------------------------------------------------------------------------------------------
 class Resource(Entity):
     '''
     A resource shared by the agents (e.g., a public bus).
@@ -260,6 +167,103 @@ class Resource(Entity):
             return
 
         self.capacity = max(0, self.capacity - n)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class Site(Resource):
+    '''
+    A physical site (e.g., a school or a store) agents can reside at.
+
+    A site has a sensible interface which makes it useful.  For example, it makes sense to ask about the size and
+    composition of population (e.g., groups) that are at that location.  However, because this information (and other,
+    similar pieces of information) may be desired at arbitrary times, it makes most sense to compute it lazily and
+    memoize it.  For that reason, a site stores a link to the population it is associated with; it queries that
+    population to compute quantities of interested when they are needed.  An added benefit of this design is fostering
+    proper composition; that is, updating the state of a site should be done by a site, not the population.
+
+    A Site is a Resource which means a Site may choose to utilize the capacity property with all its related methods.
+    A good example of when this would be useful is a hospital with a limited patient capacity that may be reached
+    during an epidemic outbreak.
+    '''
+
+    AT = '__at__'  # relation name for the group's current location
+
+    __slots__ = ('attr', 'rel_name', 'pop', 'groups')
+
+    def __init__(self, name, attr=None, rel_name=AT, pop=None, capacity_max=1):
+        # super().__init__(EntityType.SITE, '')
+        super().__init__(name, capacity_max)
+
+        self.rel_name = rel_name  # name of the relation the site is the object of
+        self.attr = attr or {}
+        self.pop = pop  # pointer to the population (can be set elsewhere too)
+        self.groups = None  # None indicates the groups at the site might have changed and need to be retrieved again from the population
+
+    def __eq__(self, other):
+        '''
+        We will make two sites identical if their keys are equal (i.e., object identity is not necessary).  This will
+        let us recognize sites even if they are instantiated multiple times.
+        '''
+
+        return isinstance(self, type(other)) and (self.__key() == other.__key())
+
+    def __hash__(self):
+        return hash(self.__key())
+
+    def __repr__(self):
+        return '{}({} {} {})'.format(self.__class__.__name__, self.name, self.__hash__(), self.attr)
+
+    def __str__(self):
+        return '{}  name: {:16}  hash: {}  attr: {}'.format(self.__class__.__name__, self.name, self.__hash__(), self.attr)
+
+    def __key(self):
+        return (self.name)
+
+    @classmethod
+    def gen_from_db(cls, db_fpath, tbl, name_col, rel_name, attr=[], limit=0):
+        if not os.path.isfile(db_fpath):
+            raise ValueError(f'The database does not exist: {db_fpath}')
+
+        sites = {}
+        with DB.open_conn(db_fpath) as c:
+            for row in c.execute('SELECT {} FROM {}{}'.format(','.join(attr + [name_col]), tbl, '' if limit <= 0 else f' LIMIT {limit}')).fetchall():
+                s = cls(row[name_col], { a: row[a] for a in attr }, rel_name=rel_name)
+                sites[s.get_hash()] = s
+
+        return sites
+
+    def get_hash(self):
+        return self.__hash__()
+
+    def get_groups_here(self, qry=None, non_empty_only=True):
+        '''
+        Returns groups which currently are at this site.
+
+        qry: GroupQry
+        '''
+
+        # TODO: Implement memoization (probably of only all the groups, i.e., not account for the 'qry').
+
+        # if self.groups is None:
+
+        qry = qry or GroupQry()
+        # qry.rel.update({ self.rel_name: self.get_hash() })
+        qry.rel.update({ self.rel_name: self })
+        groups = self.pop.get_groups(qry)
+
+        if non_empty_only:
+            return [g for g in groups if g.n > 0]
+        else:
+            return groups
+
+    def get_pop_size(self, qry=None):
+        return sum(g.n for g in self.get_groups_here(qry))
+
+    def invalidate_pop(self):
+        self.groups = None
+
+    def set_pop(self, pop):
+        self.pop = pop
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -644,7 +648,6 @@ class Group(Entity):
             raise GroupFrozenError('Attempting to set attributes of a frozen group.')
 
         raise Error('Not implemented yet')
-
 
     def set_rel(self, name, value, do_force=True):
         if self.is_frozen:
