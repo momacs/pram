@@ -111,10 +111,5 @@ forks = {
     new_group('p5',  1).set_attr(TERule.STATE, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f6' ]).set_rel(TERule.FORK_R, forks['f4' ]).commit().
     new_group('p7',  1).set_attr(TERule.STATE, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f8' ]).set_rel(TERule.FORK_R, forks['f6' ]).commit().
     new_group('p10', 1).set_attr(TERule.STATE, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f11']).set_rel(TERule.FORK_R, forks['f8' ]).commit().
-    # run(1).summary((False, True, False, False, False), (0,1)).
-    # run(1).summary((False, True, False, False, False), (0,1)).
-    # run(1).summary((False, True, False, False, False), (0,1)).
-    # run(1).summary((False, True, False, False, False), (0,1)).
-    # run(1).summary((False, True, False, False, False), (0,1))
     run(do_disp_t=True)
 )
