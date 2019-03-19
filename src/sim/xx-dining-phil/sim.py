@@ -20,9 +20,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import numpy as np
 
-from pram.sim    import Simulation
 from pram.entity import GroupSplitSpec, Resource
 from pram.rule   import Rule, TimeInt, TimePoint
+from pram.sim    import Simulation
 
 from enum import IntEnum
 
