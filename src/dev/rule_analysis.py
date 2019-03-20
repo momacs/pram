@@ -7,6 +7,9 @@
 # https://docs.python.org/3.6/library/dis.html
 # https://docs.python.org/3.6/library/parser.html
 
+# https://stackoverflow.com/questions/51901676/get-the-lists-of-functions-used-called-within-a-function-in-python
+# https://julien.danjou.info/python-ast-checking-method-declaration/
+
 import os
 import sys
 from inspect import getsourcefile
@@ -233,7 +236,7 @@ class RuleAnalyzer(object):
 
 
 from pram.rule import GotoRule, TimeInt
-from rules import AttendSchoolRule, ProgressFluRule, ProgressAndTransmitFluRule
+from sim.rules import AttendSchoolRule, ProgressFluRule, ProgressAndTransmitFluRule
 
 ra = RuleAnalyzer()
 
