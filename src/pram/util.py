@@ -8,11 +8,14 @@
 import bz2
 import copy
 import datetime
+import gc
 import gzip
 import multiprocessing
 import os
+import pickle
 import random
 import re
+import platform
 import shutil
 import sqlite3
 import string
@@ -35,7 +38,7 @@ class Data(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class DB(object):
-    ''' Made for SQLite3. '''
+    ''' Currently supports only SQLite3. '''
 
     VALID_CHARS = f'_{string.ascii_letters}{string.digits}'
 
@@ -95,10 +98,10 @@ class Err(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class FS(object):
-
-    # TODO: Add support for directories.
     @staticmethod
     def bz2(fpath_src, fpath_dst=None, compress_lvl=9, do_del=False):
+        # TODO: Add support for directories.
+
         if fpath_src.endswith('.bz2'): return  # already a BZ2 file
 
         # Compress to the same directory:
@@ -117,9 +120,10 @@ class FS(object):
         if do_del:
             os.remove(fpath_src)
 
-    # TODO: Add support for directories.
     @staticmethod
     def bz2_decomp(fpath_src, fpath_dst=None, do_del=False):
+        # TODO: Add support for directories.
+
         if not fpath_src.endswith('.bz2'): return  # not a BZ2 file
 
         # Decompress to the same directory:
@@ -146,9 +150,10 @@ class FS(object):
         if not os.path.exists(dpath): os.makedirs(dpath)
         return dpath
 
-    # TODO: Add support for directories.
     @staticmethod
     def gz(fpath_src, fpath_dst=None, compress_lvl=9, do_del=False):
+        # TODO: Add support for directories.
+
         if fpath_src.endswith('.gz'): return  # already a GZ file
 
         # Compress to the same directory:
@@ -167,9 +172,10 @@ class FS(object):
         if do_del:
             os.remove(fpath_src)
 
-    # TODO: Add support for directories.
     @staticmethod
     def gz_decomp(fpath_src, fpath_dst=None, do_del=False):
+        # TODO: Add support for directories.
+
         if not fpath_src.endswith('.gz'): return  # not a GZ file
 
         # Decompress to the same directory:
@@ -190,12 +196,49 @@ class FS(object):
         if do_del:
             os.remove(fpath_src)
 
-    # ------------------------------------------------------------------------------------------------------------------
-    # @staticmethod
-    # def load(fpath, mode='r'):
-    #     # TODO: Detect implied compression through file extension.
-    #     with open(fpath, mode) as f:
-    #         return f.read()
+    @staticmethod
+    def load_or_gen(fpath, fn_gen, name='data', is_verbose=False, hostname_gen=set()):
+        '''
+        If the 'fpath' file exists, it is ungzipped and unpickled.  If it does not exist, 'fn_gen()' is called and the
+        result is pickled and gzipped in 'fpath' and returned.  Name can be redefined for customized progress messages.
+        No filesystem interactions are made if 'fpath' is None.
+
+        Generation of the data can be restricted to a set of machines designated by hostname.
+        '''
+
+        # Load:
+        if fpath is not None and os.path.isfile(fpath):
+            if is_verbose: print(f'Loading {name}... ', end='', flush=True)
+            with gzip.GzipFile(fpath, 'rb') as f:
+                gc.disable()
+                data = pickle.load(f)
+                gc.enable()
+            if is_verbose: print('done.', flush=True)
+
+        # Generate:
+        else:
+            if len(hostname_gen) > 0 and not platform.node() in hostname_gen:
+                return None
+
+            if is_verbose: print(f'Generating {name}... ', end='', flush=True)
+            data = fn_gen()
+            if is_verbose: print('done.', flush=True)
+
+            if fpath is not None:
+                if is_verbose: print(f'Saving {name}... ', end='')
+                with gzip.GzipFile(fpath, 'wb') as f:
+                    pickle.dump(data, f)
+                if is_verbose: print('done.', flush=True)
+
+        return data
+
+    @staticmethod
+    def load(fpath, mode='r'):
+        # # TODO: Detect implied compression through file extension.
+        # with open(fpath, mode) as f:
+        #     return f.read()
+
+        pass
 
     @staticmethod
     def load_bz2(fpath):
@@ -207,12 +250,13 @@ class FS(object):
         with gzip.open(fpath, 'rb') as f:
             return f.read()
 
-    # ------------------------------------------------------------------------------------------------------------------
-    # @staticmethod
-    # def save(fpath, data, mode='w', compress_lvl=9):
-    #     # TODO: Detect implied compression through extension.
-    #     with open(fpath, mode) as f:
-    #         f.write(data)
+    @staticmethod
+    def save(fpath, data, mode='w', compress_lvl=9):
+        # # TODO: Detect implied compression through extension.
+        # with open(fpath, mode) as f:
+        #     f.write(data)
+
+        pass
 
     @staticmethod
     def save_bz2(fpath, data, compress_lvl=9):
