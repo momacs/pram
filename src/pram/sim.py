@@ -354,6 +354,7 @@ from dotmap import DotMap
 from .data   import GroupSizeProbe
 from .entity import Agent, Group, GroupQry, Site
 from .pop    import GroupPopulation
+from .util   import FS
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -507,7 +508,7 @@ class Simulation(object):
     instance, million years (myr) might be appropriate for geological processes while Plank time might be appropriate
     for modeling quantum phenomena.
 
-    Each simulation stores certain statistics related to the most recent of its runs (in the 'self.last_run' DotMap).
+    A simulation stores certain statistics related to the most recent of its runs (in the 'self.last_run' DotMap).
     '''
 
     def __init__(self, t0=0, t_step_size=1, t_step_cnt=0, rand_seed=None):
@@ -538,7 +539,7 @@ class Simulation(object):
         self.last_run = DotMap()  # dict of the most recent run
 
         self.pragma = DotMap()
-        self.pragma.analyze = True            # analyze the simulation and show improvement suggestions
+        self.pragma.analyze = True            # analyze the simulation and suggest improvements
         self.pragma.autoprune_groups = False  # remove attributes and relations not referenced by rules
 
     def __repr__(self):
@@ -658,27 +659,28 @@ class Simulation(object):
     def gen_groups_from_db(self, fpath_db, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0, fpath=None, is_verbose=False):
         groups = None
 
-        # Load:
-        if fpath is not None and os.path.isfile(fpath):
-            if is_verbose: print('Loading groups... ', end='')
-            with gzip.GzipFile(fpath, 'rb') as f:
-                gc.disable()
-                groups = pickle.load(f)
-                gc.enable()
-            if is_verbose: print('done.')
+        # # Load:
+        # if fpath is not None and os.path.isfile(fpath):
+        #     if is_verbose: print('Loading groups... ', end='')
+        #     with gzip.GzipFile(fpath, 'rb') as f:
+        #         gc.disable()
+        #         groups = pickle.load(f)
+        #         gc.enable()
+        #     if is_verbose: print('done.')
+        #
+        # # Generate:
+        # else:
+        #     if is_verbose: print('Generating groups... ', end='')
+        #     groups = Group.gen_from_db(fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
+        #     if is_verbose: print('done.')
+        #
+        #     if fpath is not None:
+        #         if is_verbose: print('Saving groups... ', end='')
+        #         with gzip.GzipFile(fpath, 'wb') as f:
+        #             pickle.dump(groups, f)
+        #         if is_verbose: print('done.')
 
-        # Generate:
-        else:
-            if is_verbose: print('Generating groups... ', end='')
-            groups = Group.gen_from_db(fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
-            if is_verbose: print('done.')
-
-            if fpath is not None:
-                if is_verbose: print('Saving groups... ', end='')
-                with gzip.GzipFile(fpath, 'wb') as f:
-                    pickle.dump(groups, f)
-                if is_verbose: print('done.')
-
+        groups = FS.load_or_gen(fpath_data, lambda: Group.gen_from_db(fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit))
         self.add_groups(groups)
         return self
 
