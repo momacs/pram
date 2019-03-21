@@ -55,7 +55,7 @@ print()
 # (2.1) A group has superfluous attributes and relations, but automatic group pruning saved the day:
 print('(2.1)')
 (Simulation(6,1,16).
-    set_pragma_prune_groups(True).
+    set_pragma_autoprune_groups(True).
     add_rule(ProgressFluRule()).
     add_probe(probe_grp_size_flu).
     new_group('0', 1000).
@@ -72,7 +72,7 @@ print()
 #       consequently, agent population mass gets automatically cumulated in the only resulting group.
 print('(2.2)')
 (Simulation(6,1,16).
-    set_pragma_prune_groups(True).
+    set_pragma_autoprune_groups(True).
     add_rule(ProgressFluRule()).
     add_probe(probe_grp_size_flu).
     new_group('0', 500).
