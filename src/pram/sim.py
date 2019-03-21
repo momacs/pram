@@ -657,58 +657,13 @@ class Simulation(object):
         return self
 
     def gen_groups_from_db(self, fpath_db, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0, fpath=None, is_verbose=False):
-        groups = None
-
-        # # Load:
-        # if fpath is not None and os.path.isfile(fpath):
-        #     if is_verbose: print('Loading groups... ', end='')
-        #     with gzip.GzipFile(fpath, 'rb') as f:
-        #         gc.disable()
-        #         groups = pickle.load(f)
-        #         gc.enable()
-        #     if is_verbose: print('done.')
-        #
-        # # Generate:
-        # else:
-        #     if is_verbose: print('Generating groups... ', end='')
-        #     groups = Group.gen_from_db(fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
-        #     if is_verbose: print('done.')
-        #
-        #     if fpath is not None:
-        #         if is_verbose: print('Saving groups... ', end='')
-        #         with gzip.GzipFile(fpath, 'wb') as f:
-        #             pickle.dump(groups, f)
-        #         if is_verbose: print('done.')
-
-        groups = FS.load_or_gen(fpath_data, lambda: Group.gen_from_db(fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit))
+        fn_gen = lambda: Group.gen_from_db(fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
+        groups = FS.load_or_gen(fpath_data, fn_gen)
         self.add_groups(groups)
         return self
 
     def gen_sites_from_db(self, fpath_db, fn_gen=None, fpath=None, is_verbose=False):
-        sites = None
-
-        # Load:
-        if fpath is not None and os.path.isfile(fpath):
-            if is_verbose: print('Loading sites... ', end='')
-            with gzip.GzipFile(fpath, 'rb') as f:
-                gc.disable()
-                sites = pickle.load(f)
-                gc.enable()
-            if is_verbose: print('done.')
-
-        # Generate:
-        elif fn_gen is not None:
-            if is_verbose: print('Generating sites... ', end='')
-            sites = fn_gen(fpath_db)
-            if is_verbose: print('done.')
-
-            if fpath is not None:
-                if is_verbose: print('Saving sites... ', end='')
-                with gzip.GzipFile(fpath, 'wb') as f:
-                    pickle.dump(sites, f)
-                if is_verbose: print('done.')
-
-        return sites
+        return FS.load_or_gen(fpath_data, lambda: fn_gen(fpath_db))
 
     def new_group(self, name=None, n=0.0):
         return Group(name or self.pop.get_next_group_name(), n, callee=self)
