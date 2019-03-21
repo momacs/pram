@@ -658,12 +658,12 @@ class Simulation(object):
 
     def gen_groups_from_db(self, fpath_db, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0, fpath=None, is_verbose=False):
         fn_gen = lambda: Group.gen_from_db(fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
-        groups = FS.load_or_gen(fpath_data, fn_gen)
+        groups = FS.load_or_gen(fpath, fn_gen, 'groups', is_verbose)
         self.add_groups(groups)
         return self
 
     def gen_sites_from_db(self, fpath_db, fn_gen=None, fpath=None, is_verbose=False):
-        return FS.load_or_gen(fpath_data, lambda: fn_gen(fpath_db))
+        return FS.load_or_gen(fpath, lambda: fn_gen(fpath_db), 'sites', is_verbose)
 
     def new_group(self, name=None, n=0.0):
         return Group(name or self.pop.get_next_group_name(), n, callee=self)
