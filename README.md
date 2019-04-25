@@ -79,7 +79,7 @@ For completeness, below are the proportions of susceptible and recovered student
 
 ### The Simulation Output
 
-Below is the output of the simulation looks like when it is run synchronously from the terminal.  For brevity, the simulation is run for only five iterations.
+Below is the output of the simulation when it is run synchronously from the terminal.  For brevity, only five-iteration run is shown.
 
 ```
 [info] Constructing a PRAM
