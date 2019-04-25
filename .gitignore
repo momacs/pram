@@ -25,8 +25,6 @@ __pycache__/
 
 *.pickle.gz
 *.pickle
-*.sqlite3
-*.png
 
 .RData
 .Rhistory
