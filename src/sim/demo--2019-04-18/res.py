@@ -60,7 +60,7 @@ def plot_compare_schools(col, name, fpath, cmap_low, cmap_med):  # tab10: 6,9
     # Plot:
     cmap = plt.get_cmap('tab20')  # https://matplotlib.org/tutorials/colors/colormaps.html
     fig = plt.figure(figsize=(16,6))
-    plt.title(f'Probability of {name} at Low- and Medium-Income Schools')
+    plt.title(f'{name} at Low- and Medium-Income Schools')
     plt.plot(data['i'], data['p.l'], lw=1, linestyle='-', marker=MARKER_LOW, color=cmap(cmap_low), markersize=4, mfc='none', antialiased=True)
     plt.plot(data['i'], data['p.m'], lw=1, linestyle='-', marker=MARKER_MED, color=cmap(cmap_med), markersize=4, mfc='none', antialiased=True)
     plt.legend(['Low-income', 'Medium-income'], loc='upper right')
