@@ -41,8 +41,8 @@ def plot_one_school(tbl, title, marker, fpath, cmap_ps, cmap_pe, cmap_pr):  # ta
     plt.grid(alpha=0.25, antialiased=True)
     fig.savefig(os.path.join(os.path.dirname(__file__), 'out', fpath), dpi=300)
 
-plot_one_school('low_income', 'School with 88% of Low-Income Students', MARKER_LOW, '03-a-low-income-school.png', 0,4,6)
-plot_one_school('med_income', 'School with 7% of Low-Income Students',  MARKER_MED, '03-b-med-income-school.png', 1,5,7)
+# plot_one_school('low_income', 'School with 88% of Low-Income Students', MARKER_LOW, '03-a-low-income-school.png', 0,4,6)
+# plot_one_school('med_income', 'School with 7% of Low-Income Students',  MARKER_MED, '03-b-med-income-school.png', 1,5,7)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
