@@ -30,7 +30,7 @@ def plot_one_school(tbl, title, marker, fpath, cmap_ps, cmap_pe, cmap_pr):  # ta
 
     # Plot:
     cmap = plt.get_cmap('tab20')  # https://matplotlib.org/tutorials/colors/colormaps.html
-    fig = plt.figure(figsize=(20,8))
+    fig = plt.figure(figsize=(16,6))
     plt.title(title)
     plt.plot(data['i'], data['ps'], lw=1, linestyle='--', marker=marker, color=cmap(cmap_ps), markersize=5, mfc='none', antialiased=True)
     plt.plot(data['i'], data['pe'], lw=1, linestyle='-',  marker=marker, color=cmap(cmap_pe), markersize=5, mfc='none', antialiased=True)
@@ -59,7 +59,7 @@ def plot_compare_schools(col, name, fpath, cmap_low, cmap_med):  # tab10: 6,9
 
     # Plot:
     cmap = plt.get_cmap('tab20')  # https://matplotlib.org/tutorials/colors/colormaps.html
-    fig = plt.figure(figsize=(20,8))
+    fig = plt.figure(figsize=(16,6))
     plt.title(f'Probability of {name} at Low- and Medium-Income Schools')
     plt.plot(data['i'], data['p.l'], lw=1, linestyle='-', marker=MARKER_LOW, color=cmap(cmap_low), markersize=4, mfc='none', antialiased=True)
     plt.plot(data['i'], data['p.m'], lw=1, linestyle='-', marker=MARKER_MED, color=cmap(cmap_med), markersize=4, mfc='none', antialiased=True)
