@@ -67,6 +67,8 @@ Below are time series of the probability of being in one of the three mutually e
 
 The plot below compares the low- and medium-income schools directly by plotting the probability of being exposed as a function of time.  Evidently, students in the low-income school are at a higher risk of being exposed to the flu compared to their medium-income school counterparts.  This is the sort of a result that may be difficult to predict but becomes clear via simulation.  This is especially true for complex systems.
 
+Another observation that is much easier to make using this side-by-side comparison is that the initial condition for both schools are identical (at least in terms of the flu status distribution) which suggests that the evident divergance is not due to the starting point.
+
 ![Exposed at both schools](src/sim/demo--2019-04-18/out/03-c-low-vs-med-income-school-pe.png)
 
 For completeness, below are the proportions of susceptible and recovered students at either site.
