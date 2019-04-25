@@ -1,30 +1,32 @@
-import gc
-import gzip
-import os
-import pickle
-import sys
-
 import os
 import sys
 from inspect import getsourcefile
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))  # 'rules' module
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
-from pram.data   import GroupSizeProbe, ProbeMsgMode
-from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
-from pram.rule   import GotoRule, Rule, TimeInt, TimePoint
-from pram.sim    import Simulation
-from pram.util   import Size
+import gc
+import gzip
+import os
+import pickle
+import signal
+import sys
 
-from rules import ResetSchoolDayRule, AttendSchoolRule
+from pram.data   import ProbeMsgMode, GroupSizeProbe
+from pram.entity import GroupDBRelSpec, GroupQry, Site
+from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, TimePoint
+from pram.sim    import Simulation
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # (0) Init:
 
-rand_seed = 1928
+def signal_handler(signal, frame):
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+
 
 dpath_res    = os.path.join(os.sep, 'Volumes', 'd', 'pitt', 'sci', 'pram', 'res', 'fred')
 dpath_cwd    = os.path.dirname(__file__)
@@ -45,7 +47,7 @@ if do_remove_file_groups and os.path.isfile(fpath_groups):
 # ----------------------------------------------------------------------------------------------------------------------
 # (1) Sites:
 
-sites = Simulation().gen_sites_from_db(
+sites = Simulation.gen_sites_from_db(
     fpath_db_in,
     lambda fpath_db: {
         'hosp'    : Site.gen_from_db(fpath_db, 'hospitals',  'hosp_id', 'hospital', ['workers', 'physicians', 'beds']),
@@ -70,23 +72,22 @@ probe_grp_size_schools = GroupSizeProbe('school', [GroupQry(rel={ Site.AT: s }) 
 # ----------------------------------------------------------------------------------------------------------------------
 # (3) Groups and simulation:
 
-(Simulation(7,1,10, rand_seed=rand_seed).
+(Simulation().
     add_rule(ResetSchoolDayRule(TimePoint(7))).
-    add_rule(AttendSchoolRule()).
+    add_rule(GoToAndBackTimeAtRule(t_at_attr='t@school')).
     add_probe(probe_grp_size_schools).
     gen_groups_from_db(
         fpath_db_in,
         tbl='people',
-        attr={},
-        rel={},
         attr_db=[],
         rel_db=[
-            GroupDBRelSpec('home', 'sp_hh_id', sites['home']),
+            GroupDBRelSpec('home',   'sp_hh_id',  sites['home']),
             GroupDBRelSpec('school', 'school_id', sites['school'])
         ],
-        rel_at='home',
-        fpath=fpath_groups
+        attr_fix={},
+        rel_fix={},
+        rel_at='home'
     ).
     summary().
-    run()
+    run(3)
 )

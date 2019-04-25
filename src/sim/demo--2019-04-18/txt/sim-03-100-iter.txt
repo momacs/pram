@@ -1,0 +1,151 @@
+[info] Generating sites from the database (db/allegheny-students.sqlite3)
+[info] Constructing a PRAM
+[info] Running static rule analysis
+[info]     Relevant attributes : ['flu', 'income']
+[info]     Relevant relations  : ['home', 'school']
+[info] Generating groups from the database (db/allegheny-students.sqlite3)
+[info]     Using relevant attributes and relations
+[info] Setting simulation duration
+[info] Syncing rule timers
+[info] Running rule setup
+[info] Compacting the model
+[info] Capturing the initial state
+[info] Initial population info
+[info]     Agents : 200,169
+[info]     Groups : 1,392
+[info]     Sites  : 351
+[info] Running the PRAM
+[info] Iteration 1 of 100
+[info] Iteration 2 of 100
+[info] Iteration 3 of 100
+[info] Iteration 4 of 100
+[info] Iteration 5 of 100
+[info] Iteration 6 of 100
+[info] Iteration 7 of 100
+[info] Iteration 8 of 100
+[info] Iteration 9 of 100
+[info] Iteration 10 of 100
+[info] Iteration 11 of 100
+[info] Iteration 12 of 100
+[info] Iteration 13 of 100
+[info] Iteration 14 of 100
+[info] Iteration 15 of 100
+[info] Iteration 16 of 100
+[info] Iteration 17 of 100
+[info] Iteration 18 of 100
+[info] Iteration 19 of 100
+[info] Iteration 20 of 100
+[info] Iteration 21 of 100
+[info] Iteration 22 of 100
+[info] Iteration 23 of 100
+[info] Iteration 24 of 100
+[info] Iteration 25 of 100
+[info] Iteration 26 of 100
+[info] Iteration 27 of 100
+[info] Iteration 28 of 100
+[info] Iteration 29 of 100
+[info] Iteration 30 of 100
+[info] Iteration 31 of 100
+[info] Iteration 32 of 100
+[info] Iteration 33 of 100
+[info] Iteration 34 of 100
+[info] Iteration 35 of 100
+[info] Iteration 36 of 100
+[info] Iteration 37 of 100
+[info] Iteration 38 of 100
+[info] Iteration 39 of 100
+[info] Iteration 40 of 100
+[info] Iteration 41 of 100
+[info] Iteration 42 of 100
+[info] Iteration 43 of 100
+[info] Iteration 44 of 100
+[info] Iteration 45 of 100
+[info] Iteration 46 of 100
+[info] Iteration 47 of 100
+[info] Iteration 48 of 100
+[info] Iteration 49 of 100
+[info] Iteration 50 of 100
+[info] Iteration 51 of 100
+[info] Iteration 52 of 100
+[info] Iteration 53 of 100
+[info] Iteration 54 of 100
+[info] Iteration 55 of 100
+[info] Iteration 56 of 100
+[info] Iteration 57 of 100
+[info] Iteration 58 of 100
+[info] Iteration 59 of 100
+[info] Iteration 60 of 100
+[info] Iteration 61 of 100
+[info] Iteration 62 of 100
+[info] Iteration 63 of 100
+[info] Iteration 64 of 100
+[info] Iteration 65 of 100
+[info] Iteration 66 of 100
+[info] Iteration 67 of 100
+[info] Iteration 68 of 100
+[info] Iteration 69 of 100
+[info] Iteration 70 of 100
+[info] Iteration 71 of 100
+[info] Iteration 72 of 100
+[info] Iteration 73 of 100
+[info] Iteration 74 of 100
+[info] Iteration 75 of 100
+[info] Iteration 76 of 100
+[info] Iteration 77 of 100
+[info] Iteration 78 of 100
+[info] Iteration 79 of 100
+[info] Iteration 80 of 100
+[info] Iteration 81 of 100
+[info] Iteration 82 of 100
+[info] Iteration 83 of 100
+[info] Iteration 84 of 100
+[info] Iteration 85 of 100
+[info] Iteration 86 of 100
+[info] Iteration 87 of 100
+[info] Iteration 88 of 100
+[info] Iteration 89 of 100
+[info] Iteration 90 of 100
+[info] Iteration 91 of 100
+[info] Iteration 92 of 100
+[info] Iteration 93 of 100
+[info] Iteration 94 of 100
+[info] Iteration 95 of 100
+[info] Iteration 96 of 100
+[info] Iteration 97 of 100
+[info] Iteration 98 of 100
+[info] Iteration 99 of 100
+[info] Iteration 100 of 100
+[info] Running dynamic rule analysis
+[info]     Relevant attributes    : ['flu', 'income']
+[info]     Relevant relations     : ['__at__', 'home', 'school']
+[info]     Superfluous attributes : []
+[info]     Superfluous relations  : []
+[info] Running rule cleanup
+[info] Compacting the model
+[info] Finishing simulation
+
+Simulation
+    Random seed: 1928
+    Timing
+        Timer: HourTimer
+    Population
+        Size        : 200,169.00
+        Groups      : 4,176
+        Groups (ne) : 4,176
+        Sites       : 351
+        Rules       : 2
+        Probes      : 2
+    Static rule analysis
+        Used
+            Attributes : ['flu', 'income']
+            Relations  : ['home', 'school']
+        Superfluous
+            Attributes : []
+            Relations  : ['__at__']
+    Dynamic rule analysis
+        Used
+            Attributes : ['flu', 'income']
+            Relations  : ['__at__', 'home', 'school']
+        Superfluous
+            Attributes : []
+            Relations  : []

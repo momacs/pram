@@ -11,33 +11,33 @@ Based on:
   sim/06-allegheny-02-db-school-large/
 '''
 
+import os
+import sys
+from inspect import getsourcefile
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+
 import gc
 import gzip
 import os
 import pickle
 import sys
 
-import os
-import sys
-from inspect import getsourcefile
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
-from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
-from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
-from pram.rule   import GotoRule, Rule, TimeInt, TimePoint
+from pram.data   import ProbePersistanceDB, GroupSizeProbe
+from pram.entity import GroupDBRelSpec, GroupQry, Site
+from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, TimePoint
 from pram.sim    import Simulation
-from pram.util   import Size
 
-from rules import ResetSchoolDayRule, AttendSchoolRule
+
+import signal
+def signal_handler(signal, frame):
+    sys.exit(0)
+signal.signal(signal.SIGINT, signal_handler)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # (0) Init:
-
-rand_seed = 1928
 
 dpath_res    = os.path.join(os.sep, 'Volumes', 'd', 'pitt', 'sci', 'pram', 'res', 'fred')
 dpath_cwd    = os.path.dirname(__file__)
@@ -46,7 +46,7 @@ fpath_sites  = os.path.join(dpath_cwd, 'allegheny-sites.pickle.gz')
 fpath_groups = os.path.join(dpath_cwd, 'allegheny-groups.pickle.gz')
 
 do_remove_file_sites  = False
-do_remove_file_groups = True
+do_remove_file_groups = False
 
 if do_remove_file_sites and os.path.isfile(fpath_sites):
     os.remove(fpath_sites)
@@ -58,7 +58,7 @@ if do_remove_file_groups and os.path.isfile(fpath_groups):
 # ----------------------------------------------------------------------------------------------------------------------
 # (1) Sites:
 
-sites = Simulation().gen_sites_from_db(
+sites = Simulation.gen_sites_from_db(
     fpath_db_in,
     lambda fpath_db: {
         'hosp'    : Site.gen_from_db(fpath_db, 'hospitals',  'hosp_id', 'hospital', ['workers', 'physicians', 'beds']),
@@ -76,17 +76,17 @@ site_home = Site('home')
 # ----------------------------------------------------------------------------------------------------------------------
 # (2) Probes:
 
-fpath_db_out_school_pop_size = os.path.join(dpath_cwd, 'school-pop-size.sqlite3')
+fpath_db_out = os.path.join(dpath_cwd, 'out.sqlite3')
 
-if os.path.isfile(fpath_db_out_school_pop_size):
-    os.remove(fpath_db_out_school_pop_size)
+if os.path.isfile(fpath_db_out):
+    os.remove(fpath_db_out)
 
-probe_persistance = ProbePersistanceDB(fpath_db_out_school_pop_size, flush_every=1)
+pp = ProbePersistanceDB(fpath_db_out, flush_every=1)
 
-probes_school_pop_size = GroupSizeProbe(
+probe_school_pop_size = GroupSizeProbe(
     name='school-pop-size',
     queries=[GroupQry(rel={ Site.AT: s }) for s in sites['school'].values()],
-    persistance=probe_persistance,
+    persistance=pp,
     var_names=
         [f'p{i}' for i in range(len(sites['school']))] +
         [f'n{i}' for i in range(len(sites['school']))],
@@ -97,24 +97,19 @@ probes_school_pop_size = GroupSizeProbe(
 # ----------------------------------------------------------------------------------------------------------------------
 # (3) Simulation:
 
-(Simulation(7,1,10, rand_seed=rand_seed).
+(Simulation().
     add_rule(ResetSchoolDayRule(TimePoint(7))).
-    add_rule(AttendSchoolRule()).
-    add_probe(probes_school_pop_size).
+    add_rule(GoToAndBackTimeAtRule(t_at_attr='t@school')).
+    add_probe(probe_school_pop_size).
     gen_groups_from_db(
         fpath_db_in,
         tbl='people',
-        attr={},
-        rel={ 'home': site_home },
-        # rel={},
+        attr_fix={},
+        rel_fix={ 'home': site_home },
         attr_db=[],
-        rel_db=[
-            # GroupDBRelSpec('home', 'sp_hh_id', sites['home']),
-            GroupDBRelSpec('school', 'school_id', sites['school'])
-        ],
-        rel_at='home',
-        fpath=fpath_groups
+        rel_db=[GroupDBRelSpec('school', 'school_id', sites['school'])],
+        rel_at='home'
     ).
     summary().
-    run(do_disp_t=True)
+    run(3, do_disp_t=True)
 )

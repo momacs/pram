@@ -16,6 +16,9 @@
 #
 # TODO
 #     Quick
+#         Sync sim.Timer with rule.Time
+#         Associate time with rules, not simulations
+#         Associate the output database (or a directory) with a simulation, not probe persistance
 #         - Store school info (e.g., size) in the probe DB and associate with the probes
 #         - Allow simulation to output warning to a file or a database
 #         - Abstract the single-group group splitting mechanism as a dedicated method.  Currently, that is used in
@@ -23,7 +26,6 @@
 #         Allow executing rule sets in the order provided
 #             E.g., some rules need to be run after all others have been applied
 #             This may not be what we want because the idea of PRAMs is to avoid order effects.
-#         Prevent creating empty groups in Group.split().
 #         - Antagonistic rules (e.g., GoHome and GoToWork), if applied at the same time will always result in order
 #           effects, won't they? Think about that.
 #         - It is possible to have groups with identical names.  If we wanted to disallow that, the best place to do
@@ -35,10 +37,17 @@
 #     Paradigm shift
 #         Implement everything on top of a relational database
 #     Internal mechanics
+#         Simulation timer
+#             Return actual time (i.e., implement flexible looping mechanism)
+#             Specify time display format that's complementary to but independent of the simulation timer
+#             Remove Simulation.set_iter_cnt and Simulation.set_time
 #         Population mass
 #             Allow the population mass to grow or shrink, most likely only via rules.
 #         Group querying
 #             Implement a more flexible way to query groups (GroupPopulation.get_groups())
+#             - Ideally, we would want to use popular query languages, SQL being the prime example of one.  Because
+#               PRAM is a simulation framework, extensions to SQL might be in order (e.g., to account for the passage
+#               of time; SELECT a FROM b AT t=3)
 #         Group size
 #             - Should we allow fractional group sizes?  At first glance it might make little sense to have a group of
 #               500.38 agents, but it's possible that if we don't allow that agents will be "slipping" between groups
@@ -61,9 +70,9 @@
 #         Account for time
 #             Generate unique entity run-time IDs
 #             Scale probabilities with time
-#                 1. Add process length and use it to scale group-splitting probabilities (i.e., those inside rules)
+#                 1. Add process length and use it to scale group-splitting probabilities (i.e., those used by rules)
 #                 2. Add cooldown to a rule; the rule does not fire until the cooldown is over; reset cooldown.
-#             Option 2 appears as more palatable at the moment, at least to me
+#             Option 2 appears more palatable at the moment, at least to me
 #         Account for space and spacial proximity
 #             - Are xy- or geo-coordinates necessary?  Perhaps relations can handle this already.  For example, a
 #               group of agents already shares the same location so we know they are in proximy of one another.
@@ -86,7 +95,14 @@
 #                 They should be reset (or handled inteligently) after mass redistribution
 #             Persist probe results on a batch basis (e.g., via 'executemany()')
 #             Remove groups unused in certain number of simulation steps to account for high group-dynamic scenarios
-#     Simulation contsruction
+#     Simulation construction
+#         Generate from DB
+#             - Make sure groups of students and workers are generated properly from one Simulation.gen_groups_from_db()
+#               call.
+#             - How to automatically inject relations from the static analysis into the DB generation in
+#               Simulation.gen_groups_from_db()?
+#             Generate groups (and therefore sites) from multiple tables
+#             Generate groups (and therefore sites) from multiple databases
 #         Define simulation definition language
 #             - Provide probabilities as a transition matrix.  Perhaps the entire simulation could be specified as a
 #               Bayesian network which would naturally imply a conditional probability distributions (or densities).
@@ -121,28 +137,45 @@
 #
 # Milestones: Code
 #     Simulation
-#         c Simulation class                                                                   [2018.12.16 - 2019.02.11]
-#             f Read and output time in time format (e.g., 'hh:mm')                            []
-#             f Convert between list of agents and groups                                      []
+#         c Simulation class                                                                   [2018.12.16 - ...]
+#         Timer
+#             Timer (base class)                                                               [2019.03.31]
+#             Timer (simple subclasses, e.g., HourTimer)                                       [2019.03.31 - 2019.04.03]
+#             CalDayTimer                                                                      [2019.03.31 - ...]
+#             CalMonthTimer                                                                    [2019.03.31 - ...]
+#         SimulationAdder class                                                                [2019.04.06]
+#         SimulationSetter class                                                               [2019.04.06]
 #         Entities
 #             c Agent                                                                          [2018.12.16 - 2019.01.05]
-#             c Entity                                                                         [2018.12.16 - ...]
-#             c Group                                                                          [2019.12.16 - ...]
+#             c Entity                                                                         [2018.12.16 - 2019.03.22]
+#             c Group                                                                          [2019.12.16 - 2019.03.10]
 #                 f Splitting                                                                  [2019.01.04 - 2019.02.11]
-#             c GroupSplitSpec                                                                 [2019.01.06 - 2019.01.21]
+#                 f Freezing                                                                   [2019.03.09]
+#                 f DB generation                                                              [2019.02.20 - 2019.03.22]
+#             c GroupDBRelSpec                                                                 [2019.02.20]
 #             c GroupQry                                                                       [2019.01.12 - 2019.01.21]
-#             c Site                                                                           [2018.12.16 - 2019.02.11]
-#                 f Canonical functionality                                                    [2010.01.19 - 2019.01.21]
-#             c Resource                                                                       [2010.01.18 - 2019.01.08]
+#             c GroupSplitSpec                                                                 [2019.01.06 - 2019.01.21]
+#             c Resource                                                                       [2010.01.18 - 2019.03.21]
+#             c Site                                                                           [2018.12.16 - 2019.03.21]
+#                 f DB generation                                                              [2019.02.20 - 2019.03.22]
 #         Rules
-#             c Time                                                                           [2019.01.06]
-#             c TimePoint                                                                      [2019.01.22]
-#             c TimeInterval                                                                   [2019.01.06]
-#             c Rule                                                                           [2019.01.03]
-#             c GotoRule                                                                       [2019.01.21]
-#             c AttendSchoolRule                                                               [2019.01.22 - 2019.01.23]
-#             c ResetDayRule                                                                   [2019.01.23]
-#             c ProgressFluRule                                                                [2019.01.03 - 2019.01.16]
+#             Time
+#                 c Time                                                                       [2019.01.06]
+#                 c TimeAlways                                                                 [2019.03.31]
+#                 c TimePoint                                                                  [2019.01.22]
+#                 c TimeInterval                                                               [2019.01.06]
+#             Basic
+#                 c Rule                                                                       [2019.01.03 - 2019.03.31]
+#                 c GoToRule                                                                   [2019.01.21 - 2019.03.27]
+#                 c GoToAndBackTimeAtRule                                                      [2019.01.22 - 2019.03.27]
+#                 c ResetRule                                                                  [2019.01.23 - 2019.03.27]
+#                 c ResetSchoolDayRule                                                         [2019.01.23 - 2019.03.27]
+#                 c ResetWorkDayRule                                                           [2019.01.23 - 2019.03.27]
+#             Epidemiology
+#                 c ProgressFluRule (deprecated)                                               [2019.01.03 - 2019.03.31]
+#                 c ProgressAndTransmitFluRule (deprecated)                                    [2019.02.05 - 2019.03.11]
+#                 c SEIRRule                                                                   [2019.03.25 - 2019.04.06]
+#                 c SEIRFluRule                                                                [2019.04.06 - 2019.04.08]
 #             f Setup                                                                          [2019.01.23]
 #         Population
 #             c Population                                                                     [2019.01.07]
@@ -150,11 +183,13 @@
 #             c GroupPopulation                                                                [2019.01.07 - ...]
 #                 f Selecting groups                                                           [2019.01.07 - 2019.01.21]
 #                 f Rule application                                                           [2019.01.04 - 2019.01.17]
-#                 f Mass redistribution                                                        [2019.01.04 - 2019.01.17]
+#                 f Mass redistribution                                                        [2019.01.04 - 2019.02.24]
 #
 #     Data collection
-#         c Probe                                                                              [2019.01.18 - 2019.01.19]
-#         c GroupSizeProbe                                                                     [2019.01.18 - 2019.01.19]
+#         c Probe                                                                              [2019.01.18 - 2019.03.31]
+#         c ProbePersistanceDB                                                                 [2019.03.02 - 2019.03.18]
+#         c ProbePersistanceFS                                                                 [2019.03.02]
+#         c GroupSizeProbe                                                                     [2019.01.18 - 2019.04.03]
 #
 #     Logging
 #         c Log                                                                                [2019.01.06]
@@ -170,25 +205,28 @@
 #         c GroupTestCase                                                                      [2019.01.11]
 #         c SimulationTestCase                                                                 [2019.01.19]
 #         c SiteTestCase                                                                       [2019.01.21]
+#         c RuleAnalyzerTestCase                                                               [2019.03.18]
 #
 #     Visualization and UI
 #         l WebUI                                                                              []
 #
 #     Utilities
 #         c Data                                                                               [2019.01.06]
-#         c DB                                                                                 [2019.02.11]
+#         c DB                                                                                 [2019.02.11 - 2019.03.18]
 #         c Err                                                                                [2019.01.21]
-#         c FS                                                                                 [2019.01.06]
-#         c Hash                                                                               [2019.01.06 - ...]
+#         c FS                                                                                 [2019.01.06 - 2019.03.22]
+#         c Hash                                                                               [2019.01.06]
 #         c MPCounter                                                                          [2019.01.06]
 #         c Size                                                                               [2019.01.06 - 2019.02.11]
 #         c Str                                                                                [2019.01.06]
 #         c Tee                                                                                [2019.01.06]
-#         c Time                                                                               [2019.01.06]
+#         c Time                                                                               [2019.01.06 - 2019.04.01]
 #
 #     Optimization
 #         String interning (sys.intern; not needed in Python 3)                                [2019.01.06 - 2019.01.17]
 #         __slots__                                                                            [2019.01.17]
+#         Profiling
+#             ProbePersistanceDB                                                               [2019.03.16 - 2019.03.17]
 #
 #     Legend
 #         c Class
@@ -242,8 +280,8 @@
 # Simulation ideas
 #     Smoking effects on lifespan
 #         Groups will have an attribute 'lifespan'
-#         Rule will make a portion of the group to smoke
-#         Smoking will negatively impact lifespan
+#         Rule will make a portion of groups smoke
+#         Smoking (both active and passive smoking) will (diffrentially) negatively impact lifespan
 #         Being in the proximity of other smokers will increase likelihood of smoking
 #
 # ----------------------------------------------------------------------------------------------------------------------
@@ -330,36 +368,199 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-# Deployment: FreeBSD  (12.0R, Python 3._._)
+# Deployment: FreeBSD  (12.0R, Python 3.6._)
 #         ...
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-# Deployment: Ubuntu  (18.04 LTS, Python 3._._)
+# Deployment: Ubuntu  (18.04 LTS, Python 3.6._)
 #         ...
 #
 # ----------------------------------------------------------------------------------------------------------------------
 
 import ast
+import datetime
 import gc
 import gzip
 import inspect
+import math
 import numpy as np
 import os
 import pickle
 
 from collections import namedtuple, Counter
-from dotmap import DotMap
+from dotmap      import DotMap
 
-from .data   import GroupSizeProbe
+from .data   import GroupSizeProbe, Probe
 from .entity import Agent, Group, GroupQry, Site
 from .pop    import GroupPopulation
-from .util   import FS
+from .rule   import Rule
+from .util   import Err, FS, Time
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SimulationConstructionError(Exception): pass
 class SimulationConstructionWarning(Warning): pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class Timer(object):
+    '''
+    Simulation timer.
+
+    This discrete time is unitless; it is the simulation context that defines the appropriate granularity.  For
+    instance, million years (myr) might be appropriate for geological processes while Plank time might be appropriate
+    for modeling quantum phenomena.  For example, one interpretation of 'self.t == 4' is that the current simulation
+    time is 4am.
+
+    To enable natural blending of rules that operate on different time scales, the number of milliseconds is stored by
+    the object.  Because of this, rule times, which define the number of milliseconds in a time unit, can be scaled.
+
+    Apart from time, this timers also stores the iteration count.
+    '''
+
+    # TODO: Loop detection currently relies on modulus which does not handle 'step_size' > 1 properly.
+
+    def __init__(self, ms=Time.MS.ms, iter=float('inf'), t0=0, tmin=0, tmax=10, do_disp_zero=True):
+        self.ms = ms
+        self.i_max = iter
+        self.i = None  # set by reset()
+
+        self.t0 = t0         # how time is going to be diplayed
+        self.tmin = tmin     # ^
+        self.tmax = tmax     # ^
+        self.t = t0          # ^
+        self.t_loop_cnt = 0  # ^
+
+        if self.tmin > self.tmax:
+            raise TypeError(f'The min time has to be smaller than the max time.')
+
+        self.do_disp_zero = do_disp_zero  # flag: print empty line on zero?
+
+        self.did_loop_on_last_iter = False  # flag: keeping this avoids printing looping info right before the simulation ends
+
+        self.reset()
+
+    def __repr__(self):
+        return '{}(name={}, ms={}  iter={}))'.format(self.__class__.__name__, self.ms, self.i_max)
+
+    def __str__(self):
+        return '{}'.format(self.__class__.__name__, self.ms, self.i_max)
+
+    def add_dur(self, dur):
+        self.i_max += math.floor(dur / self.ms)
+
+    def add_iter(self, iter):
+        self.i_max += iter
+
+    @staticmethod
+    def by_ms(ms, **kwargs):
+        ''' Returns a Timer object which matched the specified number of milliseconds. '''
+
+        timer = {
+            Time.MS.m  : MilsecTimer,
+            Time.MS.s  : SecTimer,
+            Time.MS.m  : MinTimer,
+            Time.MS.h  : HourTimer,
+            Time.MS.d  : DayTimer,
+            Time.MS.w  : WeekTimer,
+            Time.MS.M  : MonthTimer,
+            Time.MS.y  : YearTimer
+        }.get(ms, None)
+        if not timer:
+            raise ValueError(f'No timer associated with time unit given by the number of milliseconds: {ms}')
+        return timer(**kwargs)
+
+    def get_i(self):
+        return self.i
+
+    def get_t(self):
+        return self.t
+
+    def get_t_loop_cnt(self):
+        return self.t_loop_cnt
+
+    def get_i_left(self):
+        return self.i_max - self.i
+
+    def get_t_left(self):
+        return self.i_max - self.i
+
+    def reset(self):
+        self.i = 0
+        self.t = self.t0
+        self.t_loop_cnt = 0
+
+    def set_dur(self, dur):
+        self.i_max = math.floor(dur / self.ms)
+
+    def set_iter(self, iter):
+        self.i_max = iter
+
+    def step(self):
+        self.i += 1
+        if self.i > self.i_max:
+            self.i = self.i_max
+            raise TypeError(f'Timer has reached the maximum value of {self.tmax}.')
+
+        self.t = self.i % self.tmax + self.tmin
+
+        if self.do_disp_zero and self.did_loop_on_last_iter:
+            # print(f'\nLoop: {self.t_loop_cnt + 1}')
+            self.did_loop_on_last_iter = False
+
+        if self.i > 0 and self.t == self.tmin:
+            self.t_loop_cnt += 1
+            self.did_loop_on_last_iter = True
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class MilsecTimer(Timer):
+    def __init__(self, iter=float('inf'), do_disp_zero=True):
+        super().__init__(Time.MS.ms, iter, 0, 0, 1000, do_disp_zero)
+
+
+class SecTimer(Timer):
+    def __init__(self, iter=float('inf'), do_disp_zero=True):
+        super().__init__(Time.MS.s, iter, 0, 0, 60, do_disp_zero)
+
+
+class MinTimer(Timer):
+    def __init__(self, iter=float('inf'), do_disp_zero=True):
+        super().__init__(Time.MS.m, iter, 0, 0, 60, do_disp_zero)
+
+
+class HourTimer(Timer):
+    def __init__(self, iter=float('inf'), do_disp_zero=True):
+        super().__init__(Time.MS.h, iter, 0, 0, 24, do_disp_zero)
+
+
+class DayTimer(Timer):
+    def __init__(self, iter=float('inf'), do_disp_zero=True):
+        super().__init__(Time.MS.d, iter, 0, 0, 365, do_disp_zero)
+
+
+class WeekTimer(Timer):
+    def __init__(self, iter=float('inf'), do_disp_zero=True):
+        super().__init__(Time.MS.w, iter, 0, 0, 52, do_disp_zero)
+
+
+class MonthTimer(Timer):
+    def __init__(self, iter=float('inf'), do_disp_zero=True):
+        super().__init__(Time.MS.M, iter, 0, 0, 12, do_disp_zero)
+
+
+class YearTimer(Timer):
+    def __init__(self, iter=float('inf'), do_disp_zero=True):
+        super().__init__(Time.MS.y, iter, 0, 2000, 10000, do_disp_zero)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# class CalMonthTimer(Timer):
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# class CalDayTimer(Timer):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -378,14 +579,22 @@ class RuleAnalyzer(object):
 
         https://github.com/hchasestevens/astpath
         https://astsearch.readthedocs.io/en/latest
+
+    # TODO: Double check the case of multiple sequential simulation runs.
     '''
 
     def __init__(self):
-        self.attr = set()
-        self.rel  = set()
+        self.attr_used = set()
+        self.rel_used  = set()
+
+        self.attr_unused = set()
+        self.rel_unused  = set()
 
         self.cnt_rec   = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # recognized
         self.cnt_unrec = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # unrecognized
+
+        self.are_rules_done  = False
+        self.are_groups_done = False
 
     def _dump(self, node, annotate_fields=True, include_attributes=False, indent='  '):
         '''
@@ -459,17 +668,17 @@ class RuleAnalyzer(object):
                         call_args = call_args[0]
                         if call_args.__class__.__name__ == 'Str':
                             if attr_name in ('get_attr', 'has_attr'):
-                                self.attr.add(RuleAnalyzer.get_str(call_args))
+                                self.attr_used.add(RuleAnalyzer.get_str(call_args))
                             else:
-                                self.rel.add(RuleAnalyzer.get_str(call_args))
+                                self.rel_used.add(RuleAnalyzer.get_str(call_args))
                             self.cnt_rec[attr_name] += 1
                         elif call_args.__class__.__name__ in ('List', 'Dict'):
                             for i in list(ast.iter_fields(call_args))[0][1]:
                                 if i.__class__.__name__ == 'Str':
                                     if attr_name in ('get_attr', 'has_attr'):
-                                        self.attr.add(RuleAnalyzer.get_str(i))
+                                        self.attr_used.add(RuleAnalyzer.get_str(i))
                                     else:
-                                        self.rel.add(RuleAnalyzer.get_str(i))
+                                        self.rel_used.add(RuleAnalyzer.get_str(i))
                                     self.cnt_rec[attr_name] += 1
                                 else:
                                     self.cnt_unrec[attr_name] += 1
@@ -478,7 +687,29 @@ class RuleAnalyzer(object):
             for i in node:
                 self._analyze(i)
 
-    def analyze(self, rule):
+    def analyze_rules(self, rules):
+        ''' Can be (an in fact is) called before any groups have been added. '''
+
+        for r in rules:
+            self.analyze_rule(r)
+
+        self.are_rules_done = True
+
+    def analyze_groups(self, groups):
+        ''' Should be called after all the groups have been added. '''
+
+        attr_groups = set()  # attributes defining groups
+        rel_groups  = set()  # ^ (relations)
+        for g in groups:
+            for ga in g.attr.keys(): attr_groups.add(ga)
+            for gr in g.rel.keys():  rel_groups. add(gr)
+
+        self.attr_unused = attr_groups - self.attr_used  # attributes not conditioned on by even one rule
+        self.rel_unused  = rel_groups  - self.rel_used   # ^ (relations)
+
+        self.are_groups_done = True
+
+    def analyze_rule(self, rule):
         tree = ast.fix_missing_locations(ast.parse(inspect.getsource(rule.__class__)))
 
         for node in ast.walk(tree):
@@ -500,57 +731,213 @@ class RuleAnalyzer(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+class SimulationAdder(object):
+    def __init__(self, sim):
+        self.sim = sim
+
+    def done(self):
+        return self.sim
+
+    def group(self, group):
+        self.sim.add_group(group)
+        return self
+
+    def groups(self, groups):
+        self.sim.add_groups(groups)
+        return self
+
+    def probe(self, probe):
+        self.sim.add_probe(probe)
+        return self
+
+    def probes(self, probes):
+        self.sim.add_probes(probes)
+        return self
+
+    def rule(self, rule):
+        self.sim.add_rule(rule)
+        return self
+
+    def rules(self, rules):
+        self.sim.add_rules(rules)
+        return self
+
+    def site(self, site):
+        self.sim.add_site(site)
+        return self
+
+    def sites(self, sites):
+        self.sim.add_sites(sites)
+        return self
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class SimulationDBI(object):
+    def __init__(self, sim, fpath):
+        self.sim = sim
+        self.fpath = fpath
+
+        FS.req_file(fpath, f'The database does not exist: {fpath}')
+
+    def done(self):
+        return self.sim
+
+    def gen_groups(self, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, is_verbose=False):
+        self.sim.gen_groups_from_db(self.fpath, tbl, attr_db, rel_db, attr_fix, rel_fix, rel_at, limit, is_verbose)
+        return self
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class SimulationSetter(object):
+    def __init__(self, sim):
+        self.sim = sim
+
+    def done(self):
+        return self.sim
+
+    def dur(self, dur):
+        self.sim.set_dur(dur)
+        return self
+
+    def iter_cnt(self, n):
+        self.sim.set_iter_cnt(n)
+        return self
+
+    def pragma(self, name, value):
+        self.sim.set_pragma(name, value)
+        return self
+
+    def pragma_analyze(self, value):
+        self.sim.set_pragma_analyze(value)
+        return self
+
+    def pragma_autocompact(self, value):
+        self.sim.set_pragma_autocompact(value)
+        return self
+
+    def pragma_autoprune_groups(self, value):
+        self.sim.set_pragma_autoprune_groups(value)
+        return self
+
+    def pragma_autostop(self, value):
+        self.sim.set_pragma_autostop(value)
+        return self
+
+    def pragma_autostop_n(self, value):
+        self.sim.set_pragma_autostop_n(value)
+        return self
+
+    def pragma_autostop_p(self, value):
+        self.sim.set_pragma_autostop_p(value)
+        return self
+
+    def pragma_autostop_t(self, value):
+        self.sim.set_pragma_autostop_t(value)
+        return self
+
+    def pragma_live_info(self, value):
+        self.sim.set_pragma_live_info(value)
+        return self
+
+    def pragma_live_info_ts(self, value):
+        self.sim.set_pragma_live_info_ts(value)
+        return self
+
+    def pragma_probe_capture_init(self, value):
+        self.sim.set_pragma_probe_capture_init(value)
+        return self
+
+    def pragma_rule_analysis_for_db_gen(self, value):
+        self.sim.set_pragma_rule_analysis_for_db_gen(value)
+        return self
+
+    def rand_seed(self, rand_seed):
+        self.sim.set_rand_seed(rand_seed)
+        return self
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class Simulation(object):
     '''
     A PRAM simulation.
 
-    The discrete time is unitless; it is the simulation context that defines the appropriate granularity.  For
-    instance, million years (myr) might be appropriate for geological processes while Plank time might be appropriate
-    for modeling quantum phenomena.
-
-    A simulation stores certain statistics related to the most recent of its runs (in the 'self.last_run' DotMap).
+    A simulation stores certain statistics related to the most recent of its runs (in the 'self.last_run'
+    DotMap).
     '''
 
-    def __init__(self, t0=0, t_step_size=1, t_step_cnt=0, rand_seed=None):
-        '''
-        One interpretation of 't=4' is that the simulation starts at 4am.  Similarily, 't_step_size=1' could mean that
-        the simulation time increments in one-hour intervals.
-        '''
+    def __init__(self, rand_seed=None):
+        self.set_rand_seed(rand_seed)
 
-        self.t0 = t0
-        self.t = t0
-        self.t_step_size = t_step_size
-        self.t_step_cnt = t_step_cnt
-
-        self.rand_seed = rand_seed
-        if self.rand_seed is not None:
-            np.random.seed(self.rand_seed)
+        self.run_cnt = 0
 
         self.pop = GroupPopulation()
         self.rules = []
         self.probes = []
 
-        self.is_setup_done = False
+        self.timer = None  # value deduced in add_group() based on rule timers
+
+        self.is_setup_done = False  # flag
             # ensures simulation setup is performed only once while enabling multiple incremental simulation runs of
-            # arbitrary length thus promoting user-interactivity
+            # arbitrary length thus promoting interactivity (a sine qua non for a user interface)
 
         self.rule_analyzer = RuleAnalyzer()
 
+        self.pragma = DotMap(
+            analyze = True,                  # flag: analyze the simulation and suggest improvements?
+            autocompact = False,             # flag: remove empty groups after every iteration?
+            autoprune_groups = False,        # flag: remove attributes and relations not referenced by rules?
+            autostop = False,                # flag
+            autostop_n = 0,                  #
+            autostop_p = 0,                  #
+            autostop_t = 10,                 #
+            live_info = False,               #
+            live_info_ts = False,            #
+            probe_capture_init = True,       # flag: let probes capture the pre-run state of the simulation?
+            rule_analysis_for_db_gen = True  # flag: should static rule analysis results help form DB groups
+        )
+
         self.last_run = DotMap()  # dict of the most recent run
 
-        self.pragma = DotMap()
-        self.pragma.analyze = True            # analyze the simulation and suggest improvements
-        self.pragma.autoprune_groups = False  # remove attributes and relations not referenced by rules
-
     def __repr__(self):
-        return f'{self.__class__.__name__}({self.t}, {self.t_step_size}, {self.t_step_cnt}, {self.rand_seed})'
+        return f'{self.__class__.__name__}({self.rand_seed or ""})'
+
+    def _inf(self, msg):
+        if not self.pragma.live_info:
+            return
+
+        if self.pragma.live_info_ts:
+            print(f'[{datetime.datetime.now()}: info] {msg}')
+        else:
+            print(f'[info] {msg}')
+
+    def add(self, lst=None):
+        if lst:
+            for i in lst:
+                if isinstance(i, Group):
+                    self.add_group(i)
+                elif isinstance(i, Probe):
+                    self.add_probe(i)
+                elif isinstance(i, Rule):
+                    self.add_rule(i)
+                elif isinstance(i, Site):
+                    self.add_site(i)
+            return self
+        else:
+            return SimulationAdder(self)
 
     def add_group(self, group):
+        # No rules present:
         if len(self.rules) == 0:
             raise SimulationConstructionError('A group is being added but no rules are present; rules need to be added before groups.')
 
+        # No groups present:
         if len(self.pop.groups) == 0:  # run when the first group is being added (because that marks the end of adding rules)
-            self.analyze_rules_pre_run()
+            if not self.rule_analyzer.are_rules_done:
+                self.analyze_rules_pre_run()
+
+            # Sync simulation and rules timers:
+            rule_t_unit_ms = min([r.T_UNIT_MS for r in self.rules])
+            self.timer = Timer.by_ms(rule_t_unit_ms, iter=0)
 
         self.pop.add_group(group)
         return self
@@ -571,10 +958,18 @@ class Simulation(object):
         return self
 
     def add_rule(self, rule):
+        if len(self.rules) == 0:
+            self._inf('Constructing a PRAM')
+
         if len(self.pop.groups) > 0:
             raise SimulationConstructionError('A rule is being added but groups already exist; rules need be added before groups.')
 
         self.rules.append(rule)
+        return self
+
+    def add_rules(self, rules):
+        for r in rules:
+            self.add_rule(r)
         return self
 
     def add_site(self, site):
@@ -597,8 +992,12 @@ class Simulation(object):
         As a consequence, it is not possible to perform error-free groups auto-pruning based on this analysis.
         '''
 
-        for r in self.rules:
-            self.rule_analyzer.analyze(r)
+        self._inf('Running static rule analysis')
+
+        self.rule_analyzer.analyze_rules(self.rules)
+
+        self._inf(f'    Relevant attributes found : {list(self.rule_analyzer.attr_used)}')
+        self._inf(f'    Relevant relations  found : {list(self.rule_analyzer.rel_used)}')
 
         return self
 
@@ -613,11 +1012,13 @@ class Simulation(object):
         As a consequence, it is not possible to perform error-free groups auto-pruning based on this analysis.
         '''
 
+        self._inf('Running dynamic rule analysis')
+
         lr = self.last_run
         lr.clear()
 
-        lr.attr_used = getattr(Group, 'attr_used')  # attributes conditioned on by at least one rule
-        lr.rel_used  = getattr(Group, 'rel_used')   # ^ (relations)
+        lr.attr_used = getattr(Group, 'attr_used').copy()  # attributes conditioned on by at least one rule
+        lr.rel_used  = getattr(Group, 'rel_used').copy()   # ^ (relations)
 
         lr.attr_groups = set()  # attributes defining groups
         lr.rel_groups  = set()  # ^ (relations)
@@ -628,16 +1029,13 @@ class Simulation(object):
         lr.attr_unused = lr.attr_groups - lr.attr_used  # attributes not conditioned on by even one rule
         lr.rel_unused  = lr.rel_groups  - lr.rel_used   # ^ (relations)
 
-        if self.pragma.analyze and (len(lr.attr_unused) > 0 or len(lr.rel_unused) > 0):
-            if len(lr.attr_unused) > 0 and len(lr.rel_unused) == 0:
-                print('Based on the most recent simulation run, the following group attributes are superfluous:')
-                print(f'    {list(lr.attr_unused)}')
-
-            if len(lr.attr_unused) == 0 and len(lr.rel_unused) > 0:
-                print('Based on the most recent simulation run, the following group relations are superfluous:')
-                print(f'    {list(lr.rel_unused)}')
-
-            if len(lr.attr_unused) > 0 and len(lr.rel_unused) > 0:
+        if self.pragma.live_info:
+            self._inf(f'    Accessed attributes    : {list(self.last_run.attr_used)}')
+            self._inf(f'    Accessed relations     : {list(self.last_run.rel_used)}')
+            self._inf(f'    Superfluous attributes : {list(lr.attr_unused)}')
+            self._inf(f'    Superfluous relations  : {list(lr.rel_unused )}')
+        else:
+            if self.pragma.analyze and (len(lr.attr_unused) > 0 or len(lr.rel_unused) > 0):
                 print('Based on the most recent simulation run, the following group attributes A and relations R are superfluous:')
                 print(f'    A: {list(lr.attr_unused)}')
                 print(f'    R: {list(lr.rel_unused )}')
@@ -656,17 +1054,65 @@ class Simulation(object):
         self.add_group(group)
         return self
 
-    def gen_groups_from_db(self, fpath_db, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0, fpath=None, is_verbose=False):
-        fn_gen = lambda: Group.gen_from_db(fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
-        groups = FS.load_or_gen(fpath, fn_gen, 'groups', is_verbose)
+    def compact(self):
+        self.pop.compact()
+        return self
+
+    def db(self, fpath):
+        return SimulationDBI(self, fpath)
+
+    def gen_groups_from_db(self, fpath_db, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, is_verbose=False):
+        if not self.rule_analyzer.are_rules_done:
+            self.analyze_rules_pre_run()  # by now we know all rules have been added
+
+        self._inf(f"Generating groups from a database ({fpath_db}; table '{tbl}')")
+
+        if self.pragma.rule_analysis_for_db_gen:
+            attr_db.extend(self.rule_analyzer.attr_used)
+            # rel_db  = self.rule_analyzer.rel_used  # TODO: Need to use entity.GroupDBRelSpec class
+
+        fn_live_info = self._inf if self.pragma.live_info else None
+        self.add_groups(Group.gen_from_db(fpath_db, tbl, attr_db, rel_db, attr_fix, rel_fix, rel_at, limit, fn_live_info))
+        return self
+
+    def gen_groups_from_db_old(self, fpath_db, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0, fpath=None, is_verbose=False):
+        if not self.rule_analyzer.are_rules_done:
+            self.analyze_rules_pre_run()  # by now we know all rules have been added
+
+        self._inf(f"Generating groups from a database ({fpath_db}; table '{tbl}')")
+
+        if self.pragma.rule_analysis_for_db_gen:
+            # self._inf('    Using relevant attributes and relations')
+
+            attr_db.extend(self.rule_analyzer.attr_used)
+            # rel_db  = self.rule_analyzer.rel_used  # TODO: Need to use entity.GroupDBRelSpec class
+
+        # fn_gen = lambda: Group.gen_from_db(fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
+        # fn_gen = lambda: Group.gen_from_db(self, fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
+        # groups = FS.load_or_gen(fpath, fn_gen, 'groups', is_verbose)
+
+        groups = Group.gen_from_db(self, fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
         self.add_groups(groups)
         return self
 
-    def gen_sites_from_db(self, fpath_db, fn_gen=None, fpath=None, is_verbose=False):
+    @staticmethod
+    def gen_sites_from_db(fpath_db, fn_gen=None, fpath=None, is_verbose=False, pragma_live_info=False, pragma_live_info_ts=False):
+        if pragma_live_info:
+            if pragma_live_info_ts:
+                print(f'[{datetime.datetime.now()}: info] Generating sites from the database ({fpath_db})')
+            else:
+                print(f'[info] Generating sites from the database ({fpath_db})')
+
         return FS.load_or_gen(fpath, lambda: fn_gen(fpath_db), 'sites', is_verbose)
 
-    def new_group(self, name=None, n=0.0):
-        return Group(name or self.pop.get_next_group_name(), n, callee=self)
+    def gen_sites_from_db_new(self, fpath_db, tbl, name_col, rel_name=Site.AT, attr=[], limit=0):
+        self._inf(f'Generating sites from a database ({fpath_db})')
+
+        self.add_sites(Site.gen_from_db(fpath_db, tbl, name_col, rel_name, attr, limit))
+
+    def new_group(self, n=0.0, name=None):
+        # return Group(name or self.pop.get_next_group_name(), n, callee=self)
+        return Group(name, n, callee=self)
 
     def rem_probe(self, probe):
         self.probes.discard(probe)
@@ -676,65 +1122,251 @@ class Simulation(object):
         self.rules.discard(rule)
         return self
 
-    def run(self, t_step_cnt=0, do_disp_t=False):
+    def run(self, iter_or_dur=1, do_disp_t=False):
         '''
         One by-product of running the simulation is that the simulation stores all group attributes and relations that
         are conditioned on by at least one rule.  After the run is over, a set of unused attributes and relations is
         produced, unless silenced.  That output may be useful for making future simulations more efficient by allowing
-        the modeller to remove the unused bits which unnecesarily partition the group space.
+        the user to remove the unused bits which result in unnecessary group space partitioning.
         '''
+
+        # No rules or groups:
+        if len(self.rules) == 0:
+            print('No rules are present\nExiting')
+            return self
+
+        if len(self.pop.groups) == 0:
+            print('No groups are present\nExiting')
+            return self
+
+        self.pop.freeze()
+
+        # Decode iterations/duration:
+        self._inf('Setting simulation duration')
+
+        if isinstance(iter_or_dur, int):
+            self.timer.add_iter(iter_or_dur)
+        elif isinstance(iter_or_dur, str):
+            self.timer.add_dur(Time.dur2ms(iter_or_dur))
+        else:
+            raise ValueError(f'Number of iterations or duration must be an integer or a string: {iter_or_dur}')
 
         # Rule conditioning 01 -- Init:
         setattr(Group, 'attr_used', set())
         setattr(Group, 'rel_used',  set())
 
-        # Do setup:
+        # Sync simulation and rule timers:
+        self._inf('Syncing rule timers')
+
+        for r in self.rules:
+            r.set_t_unit(self.timer.ms)
+
+        # Rule setup and simulation compacting:
         if not self.is_setup_done:
-            self.pop.apply_rules(self.rules, 0, self.t, True)
+            self._inf('Running rule setup')
+
+            self.pop.apply_rules(self.rules, 0, self.timer, is_rule_setup=True)
             self.is_setup_done = True
+        if self.pragma.autocompact:
+            self._inf('Compacting the model')
+            self.compact()
 
-        # Run the simulation:
-        t_step_cnt = t_step_cnt if t_step_cnt > 0 else self.t_step_cnt
-
-        for i in range(t_step_cnt):
-            if do_disp_t: print(f't:{self.t}')
-
-            self.pop.apply_rules(self.rules, i, self.t)
+        # Force probes to capture the initial state:
+        if self.pragma.probe_capture_init and self.run_cnt == 0:
+            self._inf('Capturing the initial state')
 
             for p in self.probes:
-                p.run(i, self.t)
+                p.run(None, None)
 
-            self.t = (self.t + self.t_step_size) % 24
+        # Run the simulation:
+        self._inf('Initial population info')
+        self._inf(f'    Agents : {"{:,}".format(int(self.pop.get_size()))}')
+        self._inf(f'    Groups : {"{:,}".format(self.pop.get_group_cnt())}')
+        self._inf(f'    Sites  : {"{:,}".format(self.pop.get_site_cnt())}')
+        self._inf('Running the PRAM')
 
-        # Rule conditioning 02 -- Analyze and deinit:
+        self.run_cnt += 1
+        self.autostop_i = 0  # number of consecutive iterations the 'autostop' condition has been met for
+
+        for i in range(self.timer.get_i_left()):
+            if self.pragma.live_info:
+                self._inf(f'Iteration {i+1} of {self.timer.i_max}')
+                self._inf(f'    Group count: {self.pop.get_group_cnt()}')
+            elif do_disp_t:
+                print(f't:{self.timer.get_t()}')
+
+            # Apply rules:
+            self.pop.apply_rules(self.rules, self.timer.get_i(), self.timer.get_t())
+            n_moved = self.pop.n_distrib_last
+            p_moved = float(n_moved) / float(self.pop.get_size())
+
+            # Run probes:
+            for p in self.probes:
+                p.run(self.timer.get_i(), self.timer.get_t())
+
+            # Autostop:
+            if self.pragma.autostop:
+                if n_moved < self.pragma.autostop_n or p_moved < self.pragma.autostop_p:
+                    self.autostop_i += 1
+                else:
+                    self.autostop_i = 0
+
+                if self.autostop_i >= self.pragma.autostop_t:
+                    if self.pragma.live_info:
+                        self._inf('Autostop condition has been met; population mass redistributed during the most recent iteration')
+                        self._inf(f'    {n_moved} of {self.pop.get_size()} = {p_moved * 100}%')
+                        break
+                    else:
+                        print('')
+                        print('Autostop condition has been met; population mass redistributed during the most recent iteration:')
+                        print(f'    {n_moved} of {self.pop.get_size()} = {p_moved * 100}%')
+                        break
+
+            # Advance timer:
+            self.timer.step()
+
+            # Autocompact:
+            if self.pragma.autocompact:
+                self._inf(f'    Compacting the model')
+                self.compact()
+
+        self._inf(f'Final population info')
+        self._inf(f'    Groups: {"{:,}".format(self.pop.get_group_cnt())}')
+
+        # Rule conditioning 02 -- Analyze and cleanup:
+        self.rule_analyzer.analyze_groups(self.pop.groups.values())
         self.analyze_rules_post_run()
 
-        getattr(Group, 'attr_used').clear()
-        getattr(Group, 'rel_used' ).clear()
+        setattr(Group, 'attr_used', None)
+        setattr(Group, 'rel_used',  None)
+            # we want this None instead of just calling clear() to prevent dynamic rule analysis picking up on
+            # calls to has_attr(), has_rel(), and others that happen via outside rules
+        # getattr(Group, 'attr_used').clear()
+        # getattr(Group, 'rel_used' ).clear()
 
+        # Rule cleanup and simulation compacting:
+        self._inf('Running rule cleanup')
+
+        self.pop.apply_rules(self.rules, 0, self.timer, is_rule_cleanup=True)
+        if self.pragma.autocompact:
+            self._inf('Compacting the model')
+            self.compact()
+
+        self._inf('Finishing simulation')
+
+        return self
+
+    def set(self):
+        return SimulationSetter(self)
+
+    def set_pragma(self, name, value):
+        fn = {
+            'analyze'            : self.set_pragma_analyze,
+            'autocompact'        : self.set_pragma_autocompact,
+            'autoprune_groups'   : self.set_pragma_autoprune_groups,
+            'autostop'           : self.set_pragma_autostop,
+            'autostop_n'         : self.set_pragma_autostop_n,
+            'autostop_p'         : self.set_pragma_autostop_p,
+            'autostop_t'         : self.set_pragma_autostop_t,
+            'probe_capture_init' : self.set_pragma_probe_capture_init
+        }.get(name, None)
+
+        if fn is None:
+            raise TypeError(f"Pragma '{name}' does not exist.")
+
+        fn(value)
         return self
 
     def set_pragma_analyze(self, value):
         self.pragma.analyze = value
         return self
 
+    def set_pragma_autocompact(self, value):
+        self.pragma.autocompact = value
+        return self
+
     def set_pragma_autoprune_groups(self, value):
         self.pragma.autoprune_groups = value
         return self
 
+    def set_pragma_autostop(self, value):
+        self.pragma.autostop = value
+        return self
+
+    def set_pragma_autostop_n(self, value):
+        self.pragma.autostop_n = value
+        return self
+
+    def set_pragma_autostop_p(self, value):
+        self.pragma.autostop_p = value
+        return self
+
+    def set_pragma_autostop_t(self, value):
+        self.pragma.autostop_t = value
+        return self
+
+    def set_pragma_live_info(self, value):
+        self.pragma.live_info = value
+        return self
+
+    def set_pragma_live_info_ts(self, value):
+        self.pragma.live_info_ts = value
+        return self
+
+    def set_pragma_probe_capture_init(self, value):
+        self.pragma.probe_capture_init = value
+        return self
+
+    def set_pragma_rule_analysis_for_db_gen(self, value):
+        self.pragma.rule_analysis_for_db_gen = value
+        return self
+
+    def set_iter_cnt(self, iter_cnt):
+        self.iter_cnt = iter_cnt
+        return self
+
+    def set_dur(self, dur):
+        self.dur = dur
+        if self.timer:
+            self.timer.set_dur(dur)
+        return self
+
+    def set_rand_seed(self, rand_seed):
+        self.rand_seed = rand_seed
+        if self.rand_seed is not None:
+            np.random.seed(self.rand_seed)
+        return self
+
+    def setup_groups(self, fn):
+        self._inf('Running group setup')
+
+        self.pop.freeze()  # need to freeze the population to prevent splitting to count as new group counts
+        self.pop.apply_rules(fn, 0, self.timer, is_sim_setup=True)
+        return self
+
     def show_rule_analysis(self):
-        # Rule analyzer:
+        self.show_rule_analysis_pre()
+        self.show_rule_analysis_post()
+
+        return self
+
+    def show_rule_analysis_pre(self):
         ra = self.rule_analyzer
 
         print('Rule analyzer')
         print('    Used')
-        print(f'        Attributes : {list(ra.attr)}')
-        print(f'        Relations  : {list(ra.rel)}')
-        print('    Counts')
-        print(f'        Recognized   : get_attr:{ra.cnt_rec["get_attr"]} get_rel:{ra.cnt_rec["get_rel"]} has_attr:{ra.cnt_rec["has_attr"]} has_rel:{ra.cnt_rec["has_rel"]}')
-        print(f'        Unrecognized : get_attr:{ra.cnt_unrec["get_attr"]} get_rel:{ra.cnt_unrec["get_rel"]} has_attr:{ra.cnt_unrec["has_attr"]} has_rel:{ra.cnt_unrec["has_rel"]}')
+        print(f'        Attributes : {list(ra.attr_used)}')
+        print(f'        Relations  : {list(ra.rel_used)}')
+        print('    Superfluous')
+        print(f'        Attributes : {list(ra.attr_unused)}')
+        print(f'        Relations  : {list(ra.rel_unused)}')
+        # print('    Counts')
+        # print(f'        Recognized   : get_attr:{ra.cnt_rec["get_attr"]} get_rel:{ra.cnt_rec["get_rel"]} has_attr:{ra.cnt_rec["has_attr"]} has_rel:{ra.cnt_rec["has_rel"]}')
+        # print(f'        Unrecognized : get_attr:{ra.cnt_unrec["get_attr"]} get_rel:{ra.cnt_unrec["get_rel"]} has_attr:{ra.cnt_unrec["has_attr"]} has_rel:{ra.cnt_unrec["has_rel"]}')
 
-        # Post-run:
+        return self
+
+    def show_rule_analysis_post(self):
         lr = self.last_run
 
         print('Most recent simulation run')
@@ -761,11 +1393,8 @@ class Simulation(object):
         if do_header:
             print( 'Simulation')
             print(f'    Random seed: {self.rand_seed}')
-            print( '    Timer')
-            print(f'        Start      : {"{:,}".format(self.t0)}')
-            print(f'        Step size  : {"{:,}".format(self.t_step_size)}')
-            print(f'        Iterations : {"{:,}".format(self.t_step_cnt)}')
-            print(f'        Sequence   : {[self.t0 + self.t_step_size * i for i in range(5)]}')
+            print( '    Timing')
+            print(f'        Timer: {self.timer}')
             print( '    Population')
             print(f'        Size        : {"{:,.2f}".format(round(self.pop.get_size(), 1))}')
             print(f'        Groups      : {"{:,}".format(self.pop.get_group_cnt())}')
@@ -773,6 +1402,27 @@ class Simulation(object):
             print(f'        Sites       : {"{:,}".format(self.pop.get_site_cnt())}')
             print(f'        Rules       : {"{:,}".format(len(self.rules))}')
             print(f'        Probes      : {"{:,}".format(len(self.probes))}')
+
+            if self.pragma.analyze:
+                print('    Static rule analysis')
+                print('        Used')
+                print(f'            Attributes : {list(self.rule_analyzer.attr_used)}')
+                print(f'            Relations  : {list(self.rule_analyzer.rel_used)}')
+                print('        Superfluous')
+                print(f'            Attributes : {list(self.rule_analyzer.attr_unused)}')
+                print(f'            Relations  : {list(self.rule_analyzer.rel_unused)}')
+
+                if self.last_run:
+                    print('    Dynamic rule analysis')
+                    print('        Used')
+                    print(f'            Attributes : {list(self.last_run.attr_used)}')
+                    print(f'            Relations  : {list(self.last_run.rel_used)}')
+                    # print('        Dynamic - Groups')
+                    # print(f'            Attributes : {list(self.last_run.attr_groups)}')
+                    # print(f'            Relations  : {list(self.last_run.rel_groups)}')
+                    print('        Superfluous')
+                    print(f'            Attributes : {list(self.last_run.attr_unused)}')
+                    print(f'            Relations  : {list(self.last_run.rel_unused)}')
 
         if n_groups > 0:
             if len(self.pop.groups) > 0: print(f'    Groups ({"{:,}".format(len(self.pop.groups))})\n' + '\n'.join(['        {}'.format(g) for g in list(self.pop.groups.values())[:n_groups]]))

@@ -9,7 +9,7 @@ import sqlite3
 # (0) init:
 
 dir = os.path.dirname(__file__)
-fpath_db = os.path.join(dir, f'school-pop-size-1-home.sqlite3')
+fpath_db = os.path.join(dir, f'out-1-home.sqlite3')
 
 
 # ----------------------------------------------------------------------------------------------------------------------

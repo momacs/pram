@@ -1,0 +1,5 @@
+Create a low-vs-medium income school comparison table:
+
+CREATE TABLE comp AS
+SELECT a.id, a.ps AS ps_low, b.ps AS ps_med, a.pe AS pe_low, b.pe AS pe_med, a.pr AS pr_low, b.pr AS pr_med
+FROM low_income a INNER JOIN med_income b ON a.id = b.id;

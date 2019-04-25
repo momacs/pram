@@ -5,13 +5,13 @@ import numpy as np
 import os
 import sqlite3
 
-from abc import ABC
-from attr import attrs, attrib, converters, validators
+from abc             import ABC
+from attr            import attrs, attrib, converters, validators
 from collections.abc import Iterable
-from enum import IntEnum
-from scipy.stats import rv_continuous
+from enum            import auto, unique, IntEnum
+from scipy.stats     import rv_continuous
 
-from .util import Err, DB
+from .util import DB, Err, FS
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -19,15 +19,17 @@ class GroupFrozenError(Exception): pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+@unique
 class AttrSex(IntEnum):
     F = 1
     M = 2
 
 
+@unique
 class AttrFluStage(IntEnum):
-    NO     = 1
-    ASYMPT = 2
-    SYMPT  = 3
+    NO     = auto()
+    ASYMPT = auto()
+    SYMPT  = auto()
 
 
 # @attrs()
@@ -49,13 +51,11 @@ class AttrFluStage(IntEnum):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class DistributionAgeSchool(rv_continuous):
-    # TODO: Finish.
     def _pdf(self, x):
         return np.exp(-x**2 / 2.) / np.sqrt(2.0 * np.pi)
 
 
 class DistributionAgeWork(rv_continuous):
-    # TODO: Finish.
     def _pdf(self, x):
         return np.exp(-x**2 / 2.) / np.sqrt(2.0 * np.pi)
 
@@ -211,7 +211,8 @@ class Site(Resource):
         return hash(self.__key())
 
     def __repr__(self):
-        return '{}({} {} {})'.format(self.__class__.__name__, self.name, self.__hash__(), self.attr)
+        # return '{}({} {} {})'.format(self.__class__.__name__, self.name, self.__hash__(), self.attr)
+        return '{}({})'.format(self.__class__.__name__, self.__hash__())
 
     def __str__(self):
         return '{}  name: {:16}  hash: {}  attr: {}'.format(self.__class__.__name__, self.name, self.__hash__(), self.attr)
@@ -220,9 +221,12 @@ class Site(Resource):
         return (self.name)
 
     @classmethod
-    def gen_from_db(cls, db_fpath, tbl, name_col, rel_name, attr=[], limit=0):
-        if not os.path.isfile(db_fpath):
-            raise ValueError(f'The database does not exist: {db_fpath}')
+    def gen_from_db(cls, db_fpath, tbl, name_col, rel_name=AT, attr=[], limit=0):
+        '''
+        Returns a dictonary of sites with the Site object's hash as keys.
+        '''
+
+        FS.req_file(db_fpath, f'The database does not exist: {db_fpath}')
 
         sites = {}
         with DB.open_conn(db_fpath) as c:
@@ -231,6 +235,24 @@ class Site(Resource):
                 sites[s.get_hash()] = s
 
         return sites
+
+    @classmethod
+    def gen_from_db_tmp1(cls, sim, db_fpath, tbl, name_col, rel_name=AT, attr=[], limit=0):
+        '''
+        Goes together with Group.gen_from_db_tmp1().  See the comment therein.
+        '''
+
+        if not os.path.isfile(db_fpath):
+            raise ValueError(f'The database does not exist: {db_fpath}')
+
+        # sites = {}
+        with DB.open_conn(db_fpath) as c:
+            for row in c.execute('SELECT {} FROM {}{}'.format(','.join(attr + [name_col]), tbl, '' if limit <= 0 else f' LIMIT {limit}')).fetchall():
+                s = cls(row[name_col], { a: row[a] for a in attr }, rel_name=rel_name)
+                # sites[s.get_hash()] = s
+                sim.pop.add_site(s)
+
+        # return sites
 
     def get_hash(self):
         return self.__hash__()
@@ -392,9 +414,9 @@ class GroupSplitSpec(object):
 
 @attrs()
 class GroupDBRelSpec(object):
-    name     : str  = attrib()
-    col      : str  = attrib()
-    entities : dict = attrib()
+    name  : str  = attrib()
+    col   : str  = attrib()
+    sites : dict = attrib(default=None)  # if None it will be generated from the DB
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -403,18 +425,20 @@ class Group(Entity):
 
     attr_used = None  # a set of attribute that has been conditioned on by at least one rule
     rel_used  = None  # ^ for relations
+        # both of the above should be kept None unless a simulation is running and the dynamic rule analysis
+        # should be on-going
 
     def __init__(self, name=None, n=0.0, attr={}, rel={}, callee=None):
         super().__init__(EntityType.GROUP, '')
 
-        self.name = name or '.'
+        self.name = name
         self.n    = float(n)
         self.attr = attr or {}
         self.rel  = rel  or {}
 
         self.is_frozen = False
         self.hash = None  # computed lazily
-        self.callee = callee  # used only throughout the process of creating group; unset by commit()
+        self.callee = callee  # used only throughout the process of creating group; unset by done()
 
     def __eq__(self, other):
         '''
@@ -437,16 +461,31 @@ class Group(Entity):
         return self.hash
 
     def __repr__(self):
-        return '{}(name={}, n={}, attr={}, rel={})'.format(__class__.__name__, self.name, self.n, self.attr, self.rel)
+        return '{}(name={}, n={}, attr={}, rel={})'.format(__class__.__name__, self.name or '.', self.n, self.attr, self.rel)
 
     def __str__(self):
-        return '{}  name: {:16}  n: {:8}  attr: {}  rel: {}'.format(self.__class__.__name__, self.name, round(self.n, 2), self.attr, self.rel)
+        return '{}  name: {:16}  n: {:8}  attr: {}  rel: {}'.format(self.__class__.__name__, self.name or '.', round(self.n, 2), self.attr, self.rel)
+
+    def _isinstance(self, qry, type):
+        '''
+        Checks if items in the 'qry' are all of the specified 'type'.  'qry' can be a dictionary, an iterable, or a
+        string.
+        '''
+
+        if isinstance(qry, dict):
+            return all([isinstance(self.rel[i], type) for i in list(qry.items())])
+
+        if isinstance(qry, str):  # needs to be above the Iterable check because a string is an Iterable
+            return isinstance(self.rel[qry], type)
+
+        if isinstance(qry, Iterable):
+            return all([isinstance(self.rel[i], type) for i in qry])
 
     @staticmethod
     def _has(d, qry, used_set):
         '''
-        Compares the dictionary 'd' against 'qry' which can be a dictionary, an iterable (excluding a string), and a
-        string.  Depending on the type of 'qry', the method performs the following checks:
+        Compares the dictionary 'd' against 'qry' which can be a dictionary, an iterable, and a string.  Depending on
+        the type of 'qry', the method performs the following checks:
 
             string: 'qry' must be a key in 'd'
             iterable: all items in 'qry' must be keys in 'd'
@@ -473,7 +512,7 @@ class Group(Entity):
 
         raise TypeError(Err.type('qry', 'dictionary, Iterable, or string'))
 
-    def apply_rules(self, pop, rules, iter, t, is_setup=False):
+    def apply_rules(self, pop, rules, iter, t, is_rule_setup=False, is_rule_cleanup=False, is_sim_setup=False):
         '''
         Applies the list of rules, each of which may split the group into (possibly already extant) subgroups.  A
         sequential rule application scheme is (by the definition of sequentiality) bound to produce order effects which
@@ -485,13 +524,23 @@ class Group(Entity):
         those individual split specs are multiplied because the rules are assumed to be independent.  Any dependencies
         are assumed to have been handles inside the rules themselves.
 
+        The two special rule modes this method can be called in are: setup and cleanup.  Neither of these modes
+        checks for applicability; that should be performed inside the setup() and cleanup() method of a rule.  An
+        additional special mode is that of the simulation group setup (i.e., is_sim_setup = True).  In that mode,
+        the 'rules' argument is assumed to be a function to be called for the group (and not an iterable of Rule
+        classes as is usual in normal operation).
+
         TODO: Think if the dependencies between rules could (or perhaps even should) be read from some sort of a
               graph.  Perhaps then multiplying the probabilities would not be appropriate.
         '''
 
-        # Apply all the rules and get their respective split specs (ss):
-        if is_setup:
+        # (1) Apply all the rules and get their respective split specs (ss):
+        if is_rule_setup:
             ss_rules = [r.setup(pop, self) for r in rules]
+        elif is_rule_cleanup:
+            ss_rules = [r.cleanup(pop, self) for r in rules]
+        elif is_sim_setup:
+            ss_rules = [rules(pop, self)]
         else:
             ss_rules = [r.apply(pop, self, iter, t) for r in rules if r.is_applicable(self, iter, t)]
 
@@ -499,7 +548,7 @@ class Group(Entity):
         if len(ss_rules) == 0:
             return None
 
-        # Create a Cartesian product of the split specs (ss):
+        # (2) Create a Cartesian product of the split specs (ss):
         ss_prod = []
         for ss_lst in itertools.product(*ss_rules):
             ss_comb = GroupSplitSpec(p=1.0, attr_set={}, attr_del=set(), rel_set={}, rel_del=set())  # the combined split spec
@@ -511,9 +560,10 @@ class Group(Entity):
                 ss_comb.rel_del.update(i.rel_del)
             ss_prod.append(ss_comb)
 
+        # (3) Split the group:
         return self.split(ss_prod)
 
-    def commit(self):
+    def done(self):
         ''' Ends creating the group by notifing the callee that has begun the group creation. '''
 
         if self.callee is None:
@@ -552,18 +602,144 @@ class Group(Entity):
         return hash(tuple([frozenset(attr.items()), frozenset(rel.items())]))
 
     @classmethod
-    def gen_from_db(cls, db_fpath, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0):
-        if not os.path.isfile(db_fpath):
-            raise ValueError(f'The database does not exist: {db_fpath}')
+    def gen_from_db(cls, db_fpath, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, fn_live_info=None):
+        '''
+        In this method, lists are sometimes converted to allow for set operations (e.g., union or difference) and the
+        results of those operations are converted back to lists for nice output printout (e.g., '[]' is more succinct
+        than 'set()', which is what an empty set is printed out as).
+        '''
 
+        inf = fn_live_info  # shorthand
+
+        FS.req_file(db_fpath, f'The database does not exist: {db_fpath}')
+
+        if inf:
+            inf('    Expected in table')
+            inf(f'        Attributes : {attr_db}')
+            inf(f'        Relations  : {[r.col for r in rel_db]}')
+
+        # (1) Sort out attributes and relations that do and do not exist in the table and reconcile them with the fixed ones:
+        # (1.1) Use table columns to identify the attributes and relations that do and do not exist:
+        with DB.open_conn(db_fpath) as c:
+            columns = [i[1] for i in c.execute(f'PRAGMA table_info({tbl})')]
+            attr_db_keep = [a for a in attr_db if a in columns]     # attributes to be kept based on the table schema
+            rel_db_keep  = [r for r in rel_db if r.col in columns]  # relations
+
+        if fn_live_info:
+            inf( '    Found in table')
+            inf(f'        Attributes : {attr_db_keep}')
+            inf(f'        Relations  : {[r.col for r in rel_db]}')
+            inf( '    Not found in table')
+            inf(f'        Attributes : {list(set(attr_db) - set(attr_db_keep))}')
+            inf(f'        Relations  : {list(set([r.col for r in rel_db]) - set([r.col for r in rel_db_keep]))}')
+            inf( '    Fixed manually')
+            inf(f'        Attributes : {attr_fix}')
+            inf(f'        Relations  : {rel_fix}')
+            if len(set(attr_db_keep) & set(attr_fix)) > 0:
+                inf( '    WARNING: The following exist in the table but will be masked because are manually fixed')
+                inf(f'        Attributes : {list(set(attr_db_keep)             & set(attr_fix.keys()))}')
+                inf(f'        Relations  : {list(set([r.col for r in rel_db])  & set(rel_fix.keys()))}')
+
+        # (1.2) Remove the fixed attributes and relations:
+        attr_db_keep = list(set(attr_db_keep) - set(attr_fix.keys()))
+        rel_db_keep  = [r for r in rel_db_keep if not r.col in rel_fix.keys()]
+
+        if fn_live_info:
+            inf( '    Final combination used for group forming')
+            inf(f'        Attributes fixed      : {attr_fix}')
+            inf(f'        Attributes from table : {attr_db_keep}')
+            inf(f'        Relations  fixed      : {rel_fix}')
+            inf(f'        Relations  from table : {[r.col for r in rel_db]}')
+
+        # (2) Contruct the query:
         qry = 'SELECT COUNT(*) AS n{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
             tbl=tbl,
-            cols=', '.join(attr_db + [r.col for r in rel_db]),
-            cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr_db + [r.col for r in rel_db]]),
-            comma='' if len(attr_db + [r.col for r in rel_db]) == 0 else ', ',
+            cols=', '.join(attr_db_keep + [r.col for r in rel_db]),
+            cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr_db_keep + [r.col for r in rel_db]]),
+            comma='' if len(attr_db_keep + [r.col for r in rel_db]) == 0 else ', ',
             limit='' if limit <= 0 else f' LIMIT {limit}'
         )
 
+        # (3) Generate sites and groups:
+        sites = {}
+        groups = []
+        grp_n_tot = 0
+
+        with DB.open_conn(db_fpath) as c:
+            # (3.1) Sites:
+            for r in rel_db_keep:
+                # (3.1.1) Sites have been provided:
+                if r.sites is not None:
+                    sites[r.name] = r.sites
+                # (3.1.2) Sites have not been provided; generate them from the DB:
+                else:
+                    fk = DB.get_fk(c, tbl, r.col)
+                    sites[r.name] = Site.gen_from_db(db_fpath, tbl=fk.tbl_to, name_col=fk.col_to)
+
+            # (3.2) Groups:
+            row_cnt = DB.get_cnt(c, tbl)
+            for row in c.execute(qry).fetchall():
+                g_attr = {}  # group attributes
+                g_rel  = {}  # group relations
+
+                g_attr.update(attr_fix)
+                g_rel.update(rel_fix)
+
+                g_attr.update({ a: row[a] for a in attr_db_keep })
+                g_rel.update({ r.name: sites[r.name][row[r.col]] for r in rel_db_keep })
+
+                if rel_at is not None:
+                    g_rel.update({ Site.AT: g_rel.get(rel_at) })
+
+                groups.append(cls(n=row['n'], attr=g_attr, rel=g_rel))
+                grp_n_tot += int(row['n'])
+
+        if inf:
+            inf( '    Summary')
+            inf(f'        Records in table: {row_cnt}')
+            inf(f'        Groups formed: {len(groups)}')
+            inf(f'        Agent population accounted for by the groups: {grp_n_tot}')
+
+        return groups
+
+    @classmethod
+    def gen_from_db_tmp1(cls, sim, db_fpath, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0):
+        '''
+        So far unsuccessful attempt to internalize generation of sites from the DB.  As of 2019.04.24 this is no longer
+        the main development route as another has proved more fruitful.  Keeping this method here in case it comes
+        useful at some point.
+
+        @attrs()
+        class GroupDBRelSpec(object):
+            tbl      : str  = attrib()
+            col_from : str  = attrib()
+            col_to   : str  = attrib()
+            name     : str  = attrib()
+            sites    : dict = attrib(default=None)
+        '''
+
+        if not os.path.isfile(db_fpath):
+            raise ValueError(f'The database does not exist: {db_fpath}')
+
+        # (1) Remove attribute that don't exist in the DB:
+        with DB.open_conn(db_fpath) as c:
+            columns = [i[1] for i in c.execute(f'PRAGMA table_info({tbl})')]
+            attr_db_keep = [a for a in attr_db if a in columns]
+
+        # (2) Contruct the query:
+        qry = 'SELECT COUNT(*) AS n{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
+            tbl=tbl,
+            cols=', '.join(attr_db_keep + [r.col_from for r in rel_db]),
+            cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr_db_keep + [r.col_from for r in rel_db]]),
+            comma='' if len(attr_db_keep + [r.col_from for r in rel_db]) == 0 else ', ',
+            limit='' if limit <= 0 else f' LIMIT {limit}'
+        )
+
+        for i in rel_db:
+            # i.sites = Site.gen_from_db(db_fpath, i.tbl, name_col=i.col_to, rel_name=i.name)
+            Site.gen_from_db(sim, db_fpath, i.tbl, name_col=i.col_to, rel_name=i.name)
+
+        # (3) Generate groups:
         groups = []
         with DB.open_conn(db_fpath) as c:
             for row in c.execute(qry).fetchall():
@@ -573,13 +749,113 @@ class Group(Entity):
                 g_attr.update(attr)
                 g_rel.update(rel)
 
-                g_attr.update({ a: row[a] for a in attr_db })
+                g_attr.update({ a: row[a] for a in attr_db_keep })
+                # g_rel.update({ i.name: i.entities[row[i.col]] for i in rel_db })  # original
+                # g_rel.update({ i.name: i.sites[row[i.col]] for i in rel_db })     # same but with sites internalized
+                for i in rel_db:                                                    # new
+                    # site = i.sites[row[i.col_from]]
+                    site = sim.pop.sites[row[i.col_from]]
+                    # g_rel.update({ Site.AT: site })
+                    g_rel.update({ i.name: site })
+                    # sim.add_site(site)
+
+                if rel_at is not None:
+                    g_rel.update({ Site.AT: g_rel.get(rel_at) })
+
+                print(f'A:{g_attr}  R:{g_rel}')
+                groups.append(cls(n=row['n'], attr=g_attr, rel=g_rel))
+
+        return groups
+
+    @classmethod
+    def gen_from_db_tmp2(cls, db_fpath, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, fn_live_info=None):
+        '''
+        Before generating sites based on the DB schema.  Works.
+
+        In this method, lists are sometimes converted to allow for set operations (e.g., union or difference) and the
+        results of those operations are converted back to lists for nice output printout (e.g., '[]' is more succinct
+        than 'set()', which is what an empty set is printed out as).
+        '''
+
+        inf = fn_live_info  # shorthand
+
+        if not os.path.isfile(db_fpath):
+            raise ValueError(f'The database does not exist: {db_fpath}')
+
+        if inf:
+            inf('    Expected in table')
+            inf(f'        Attributes : {attr_db}')
+            inf(f'        Relations  : {[r.col for r in rel_db]}')
+
+        # (1) Sort out attributes and relations that do and do not exist in the table and reconcile them with the fixed ones:
+        # (1.1) Use table columns to identify the attributes and relations that do and do not exist:
+        with DB.open_conn(db_fpath) as c:
+            columns = [i[1] for i in c.execute(f'PRAGMA table_info({tbl})')]
+            attr_db_keep = [a for a in attr_db if a in columns]     # attributes to be kept based on the table schema
+            rel_db_keep  = [r for r in rel_db if r.col in columns]  # relations
+
+        if fn_live_info:
+            inf( '    Found in table')
+            inf(f'        Attributes : {attr_db_keep}')
+            inf(f'        Relations  : {[r.col for r in rel_db]}')
+            inf( '    Not found in table')
+            inf(f'        Attributes : {list(set(attr_db) - set(attr_db_keep))}')
+            inf(f'        Relations  : {list(set([r.col for r in rel_db]) - set([r.col for r in rel_db_keep]))}')
+            inf( '    Fixed manually')
+            inf(f'        Attributes : {attr_fix}')
+            inf(f'        Relations  : {rel_fix}')
+            if len(set(attr_db_keep) & set(attr_fix)) > 0:
+                inf( '    WARNING: The following exist in the table but will be masked because are manually fixed')
+                inf(f'        Attributes : {list(set(attr_db_keep)             & set(attr_fix.keys()))}')
+                inf(f'        Relations  : {list(set([r.col for r in rel_db])  & set(rel_fix.keys()))}')
+
+        # (1.2) Remove the fixed attributes and relations:
+        attr_db_keep = list(set(attr_db_keep) - set(attr_fix.keys()))
+        rel_db_keep  = [r for r in rel_db_keep if not r.col in rel_fix.keys()]
+
+        if fn_live_info:
+            inf( '    Final combination used for group forming')
+            inf(f'        Attributes fixed      : {attr_fix}')
+            inf(f'        Attributes from table : {attr_db_keep}')
+            inf(f'        Relations  fixed      : {rel_fix}')
+            inf(f'        Relations  from table : {[r.col for r in rel_db]}')
+
+        # (2) Contruct the query:
+        qry = 'SELECT COUNT(*) AS n{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
+            tbl=tbl,
+            cols=', '.join(attr_db_keep + [r.col for r in rel_db]),
+            cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr_db_keep + [r.col for r in rel_db]]),
+            comma='' if len(attr_db_keep + [r.col for r in rel_db]) == 0 else ', ',
+            limit='' if limit <= 0 else f' LIMIT {limit}'
+        )
+
+        # (3) Generate groups:
+        groups = []
+        grp_n_tot = 0
+
+        with DB.open_conn(db_fpath) as c:
+            row_cnt = DB.get_cnt(c, tbl)
+            for row in c.execute(qry).fetchall():
+                g_attr = {}  # group attributes
+                g_rel  = {}  # group relations
+
+                g_attr.update(attr_fix)
+                g_rel.update(rel_fix)
+
+                g_attr.update({ a: row[a] for a in attr_db_keep })
                 g_rel.update({ spec.name: spec.entities[row[spec.col]] for spec in rel_db })
 
                 if rel_at is not None:
                     g_rel.update({ Site.AT: g_rel.get(rel_at) })
 
                 groups.append(cls(n=row['n'], attr=g_attr, rel=g_rel))
+                grp_n_tot += int(row['n'])
+
+        if inf:
+            inf( '    Summary')
+            inf(f'        Records in table: {row_cnt}')
+            inf(f'        Groups formed: {len(groups)}')
+            inf(f'        Agent population accounted for by the groups: {grp_n_tot}')
 
         return groups
 
@@ -600,7 +876,7 @@ class Group(Entity):
         if d_upd is not None:
             ret.update(d_upd)
 
-        if k_del is not None:
+        if k_del is not None and len(k_del) > 0:
             for k in k_del:
                 if k in ret:
                     del ret[k]
@@ -608,19 +884,21 @@ class Group(Entity):
         return ret
 
     def get_attr(self, name=None):
-        if name is not None:
+        if name and self.attr_used is not None:
             self.attr_used.add(name)
 
-        return self.attr[name] if name is not None else self.attr
+        # return self.attr[name] if name is not None else self.attr
+        return self.attr.get(name) if name is not None else self.attr
 
     def get_hash(self):
         return self.__hash__()
 
     def get_rel(self, name=None):
-        if name is not None:
+        if name and self.rel_used is not None:
             self.rel_used.add(name)
 
-        return self.rel[name] if name is not None else self.rel
+        # return self.rel[name] if name is not None else self.rel
+        return self.rel.get(name) if name else self.rel
 
     def get_size(self):
         return self.n
@@ -628,13 +906,16 @@ class Group(Entity):
     def has_attr(self, qry):
         return Group._has(self.attr, qry, self.attr_used)
 
-    def has_rel(self, qry):
+    def has_rel(self, qry, are_sites=False):
         return Group._has(self.rel, qry, self.rel_used)
 
+    def has_sites(self, qry):
+        return Group._has(self.rel, qry, self.rel_used) and self._isinstance(qry, Site)
+
     def set_attr(self, name, value, do_force=True):
-        # if self.is_frozen:
-        #     raise GroupFrozenError('Attempting to set an attribute of a frozen group.')
-        #
+        if self.is_frozen:
+            raise GroupFrozenError('Attempting to set an attribute of a frozen group.')
+
         # if self.attr.get(name) is not None and not do_force:
         #     raise ValueError("Group '{}' already has the attribute '{}'.".format(self.name, name))
 
@@ -656,8 +937,8 @@ class Group(Entity):
         # if name == Site.AT:
         #     raise ValueError("Relation name '{}' is restricted for internal use.".format(Site.AT))
 
-        if self.rel.get(name) is not None and not do_force:
-            raise ValueError("Group '{}' already has the relation '{}'.".format(self.name, name))
+        if self.rel.get(name) and not do_force:
+            raise ValueError("Group '{}' already has the relation '{}'.".format(self.name or '.', name))
 
         self.rel[name] = value
         self.hash = None
@@ -707,10 +988,15 @@ class Group(Entity):
             attr = Group.gen_dict(self.attr, s.attr_set, s.attr_del)
             rel  = Group.gen_dict(self.rel,  s.rel_set,  s.rel_del)
 
-            g = Group('{}.{}'.format(self.name, i), n, attr, rel)
-            if g == self:
-                g.name = self.name
-            groups.append(g)
+            # g = Group('{}.{}'.format(self.name, i), n, attr, rel)
+            # if g == self:
+            #     g.name = self.name
+            # groups.append(g)
+
+            groups.append(Group(None, n, attr, rel))
+
+            if p_sum == 1.0:
+                break
 
         return groups
 

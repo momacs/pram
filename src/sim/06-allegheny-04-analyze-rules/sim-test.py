@@ -15,17 +15,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pram.data   import GroupSizeProbe, ProbeMsgMode
 from pram.entity import AttrFluStage, Group, GroupSplitSpec, Site
-from pram.rule   import GotoRule, Rule, TimeInt
-from pram.sim    import Simulation, SimulationConstructionError, SimulationConstructionWarning
+from pram.rule   import GoToRule, GoToAndBackTimeAtRule, TimeInt
+from pram.sim    import Simulation, SimulationConstructionError, SimulationConstructionWarning, TimeHour
 
-from rules import AttendSchoolRule, ProgressFluRule
+from rules import ProgressFluRule
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-sites = {
-    'home': Site('h'),
-    'work': Site('w')
-}
+sites = { 'home': Site('h'), 'work': Site('w') }
 
 probe_grp_size_flu = GroupSizeProbe.by_attr('flu', 'flu-stage', AttrFluStage, msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across flu stages')
 
@@ -34,17 +31,17 @@ probe_grp_size_flu = GroupSizeProbe.by_attr('flu', 'flu-stage', AttrFluStage, ms
 # (1) A proper simulation:
 
 print('(1)')
-s = (Simulation(6,1,16).
+s = (Simulation(TimeHour(6), 16).
     add_rule(ProgressFluRule()).
-    add_rule(AttendSchoolRule()).
+    add_rule(GoToAndBackTimeAtRule()).
     add_probe(probe_grp_size_flu).
     new_group('0', 1000).
         set_attr('flu-stage', AttrFluStage.NO).
         commit()
 )
 
-print(f'Attributes : {s.get_rules_compiler().attr}')  # this is only relevant internally, but we can still take a peak
-print(f'Relations  : {s.get_rules_compiler().rel}')   # ^
+print(f'Attributes : {s.last_run.attr_used}')
+print(f'Relations  : {s.last_run.rel_used}')
 
 print()
 
@@ -54,8 +51,8 @@ print()
 
 # (2.1) A group has superfluous attributes and relations, but automatic group pruning saved the day:
 print('(2.1)')
-(Simulation(6,1,16).
-    set_pragma_prune_groups(True).
+(Simulation(TimeHour(6), 16).
+    set_pragma_autoprune_groups(True).
     add_rule(ProgressFluRule()).
     add_probe(probe_grp_size_flu).
     new_group('0', 1000).
@@ -71,8 +68,8 @@ print()
 # (2.2) Like the simulation above, but two groups are added.  These two groups, when pruned, turn out identical;
 #       consequently, agent population mass gets automatically cumulated in the only resulting group.
 print('(2.2)')
-(Simulation(6,1,16).
-    set_pragma_prune_groups(True).
+(Simulation(TimeHour(6), 16).
+    set_pragma_autoprune_groups(True).
     add_rule(ProgressFluRule()).
     add_probe(probe_grp_size_flu).
     new_group('0', 500).
@@ -95,13 +92,13 @@ print()
 # (3.1) Problem: Attempting to add a rule after having added a group:
 print('(3.1)')
 try:
-    (Simulation(6,1,16).
+    (Simulation(TimeHour(6), 16).
         add_rule(ProgressFluRule()).
         add_probe(probe_grp_size_flu).
         new_group('0', 1000).
             set_attr('flu-stage', AttrFluStage.NO).
             commit().
-        add_rule(GotoRule(TimeInt(10,16), 0.4, 'home', 'work'))
+        add_rule(GoToRule(TimeInt(10,16), 0.4, 'home', 'work'))
     )
 except SimulationConstructionError as e:
     print(e)
@@ -110,7 +107,7 @@ print()
 # (3.2) Problem: Attempting to add a group with no rules present:
 print('(3.2)')
 try:
-    (Simulation(6,1,16).
+    (Simulation(TimeHour(6), 16).
         new_group('0', 1000).
             set_attr('flu-stage', AttrFluStage.NO).
             commit().
@@ -124,7 +121,7 @@ print()
 # (3.3) Problem: A group has superfluous attributes and relations:
 print('(3.3)')
 try:
-    (Simulation(6,1,16).
+    (Simulation(TimeHour(6), 16).
         add_rule(ProgressFluRule()).
         add_probe(probe_grp_size_flu).
         new_group('0', 1000).

@@ -6,27 +6,25 @@ demonstrate that they scale to this more realistic scenario.
 Based on: sim/03-attend-school
 '''
 
-import gc
-import gzip
-import os
-import pickle
-import sys
-
 import os
 import sys
 from inspect import getsourcefile
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import gc
+import gzip
+import os
+import pickle
+import signal
+import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
-from pram.data   import GroupSizeProbe, ProbeMsgMode
-from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
-from pram.rule   import GotoRule, Rule, TimeInt, TimePoint
-from pram.sim    import Simulation
+from pram.data   import ProbeMsgMode, GroupSizeProbe
+from pram.entity import Group, GroupDBRelSpec, GroupQry, Site
+from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, TimePoint
+from pram.sim    import HourTimer, Simulation
 from pram.util   import Size
-
-from rules import ResetSchoolDayRule, AttendSchoolRule
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -37,7 +35,11 @@ def inf(name, o, do_calc_size=False):
 # ----------------------------------------------------------------------------------------------------------------------
 # (0) Init:
 
-rand_seed = 1928
+def signal_handler(signal, frame):
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+
 
 dpath_res    = os.path.join(os.sep, 'Volumes', 'd', 'pitt', 'sci', 'pram', 'res', 'fred')
 dpath_cwd    = os.path.dirname(__file__)
@@ -217,10 +219,10 @@ few_schools = [sites['school'][k] for k in list(sites['school'].keys())[:n_schoo
 
 probe_grp_size_schools = GroupSizeProbe('school', [GroupQry(rel={ Site.AT: s }) for s in few_schools], msg_mode=ProbeMsgMode.DISP)
 
-(Simulation(7,1,10, rand_seed=rand_seed).
+(Simulation().
     add_rule(ResetSchoolDayRule(TimePoint(7))).
-    add_rule(AttendSchoolRule()).
+    add_rule(GoToAndBackTimeAtRule()).
     add_probe(probe_grp_size_schools).
     add_groups(groups).
-    run()
+    run(10)
 )

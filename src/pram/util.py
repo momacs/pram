@@ -22,6 +22,7 @@ import string
 import sys
 import time
 
+from dotmap  import DotMap
 from pathlib import Path
 
 
@@ -43,6 +44,30 @@ class DB(object):
     VALID_CHARS = f'_{string.ascii_letters}{string.digits}'
 
     PATT_VALID_NAME = re.compile('^[a-zA-Z][a-zA-Z0-9_]*$')
+
+    @staticmethod
+    def get_num(conn, tbl, col, where=None):
+        where = '' if where is None else f' WHERE {where}'
+        row = conn.execute(f'SELECT {col} FROM {tbl}{where}').fetchone()
+        return row[0] if row else None
+
+    @staticmethod
+    def get_cnt(conn, tbl, where=None):
+        return DB.get_num(conn, tbl, 'COUNT(*)', where)
+
+    @staticmethod
+    def get_id(conn, tbl, col='rowid', where=None):
+        return DB.get_num(conn, tbl, 'rowid', where)
+
+    @staticmethod
+    def get_fk(conn, tbl, col_from):
+        ''' Get the foreign key constraint for the specified table and column. '''
+
+        with conn as c:
+            for row in c.execute(f'PRAGMA foreign_key_list({tbl})').fetchall():
+                if row['from'] == col_from:
+                    return DotMap(tbl_to=row['table'], col_to=row['to'])
+            return None
 
     @staticmethod
     def open_conn(fpath):
@@ -251,6 +276,11 @@ class FS(object):
             return f.read()
 
     @staticmethod
+    def req_file(fpath, msg):
+        if not os.path.isfile(fpath):
+            raise ValueError(msg)
+
+    @staticmethod
     def save(fpath, data, mode='w', compress_lvl=9):
         # # TODO: Detect implied compression through extension.
         # with open(fpath, mode) as f:
@@ -339,6 +369,10 @@ class Size(object):
         return inner(obj0)
 
     @staticmethod
+    def b2h(b, do_ret_tuple=False):
+        return __class__.bytes2human(b, do_ret_tuple)
+
+    @staticmethod
     def bytes2human(b, do_ret_tuple=False):
         symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
         prefix = {}
@@ -416,6 +450,26 @@ class Time(object):
 
     POSIX_TS = datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=0)  # POSIX timestamp; datetime.datetime.utcfromtimestamp(0)
     POSIX_DT = datetime.datetime(1970, 1, 1)                                  # POSIX datetime
+
+    PATT_STR_DUR = re.compile('^(\d+)\s*(\w+)$')
+
+    MS = DotMap({
+        'ys'  : 10 ** -21,
+        'zs'  : 10 ** -18,
+        'as'  : 10 ** -15,
+        'fs'  : 10 ** -12,
+        'ps'  : 10 **  -9,
+        'ns'  : 10 **  -6,
+        'mus' : 10 **  -3,
+        'ms'  : 1,
+        's'   : 1000,
+        'm'   : 1000 * 60,
+        'h'   : 1000 * 60 * 60,
+        'd'   : 1000 * 60 * 60 * 24,
+        'w'   : 1000 * 60 * 60 * 24 * 7,
+        'M'   : 1000 * 60 * 60 * 24 * 365 / 12,
+        'y'   : 1000 * 60 * 60 * 24 * 365
+    })
 
     @staticmethod
     def dt():
@@ -503,24 +557,45 @@ class Time(object):
 
         return ('%d days, ' + pattern) % (d, h, m, s)
 
+    @staticmethod
+    def dur2ms(s):
+        m = __class__.PATT_STR_DUR.match(s)
+
+        # Extract the parts:
+        if len(m.groups()) != 2:
+            raise ValueError(f'Incorrect duration specification: {s}')
+
+        # The number part:
+        try:
+            n = int(m[1])
+        except:
+            raise ValueError(f'Incorrect duration number: {s}')
+
+        # The unit part:
+        if m[2] not in __class__.MS:
+            raise ValueError(f'Incorrect duration unit: {m[2]}')
+        ms = __class__.MS[m[2]]
+
+        return n * ms
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     print('--- Size ---')
-    print(Size.bytes2human(154))
-    print(Size.bytes2human(1540))
-    print(Size.bytes2human(15400))
-    print(Size.bytes2human(154000))
-    print(Size.bytes2human(1540000))
-    print(Size.bytes2human(15400000))
-    print(Size.bytes2human(154000000))
-    print(Size.bytes2human(1540000000))
-    print(Size.bytes2human(15400000000))
-    print(Size.bytes2human(154000000000))
-    print(Size.bytes2human(1540000000000))
+    print(Size.b2h(154))
+    print(Size.b2h(1540))
+    print(Size.b2h(15400))
+    print(Size.b2h(154000))
+    print(Size.b2h(1540000))
+    print(Size.b2h(15400000))
+    print(Size.b2h(154000000))
+    print(Size.b2h(1540000000))
+    print(Size.b2h(15400000000))
+    print(Size.b2h(154000000000))
+    print(Size.b2h(1540000000000))
 
-    print(*Size.bytes2human(154, True))
-    print('{:.1f}{}'.format(*Size.bytes2human(154, True)))
+    print(*Size.b2h(154, True))
+    print('{:.1f}{}'.format(*Size.b2h(154, True)))
 
     print('\n--- DB ---')
     print(DB.str_to_name('one fine column name'))
@@ -530,3 +605,12 @@ if __name__ == '__main__':
     print(DB.str_to_name('123 fine column name'))
     print(DB.str_to_name('123 fine column ... name'))
     print(DB.str_to_name('123 /a77&<>.,":[)(]'))
+
+    print('\n--- Time ---')
+    print(Time.dur2ms('7ms'))
+    print(Time.dur2ms('1s'))
+    print(Time.dur2ms('1d'))
+    print(Time.dur2ms('25h'))
+    print(Time.dur2ms('2d'))
+    print(Time.dur2ms('10m'))
+    print(Time.dur2ms('10M'))

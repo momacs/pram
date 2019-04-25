@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import os
 import sqlite3
 
@@ -158,9 +159,11 @@ class ProbeMsgMode(Flag):
     CUMUL = auto()  # hold messages in the buffer
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+Var   = namedtuple('Var', ['name', 'type'])           # having this inside of the Probe class breaks Flask/Celery
+Const = namedtuple('Const', ['name', 'type', 'val'])  # ^
+
 class Probe(ABC):
-    Var   = namedtuple('Var', ['name', 'type'])
-    Const = namedtuple('Const', ['name', 'type', 'val'])
 
     def __init__(self, name, msg_mode=ProbeMsgMode.DISP, pop=None, memo=None):
         self.name = name
@@ -206,8 +209,8 @@ class GroupSizeProbe(Probe):
 
         if var_names is None:
             self.vars = \
-                [Probe.Var(f'p{i}', 'float') for i in range(len(self.queries))] + \
-                [Probe.Var(f'n{i}', 'float') for i in range(len(self.queries))]
+                [Var(f'p{i}', 'float') for i in range(len(self.queries))] + \
+                [Var(f'n{i}', 'float') for i in range(len(self.queries))]
                 # proportions and numbers
             # self.vars = [Probe.Var(f'v{i}', 'float') for i in range(len(self.queries))]
         else:
@@ -226,7 +229,7 @@ class GroupSizeProbe(Probe):
                     raise ValueError(f"Variable name error: Name '{vn}' translates into a database name '{vn_db}' which already exists.")
 
                 vn_db_used.add(vn_db)
-                self.vars.append(Probe.Var(vn_db, 'float'))
+                self.vars.append(Var(vn_db, 'float'))
 
         self.set_consts(consts)
         self.set_persistance(persistance)
@@ -250,15 +253,26 @@ class GroupSizeProbe(Probe):
         return 'Probe  name: {:16}  query-cnt: {:>3}'.format(self.name, len(self.queries))
 
     def run(self, iter, t):
-        if self.msg_mode != 0 or self.persistance is not None:
-            n_tot = sum([g.n for g in self.pop.get_groups(self.qry_tot)])  # TODO: If the total mass never changed, we could memoize this (likely in GroupPopulation).
+        '''
+        Leaving both 'iter' and 't' at their default of 'None' will prevent persistance from being invokedand message cumulation.  It
+        will still allow print to stdout.  This is used by the sim.Simulation class to print the intial state of the
+        system (as seen by those probes that print) before the simulation run begins.
+        '''
+
+        if self.msg_mode != 0 or self.persistance:
+            n_tot = sum([g.n for g in self.pop.get_groups(self.qry_tot)])  # TODO: If the total mass never changed, we could memoize this (either here or in GroupPopulation).
             n_qry = [sum([g.n for g in self.pop.get_groups(q)]) for q in self.queries]
+
+        # if iter and iter >= 40:
+        #     # print(f'    {self.name}  {round(n_tot)}  {[round(i) for i in n_qry]}')
+        #     # print(f'    {self.name}\n         {self.pop.get_groups(self.qry_tot)}\n        {[self.pop.get_groups(q) for q in self.queries]}\n')
+        #     pass
 
         # Message:
         if self.msg_mode != 0:
             msg = []
             if n_tot > 0:
-                msg.append('{:2}  {}: ('.format(t, self.name))
+                msg.append('{:2}  {}: ('.format(t if not t is None else '.', self.name))
                 for n in n_qry:
                     msg.append('{:.2f} '.format(abs(round(n / n_tot, 2))))  # abs solves -0.00, likely due to rounding and string conversion
                 msg.append(')   (')
@@ -266,7 +280,7 @@ class GroupSizeProbe(Probe):
                     msg.append('{:>7} '.format(abs(round(n, 1))))  # abs solves -0.00, likely due to rounding and string conversion
                 msg.append(')   [{}]'.format(round(n_tot, 1)))
             else:
-                msg.append('{:2}  {}: ---'.format(t, self.name))
+                msg.append('{:2}  {}: ---'.format(t if not t is None else '.', self.name))
 
             if self.msg_mode & ProbeMsgMode.DISP:
                 print(''.join(msg))
@@ -274,12 +288,15 @@ class GroupSizeProbe(Probe):
                 self.msg.append(''.join(msg))
 
         # Persistance:
-        if self.persistance is not None:
+        if self.persistance and not iter is None:
             vals_p = []
             vals_n = []
             for n in n_qry:
                 vals_p.append(n / n_tot)
                 vals_n.append(n)
+
+            # if iter and iter >= 40:
+            #     print(f'    {self.name}  {round(n_tot)}  {[round(i,2) for i in vals_p]}')
 
             self.persistance.persist(self, vals_p + vals_n, iter, t)
 

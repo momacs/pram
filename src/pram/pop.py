@@ -20,6 +20,11 @@ class GroupPopulation(object):
         self.sites = {}
         self.resources = {}
 
+        self.size = 0
+        self.n_distrib_last = 0  # number of agents distributed during the most recent mass distribution
+
+        self.is_frozen = False  # the simulation freezes the population on first run
+
     def __repr__(self):
         pass
 
@@ -34,6 +39,9 @@ class GroupPopulation(object):
         All groups added to the population become frozen to prevent the user from changing their attribute and relations
         directly; doing it via group splitting is the proper way.
         '''
+
+        if not self.is_frozen:
+            self.size += group.n
 
         g = self.groups.get(group.get_hash())
         if g is not None:
@@ -81,18 +89,20 @@ class GroupPopulation(object):
             self.add_site(s)
         return self
 
-    def apply_rules(self, rules, iter, t, is_setup=False):
+    def apply_rules(self, rules, iter, t, is_rule_setup=False, is_rule_cleanup=False, is_sim_setup=False):
         '''
         Iterates through groups and for each applies all rules (which is handled intelligently by the Group class).
         The result of (possible) rules applications is a list of new groups the original group should be split into.
         When all the groups have been processed in this way, and all new groups have been defined, they are
         subsequently used for actual mass redistribution (which updates existing groups and creates new ones).
+
+        Returns the total number of agents displaced.
         '''
 
         new_groups = []
         upd_group_hashes = set()  # hashes of groups to be updated (to safeguard against resetting unaffected groups)
         for g in self.groups.values():
-            new_groups_g = g.apply_rules(self, rules, iter, t, is_setup)
+            new_groups_g = g.apply_rules(self, rules, iter, t, is_rule_setup, is_rule_cleanup, is_sim_setup)
             if new_groups_g is not None:
                 new_groups.extend(new_groups_g)
                 upd_group_hashes.add(g.get_hash())
@@ -102,11 +112,21 @@ class GroupPopulation(object):
 
         return self.distribute_mass(upd_group_hashes, new_groups)
 
+    def compact(self):
+        # Remove empty groups:
+        self.groups = { k:v for k,v in self.groups.items() if v.n > 0 }
+
+        return self
+
     def distribute_mass(self, upd_group_hashes, new_groups):
         '''
         Distributes the mass as described by the list of new groups.  Because not all groups may participate in mass
         distribution, sizes of only those that actually do are updated.
+
+        Returns the total number of agents displaced.
         '''
+
+        n = 0  # number of agents redistributed
 
         # Reset the population mass (but only for the groups that are being updated):
         for h in upd_group_hashes:
@@ -124,10 +144,20 @@ class GroupPopulation(object):
             else:
                 self.add_group(g01)
 
-        # Notify sites of mass redistribution:
-        for s in self.sites.values():
-            s.invalidate_pop()
+            n += g01.n
 
+        # Notify sites of mass redistribution:
+        # for s in self.sites.values():
+        #     s.invalidate_pop()  # TODO: Develop this further (AFAIR, unused ATM).
+
+        self.n_distrib_last = n
+
+        return self
+
+    def freeze(self):
+        # [g.freeze() for g in self.groups.values()]
+        # self.groups = { g.get_hash(): g for g in self.groups.values() }
+        self.is_frozen = True
         return self
 
     def gen_agent_pop(self):
@@ -137,7 +167,8 @@ class GroupPopulation(object):
 
     def get_group(self, qry=None):
         '''
-        Returns the group with the all attributes and relations as specified; or None if such a group does not exist.
+        Returns the group with the all attributes and relations as specified; or None if such a group does not
+        exist.
 
         qry: GroupQry
         '''
@@ -153,8 +184,8 @@ class GroupPopulation(object):
 
     def get_groups(self, qry=None):
         '''
-        Returns a list of groups that contain the specified attributes and relation.  Both those dictionaries could be
-        empty, in which case all groups would be returned.
+        Returns a list of groups that contain the specified attributes and relation.  Both those dictionaries
+        could be empty, in which case all groups would be returned.
 
         qry: GroupQry
         '''
@@ -182,4 +213,5 @@ class GroupPopulation(object):
         return len(self.sites)
 
     def get_size(self):
-        return sum([g.n for g in self.groups.values()])
+        # return sum([g.n for g in self.groups.values()])
+        return self.size

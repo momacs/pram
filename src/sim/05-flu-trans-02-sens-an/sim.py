@@ -18,18 +18,17 @@ import numpy as np
 
 from collections import namedtuple
 
-from pram.sim    import Simulation
+from pram.data   import Probe, ProbePersistanceDB, GroupSizeProbe
 from pram.entity import AttrFluStage, GroupQry, GroupSplitSpec, Site
-from pram.data   import GroupSizeProbe, Probe, ProbeMsgMode, ProbePersistanceDB
-from pram.rule   import GotoRule, Rule, TimeInt, TimePoint
+from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, TimeInt, TimePoint
+from pram.sim    import HourTimer, Simulation
 
-from rules import ResetSchoolDayRule, AttendSchoolRule, ProgressAndTransmitFluRule
+from rules import ProgressAndTransmitFluRule
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # (1) Init, sites, and probes:
 
-rand_seed = 1928
 sim_dur_days = 7
 
 Spec = namedtuple('Spec', ('name', 'n'))
@@ -88,7 +87,9 @@ flu_rule = ProgressAndTransmitFluRule()
 
 def run_sim(p_lst):
     for p in p_lst:
-        sim = (Simulation(6,1,24 * sim_dur_days, rand_seed=rand_seed).
+        sim = (Simulation().
+            set_timer(HourTimer(6)).
+            set_iter_cnt(24 * sim_dur_days).
             add_rule(ResetSchoolDayRule(TimePoint(7))).
             add_rule(AttendSchoolRule()).
             add_rule(flu_rule).
@@ -96,13 +97,13 @@ def run_sim(p_lst):
         )
 
         for s in specs:
-            (sim.new_group(s.name, s.n).
+            (sim.new_group(s.n, s.name).
                 set_attr('is-student', True).
                 set_attr('flu-stage', AttrFluStage.NO).
                 set_rel(Site.AT,  sites['home']).
                 set_rel('home',   sites['home']).
                 set_rel('school', sites[f'school-{s.name}']).
-                commit()
+                done()
             )
 
         setattr(flu_rule, 'p_infection_min', p)

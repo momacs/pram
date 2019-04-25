@@ -1,0 +1,497 @@
+<!doctype html>
+
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>PRAM</title>
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans" />
+
+    <!--
+    <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}">
+    -->
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link type="text/css" rel="stylesheet" href="{{url_for('static', filename='css/materialize.min.css')}}"  media="screen,projection" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!--
+    <style type="text/css">
+        @viewport { width: device-width; zoom: 1.0; }
+
+        body  { margin: 20px 0px 0px 0px; font-size: 1em; text-align: center; background: transparent url('kindajean.png') repeat scroll 0%; cursor: default; -webkit-font-smoothing: subpixel-antialiased; -moz-font-smoothing: subpixel-antialiased; -o-font-smoothing: subpixel-antialiased; }
+        p,span,div,td,input,textarea,select  { font-family: 'Open Sans',Calibri,Tahoma,Geneva,Helvetica,Arial,sans-script; font-weight: 400; line-height: 150%; }
+
+        @media only screen and ( max-device-width: 736px ) {
+            body { margin: 0px 0px 0px 0px; background: #fafafa; }
+        }
+    </style>
+    -->
+
+    <!--
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="{{url_for('static', filename='jquery.js') }}">\x3C/script>')</script><hr>
+    -->
+
+    <script type="text/javascript" src="https://unpkg.com/promise-polyfill@7.1.2/dist/polyfill.min.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/whatwg-fetch@2.0.4/fetch.js"></script>
+
+    <script type="text/javascript" src="{{url_for('static', filename='js/materialize.min.js')}}"></script>
+
+    <script>
+        $ = (id) => document.getElementById(id);
+
+        function sum() {
+            fd = new FormData();
+            fd.append('a', $('sum-a').value);
+            fd.append('b', $('sum-b').value);
+
+            fetch({{ url_for('add')|tojson }}, { method: 'POST', body: fd }).
+            then(res => res.json()).
+            then(data => { $('sum-out').innerText = data.res; });
+        }
+
+        function sim() {
+            fetch({{ url_for('sim01')|tojson }}, { method: 'POST' }).
+            then(res => res.text()).
+            then(text => {
+                $('sim-out').value = text;
+                M.textareaAutoResize($('sim-out'));
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            $('sum').addEventListener('click', sum, false);
+            $('btn-epi-sim-01').addEventListener('click', sim, false);
+
+            // M.AutoInit();
+            M.Tabs.init(document.querySelectorAll('.tabs'), { swipeable: false });
+            M.Collapsible.init(document.querySelectorAll('.collapsible'), { accordion: true, inDuration: 150, outDuration: 150 });
+            M.FloatingActionButton.init(document.querySelectorAll('.fixed-action-btn'), {});
+            M.Sidenav.init(document.querySelectorAll('.sidenav'), {});
+        });
+    </script>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="nav-extended">
+        <div class="nav-wrapper">
+            <a href="#" class="brand-logo">PRAM</a>
+            <ul class="right">
+                <li><a id="btn-ping" class="waves-effect waves-light btn">Ping</a></li>
+            </ul>
+        </div>
+        <div class="nav-content">
+            <ul class="tabs tabs-transparent">
+                <li class="tab"><a class="active" href="#tab-01">Flu: Simple</a></li>
+                <li class="tab"><a href="#tab-02">Flu: Allegheny</a></li>
+                <li class="tab"><a href="#tab-03">University</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div id="tab-01" class="col s12">
+        <ul class="collapsible">
+
+            <li class="active">
+                <div class="collapsible-header"><i class="material-icons">looks_one</i>The Flu at School</div>
+                <div class="collapsible-body">
+                    <!--
+                    <div class="row">
+                        <p class="range-field">
+                            <input type="range" id="test5" min="0" max="100" />
+                        </p>
+
+                        <label>
+                        <input type="checkbox" checked="checked" class="filled-in" />
+                        <span>Yellow</span>
+                        </label>
+
+                        <label>
+                        Off
+                        <input type="checkbox">
+                        <span class="lever"></span>
+                        On
+                        </label>
+                    </div>
+                    -->
+
+                    <div class="section">
+                        <h5>Description</h5>
+                        <p>A simple simulation.</p>
+                    </div>
+
+                    <div class="section">
+                        <h5>Controls</h5>
+                        <!-- <form action="#" class="col s6"> -->
+                        <div class="row">
+                            <div class="input-field col s3">
+                                <label for="step-cnt">Step count</label>
+                                <input id="step-cnt" type="text" />
+                            </div>
+                        </div>
+                        <div class="row">
+                            <button id="btn-epi-sim-01" class="btn waves-effect waves-light" name="action">Run
+                                <i class="material-icons right">play_circle_filled</i>
+                            </button>
+                        </div>
+                        <!-- </form> -->
+                    </div>
+
+                    <div class="section">
+                        <h5>Results</h5>
+                        <div class="row">
+                            <div class="input-field col s6">
+                                <i class="material-icons prefix">play_circle_outline</i>
+                                <textarea id="sim-out" class="materialize-textarea"></textarea>
+                                <label for="sim-out">Output</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </li>
+
+            <li>
+                <div class="collapsible-header"><i class="material-icons">looks_two</i>The Flu at Schools in the Allegheny County</div>
+                <div class="collapsible-body">
+                </div>
+            </li>
+
+            <li>
+                <div class="collapsible-header"><i class="material-icons">looks_3</i>...</div>
+                <div class="collapsible-body">
+                    <div class="row">
+                        <div class="progress">
+                            <div class="determinate" style="width: 70%"></div>
+                        </div>
+                    </div>
+                </div>
+            </li>
+
+            <li>
+                <div class="collapsible-header"><i class="material-icons">looks_4</i>...</div>
+                <div class="collapsible-body">
+                    <div class="card" style="width:300px">
+                        <div class="card-content">
+                            <p>A simulation framework that fuses relational probabilistic models and agent-based models. This software is in the pre-release stage, so feel free to play with it, but keep in mind that not all pieces may be working. Until there is a release, please don't open issues and flex your own Python muscle to fix problems you encounter.</p>
+                        </div>
+                        <div class="card-tabs">
+                            <ul class="tabs tabs-fixed-width">
+                                <li class="tab"><a class="active" href="#card-01">Sim 1</a></li>
+                                <li class="tab"><a href="#card-02">Sim 2</a></li>
+                                <li class="tab"><a href="#card-03">Sim 3</a></li>
+                            </ul>
+                        </div>
+                        <div class="card-content grey lighten-4">
+                            <div id="card-01">Output 1</div>
+                            <div id="card-02">Output 2</div>
+                            <div id="card-03">Output 3</div>
+                        </div>
+                    </div>
+                </div>
+            </li>
+
+            <li>
+                <div class="collapsible-header"><i class="material-icons">looks_5</i>...</div>
+                <div class="collapsible-body">
+                </div>
+            </li>
+
+            <li>
+                <div class="collapsible-header"><i class="material-icons">looks_6</i>...</div>
+                <div class="collapsible-body">
+                    <div class="row">
+                        <div class="input-field col s6">
+                            <label for="sum-a">a</label>
+                            <input id="sum-a" type="text" placeholder="10" />
+                        </div>
+                        <div class="input-field col s6">
+                            <label for="sum-b">b</label>
+                            <input id="sum-b" type="text" placeholder="20" />
+                        </div>
+                        <div class="input-field col s6">
+                            <a id="sum" class="waves-effect waves-light btn">Sum!</a>
+                        </div>
+                        <div class="input-field col s6">
+                            <span><span id="sum-out">?</span></span>
+                        </div>
+                    </div>
+                </div>
+            </li>
+
+        </ul>
+    </div>
+
+    <div id="tab-02" class="col s12">
+        xyz
+    </div>
+
+    <div id="tab-03" class="col s12">
+        XYZ
+    </div>
+
+    <!-- Navbar -->
+    <!--
+    <ul id="dropdown-navbar" class="dropdown-content">
+        <li><a href="#!">one</a></li>
+        <li><a href="#!">two</a></li>
+        <li class="divider"></li>
+        <li><a href="#!">three</a></li>
+    </ul>
+    <nav>
+        <div class="nav-wrapper">
+            <a href="#!" lass="brand-logo">PRAM</a>
+            <ul class="right">
+                <li><a class="dropdown-trigger" href="#!" data-target="dropdown-navbar">Options<i class="material-icons right">arrow_drop_down</i></a></li>
+                <li><a id="btn-ping" class="waves-effect waves-light btn">Ping</a></li>
+            </ul>
+        </div>
+    </nav>
+    -->
+
+
+
+
+    <!-- Floating action button -->
+    <!--
+    <div class="fixed-action-btn">
+        <a class="btn-floating btn-large red">
+            <i class="large material-icons">mode_edit</i>
+        </a>
+        <ul>
+            <li><a class="btn-floating red"><i class="material-icons">insert_chart</i></a></li>
+            <li><a class="btn-floating yellow darken-1"><i class="material-icons">format_quote</i></a></li>
+            <li><a class="btn-floating green"><i class="material-icons">publish</i></a></li>
+            <li><a class="btn-floating blue"><i class="material-icons">attach_file</i></a></li>
+        </ul>
+    </div>
+    -->
+
+    <!-- Tabs -->
+    <div _id="tabs" class="row" style="display: none">
+        <div class="col s12">
+            <ul class="tabs">
+                <li class="tab col s2"><a href="#tab-epi">Epidemiology</a></li>
+                <li class="tab col s2"><a href="#tab-port-auth">Port Authority</a></li>
+                <li class="tab col s2"><a href="#tab-uni">University Admissions</a></li>
+            </ul>
+        </div>
+
+        <!-- Tab: Epidemiology -->
+        <div id="tab-epi" class="col s12">
+            <ul class="collapsible">
+
+                <li class="active">
+                    <div class="collapsible-header"><i class="material-icons">looks_one</i>The Flu at School</div>
+                    <div class="collapsible-body">
+                        <!--
+                        <div class="row">
+                            <p class="range-field">
+                                <input type="range" id="test5" min="0" max="100" />
+                            </p>
+
+                            <label>
+                            <input type="checkbox" checked="checked" class="filled-in" />
+                            <span>Yellow</span>
+                            </label>
+
+                            <label>
+                            Off
+                            <input type="checkbox">
+                            <span class="lever"></span>
+                            On
+                            </label>
+                        </div>
+                        -->
+
+                        <div class="section">
+                            <h5>Description</h5>
+                            <p>A simple simulation.</p>
+                        </div>
+
+                        <div class="section">
+                            <h5>Controls</h5>
+                            <!-- <form action="#" class="col s6"> -->
+                            <div class="row">
+                                <div class="input-field col s3">
+                                    <label for="step-cnt">Step count</label>
+                                    <input id="step-cnt" type="text" />
+                                </div>
+                            </div>
+                            <div class="row">
+                                <button id="btn-epi-sim-01" class="btn waves-effect waves-light" name="action">Run
+                                    <i class="material-icons right">play_circle_filled</i>
+                                </button>
+                            </div>
+                            <!-- </form> -->
+                        </div>
+
+                        <div class="section">
+                            <h5>Results</h5>
+                            <div class="row">
+                                <div class="input-field col s6">
+                                    <i class="material-icons prefix">play_circle_outline</i>
+                                    <textarea id="sim-out" class="materialize-textarea"></textarea>
+                                    <label for="sim-out">Output</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+
+                <li>
+                    <div class="collapsible-header"><i class="material-icons">looks_two</i>The Flu at Schools in the Allegheny County</div>
+                    <div class="collapsible-body">
+                    </div>
+                </li>
+
+                <li>
+                    <div class="collapsible-header"><i class="material-icons">looks_3</i>...</div>
+                    <div class="collapsible-body">
+                        <div class="row">
+                            <div class="progress">
+                                <div class="determinate" style="width: 70%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+
+                <li>
+                    <div class="collapsible-header"><i class="material-icons">looks_4</i>...</div>
+                    <div class="collapsible-body">
+                        <div class="card" style="width:300px">
+                            <div class="card-content">
+                                <p>A simulation framework that fuses relational probabilistic models and agent-based models. This software is in the pre-release stage, so feel free to play with it, but keep in mind that not all pieces may be working. Until there is a release, please don't open issues and flex your own Python muscle to fix problems you encounter.</p>
+                            </div>
+                            <div class="card-tabs">
+                                <ul class="tabs tabs-fixed-width">
+                                    <li class="tab"><a class="active" href="#card-01">Sim 1</a></li>
+                                    <li class="tab"><a href="#card-02">Sim 2</a></li>
+                                    <li class="tab"><a href="#card-03">Sim 3</a></li>
+                                </ul>
+                            </div>
+                            <div class="card-content grey lighten-4">
+                                <div id="card-01">Output 1</div>
+                                <div id="card-02">Output 2</div>
+                                <div id="card-03">Output 3</div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+
+                <li>
+                    <div class="collapsible-header"><i class="material-icons">looks_5</i>...</div>
+                    <div class="collapsible-body">
+                    </div>
+                </li>
+
+                <li>
+                    <div class="collapsible-header"><i class="material-icons">looks_6</i>...</div>
+                    <div class="collapsible-body">
+                        <div class="row">
+                            <div class="input-field col s6">
+                                <label for="sum-a">a</label>
+                                <input id="sum-a" type="text" placeholder="10" />
+                            </div>
+                            <div class="input-field col s6">
+                                <label for="sum-b">b</label>
+                                <input id="sum-b" type="text" placeholder="20" />
+                            </div>
+                            <div class="input-field col s6">
+                                <a id="sum" class="waves-effect waves-light btn">Sum!</a>
+                            </div>
+                            <div class="input-field col s6">
+                                <span><span id="sum-out">?</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+
+            </ul>
+        </div>
+
+        <!-- Tab: Port Authority -->
+        <div id="tab-port-auth" class="col s12">
+            <ul class="collapsible">
+                <li>
+                    <div class="collapsible-header"><i class="material-icons">looks_one</i>Simulation</div>
+                    <div class="collapsible-body">
+                </li>
+            </ul>
+        </div>
+
+        <!-- Tab: University Admissions -->
+        <div id="tab-uni" class="col s12">
+            <ul class="collapsible">
+                <li>
+                    <div class="collapsible-header"><i class="material-icons">looks_one</i>Simulation</div>
+                    <div class="collapsible-body">
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!--
+    <div id="tabs" class="row">
+        <div class="col s12">
+            <ul class="tabs">
+                <li class="tab col s3"><a href="#test1">Test 1</a></li>
+                <li class="tab col s3"><a class="active" href="#test2">Test 2</a></li>
+                <li class="tab col s3 disabled"><a href="#test3">Disabled Tab</a></li>
+                <li class="tab col s3"><a href="#test4">Test 4</a></li>
+            </ul>
+        </div>
+
+        <div id="test1" class="col s12">
+            <input id="a" name="a" value="2" />
+            <input id="b" name="b" value="4" />
+            <a id="sum" class="waves-effect waves-light btn">Sum!</a>
+            <span><span id="sum-out">?</span></span>
+        </div>
+
+        <div id="test2" class="col s12">
+            <a id="sim" class="waves-effect waves-light btn">Simulate!</a>
+            <textarea id="sim-out"></textarea>
+        </div>
+
+        <div id="test3" class="col s12">Test 3</div>
+
+        <div id="test4" class="col s12">Test 4</div>
+    </div>
+    -->
+
+    <!-- <a class="btn-floating btn-large waves-effect waves-light red"><i class="material-icons">add</i></a> -->
+
+    <!--
+    <footer class="page-footer">
+        <div class="container">
+            <div class="row">
+                <div class="col l6 s12">
+                    <h5 class="white-text">Footer Content</h5>
+                    <p class="grey-text text-lighten-4">You can use rows and columns here to organize your footer content.</p>
+                </div>
+                <div class="col l4 offset-l2 s12">
+                    <h5 class="white-text">Links</h5>
+                    <ul>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 1</a></li>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 2</a></li>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 3</a></li>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 4</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="footer-copyright">
+            <div class="container">
+                © 2014 Copyright Text
+                <a class="grey-text text-lighten-4 right" href="#!">More Links</a>
+            </div>
+        </div>
+    </footer>
+    -->
+</body>
+
+</html>

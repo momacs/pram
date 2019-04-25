@@ -1,0 +1,602 @@
+<!doctype html>
+<html>
+<head>
+    <!--
+    Res
+        https://materializecss.com/icons.html
+    -->
+
+    <meta charset="utf-8">
+    <title>PRAM Demo</title>
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Exo+2">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="{{url_for('static', filename='css/materialize.min.css')}}" media="screen,projection" />
+    <link rel="stylesheet" href="{{url_for('static', filename='css/style.css')}}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <style type="text/css">
+        #server-load-avg    { font-weight: bold; }
+        #btn-sim-flu-reset  { margin-right: 40px; }
+        #sim-flu-out        { _overflow-y: scroll; _max-height: 300px; _padding: 4px 8px 4px 8px; font: 1em courier; _border: 1px solid #eee; background: #fafafa; white-space: pre; }
+        #sim-flu-out > div  { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+    </style>
+
+    <!--
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="{{url_for('static', filename='jquery.js') }}">\x3C/script>')</script><hr>
+    -->
+
+    <script type="text/javascript" src="https://unpkg.com/promise-polyfill@7.1.2/dist/polyfill.min.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/whatwg-fetch@2.0.4/fetch.js"></script>
+    <script type="text/javascript" src="{{url_for('static', filename='js/materialize.min.js')}}"></script>
+
+    <script>
+        'use strict';
+
+        const sysGetLoadWait  = 500;  // time between get-system-load requests [ms]
+        const simUpdWait      = 100;  // time between simulation-update requests [ms]
+
+        var app = {
+            isMonitoringSysLoad: false,
+            isRoot: false
+        };
+
+        var ui = {
+            btnUserRootInnerHTML  : 'person_add',
+            btnUserUserInnerHTML  : 'person',
+            // simInfIcon : 'info_outline',
+            // simCtlIcon : 'tune',
+            // simOutIcon : 'equalizer'
+            iconSimInf : 'looks_one',
+            iconSimCtl : 'looks_two',
+            iconSimOut : 'looks_3'
+        };
+
+
+        // -------------------------------------------------------------------------------------------------------------
+        // ----[ UTIL ]-------------------------------------------------------------------------------------------------
+        // -------------------------------------------------------------------------------------------------------------
+
+        let $ = (id) => document.getElementById(id);
+        let hide = (id) => $(id).style.display = 'none';
+        let show = (id) => $(id).style.display = 'block';
+        let sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        let $$ = (tag, parent=null, id='', cls='', innerHTML='') => {
+            let el = document.createElement(tag);
+            el.id = id;
+            el.className = cls;
+            el.innerHTML = innerHTML;
+            if (parent) parent.appendChild(el);
+            return el;
+        }
+
+
+        // -------------------------------------------------------------------------------------------------------------
+        // ----[ SYSTEM ]-----------------------------------------------------------------------------------------------
+        // -------------------------------------------------------------------------------------------------------------
+
+        function sysGetLoad() {
+            fetch({{ url_for('sys_get_load')|tojson }}, { method: 'GET', cache: 'no-cache' }).
+            then(res => res.json()).
+            then(data => {
+                if (data.res) {
+                    $('sys-load-cpu-size').innerText = data.size.cpu;
+                    $('sys-load-ram-size').innerText = data.size.ram;
+                    $('sys-load-hdd-size').innerText = data.size.hdd;
+                    $('sys-load-cpu-used').innerText = data.used.cpu;
+                    $('sys-load-ram-used').innerText = data.used.ram;
+                    $('sys-load-hdd-used').innerText = data.used.hdd;
+                    $('sys-load-cpu-free').innerText = data.free.cpu;
+                    $('sys-load-ram-free').innerText = data.free.ram;
+                    $('sys-load-hdd-free').innerText = data.free.hdd;
+
+                    $('sys-load-avg-t1') .innerText = data.avg.t1;
+                    $('sys-load-avg-t5') .innerText = data.avg.t5;
+                    $('sys-load-avg-t15').innerText = data.avg.t15;
+                }
+
+                if (app.isMonitoringSysLoad) {
+                    window.setTimeout(sysGetLoad, sysGetLoadWait);
+                }
+            });
+        }
+
+        function sysPing() {
+            let t0 = new Date().getTime()
+            fetch({{ url_for('sys_ping')|tojson }}, { method: 'HEAD', cache: 'no-cache' }).
+            then(res => $('btn-sys-ping').innerHTML = (res.ok ? (new Date().getTime() - t0) + ' ms' : 'Error')).
+            catch(err => {
+                console.log('Fetch error: ', err.message);
+                M.toast({html: err.message});
+            });
+        }
+
+        // -------------------------------------------------------------------------------------------------------------
+        // ----[ USER ]-------------------------------------------------------------------------------------------------
+        // -------------------------------------------------------------------------------------------------------------
+
+        function usrClrSess() {
+            fetch({{ url_for('usr_clr_sess')|tojson }}, { method: 'GET', cache: 'no-cache' }).
+            then(res => {
+                $('sim-flu-out').innerHTML = '';
+                usrIsRoot();
+                M.toast({html: 'User session has been cleared'});
+            });
+        }
+
+        function usrGetSess() {
+            fetch({{ url_for('usr_get_sess')|tojson }}, { method: 'GET', cache: 'no-cache' }).
+            then(res => res.json()).
+            then(data => {
+                switch (data.sim) {
+                    case 2:
+                        simFluAStatus();
+                        break;
+                    case 'test':
+                        simTestStatus();
+                        break;
+                }
+            });
+        }
+
+        function usrIsRoot() {
+            fetch({{ url_for('usr_is_root')|tojson }}, { method: 'GET', cache: 'no-cache' }).
+            then(res => res.json()).
+            then(data => {
+                app.isRoot = data;
+                $('btn-usr-toggle').childNodes[0].innerText = (app.isRoot ? ui.btnUserRootInnerHTML : ui.btnUserUserInnerHTML);
+            });
+        }
+
+        function usrToggle() {
+            let fd = new FormData();
+            if (!app.isRoot) {
+                fd.append('code', prompt('Code:'));
+            }
+
+            fetch({{ url_for('usr_toggle')|tojson }}, { method: 'POST', cache: 'no-cache', body: fd }).
+            then(res => res.json()).
+            then(data => {
+                app.isRoot = data;
+                $('btn-usr-toggle').childNodes[0].innerText = (app.isRoot ? ui.btnUserRootInnerHTML : ui.btnUserUserInnerHTML);
+            });
+        }
+
+
+        // -------------------------------------------------------------------------------------------------------------
+        // ----[ SIM: FLU ]---------------------------------------------------------------------------------------------
+        // -------------------------------------------------------------------------------------------------------------
+
+        function simFluReset() {
+            fetch({{ url_for('sim_flu_reset')|tojson }}, { method: 'GET', cache: 'no-cache' }).
+            then(res => res.json()).
+            then(data => {
+                if (data.res) {
+                    $('sim-flu-out').innerHTML = '';
+                }
+            });
+        }
+
+        function simFluRun(iterN) {
+            let fd = new FormData();
+            fd.append('iter-n', iterN);
+            fd.append('grp-a-n', 500);
+            fd.append('grp-b-n', 500);
+
+            fetch({{ url_for('sim_flu_run')|tojson }}, { method: 'POST', cache: 'no-cache', body: fd }).
+            then(res => res.json()).
+            then(data => {
+                if (data.res) {
+                    $$('div', $('sim-flu-out'), '', '', data.out);
+                }
+            });
+        }
+
+
+        // -------------------------------------------------------------------------------------------------------------
+        // ----[ SIM: FLU ALLEGHENY ]-----------------------------------------------------------------------------------
+        // -------------------------------------------------------------------------------------------------------------
+
+        function simFluARun() {
+            fetch({{ url_for('sim_flu_a_run')|tojson }}, { method: 'POST', cache: 'no-cache' }).
+            then(res => res.json()).
+            then(data => {
+                if (data.res) {
+                    $('btn-sim-flu-a-stop').style.background = 'linear-gradient(90deg, #ff0000 0%, #ffbdbd 0%)';
+                    hide('btn-sim-flu-a-run');
+                    show('btn-sim-flu-a-stop');
+
+                    window.setTimeout(simFluAStatus, simUpdWait);
+                }
+                if (data.err) {
+                    M.toast({html: data.err});
+                }
+            });
+        }
+
+        function simFluAStatus() {
+            fetch({{ url_for('sim_flu_a_status')|tojson }}, { method: 'GET', cache: 'no-cache' }).
+            then(res => res.json()).
+            then(data => {
+                if (data.isRunning) {
+                    hide('btn-sim-flu-a-run');
+                    show('btn-sim-flu-a-stop');
+
+                    let p = Math.round(data.p * 100);
+                    $('btn-sim-flu-a-stop').style.background = 'linear-gradient(90deg, #ff0000 ' + p + '%, #ffbdbd ' + p + '%)';
+                    window.setTimeout(simFluAStatus, simUpdWait);
+                }
+                else {
+                    hide('btn-sim-flu-a-stop');
+                    show('btn-sim-flu-a-run');
+                }
+            });
+        }
+
+        function simFluAStop() {
+            fetch({{ url_for('sim_flu_a_stop')|tojson }}, { method: 'GET', cache: 'no-cache' }).
+            then(res => res.json()).
+            then(data => {
+                window.setTimeout(simFluAStatus, simUpdWait);
+            });
+        }
+
+
+        // -------------------------------------------------------------------------------------------------------------
+        // ----[ SIM: TEST ]--------------------------------------------------------------------------------------------
+        // -------------------------------------------------------------------------------------------------------------
+
+        function simTestRun() {
+            fetch({{ url_for('sim_test_run')|tojson }}, { method: 'POST', cache: 'no-cache' }).
+            then(res => res.json()).
+            then(data => {
+                if (data.res) {
+                    $('btn-sim-test-stop').style.background = 'linear-gradient(90deg, #ff0000 0%, #ffbdbd 0%)';
+                    hide('btn-sim-test-run');
+                    show('btn-sim-test-stop');
+
+                    window.setTimeout(simTestStatus, simUpdWait);
+                }
+                if (data.err) {
+                    M.toast({html: data.err});
+                }
+            });
+        }
+
+        function simTestStatus() {
+            fetch({{ url_for('sim_test_status')|tojson }}, { method: 'GET', cache: 'no-cache' }).
+            then(res => res.json()).
+            then(data => {
+                if (data.isRunning) {
+                    hide('btn-sim-test-run');
+                    show('btn-sim-test-stop');
+
+                    let p = Math.round(data.p * 100);
+                    $('btn-sim-test-stop').style.background = 'linear-gradient(90deg, #ff0000 ' + p + '%, #ffbdbd ' + p + '%)';
+                    window.setTimeout(simTestStatus, simUpdWait);
+                }
+                else {
+                    hide('btn-sim-test-stop');
+                    show('btn-sim-test-run');
+                }
+            });
+        }
+
+        function simTestStop() {
+            fetch({{ url_for('sim_test_stop')|tojson }}, { method: 'GET', cache: 'no-cache' }).
+            then(res => res.json()).
+            then(data => {
+                window.setTimeout(simTestStatus, simUpdWait);
+            });
+        }
+
+
+        // -------------------------------------------------------------------------------------------------------------
+        // ----[ APP INIT ]---------------------------------------------------------------------------------------------
+        // -------------------------------------------------------------------------------------------------------------
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // (1) Events:
+            $('btn-usr-toggle')   .addEventListener('click', usrToggle, false);
+            $('btn-usr-clr-sess') .addEventListener('click', usrClrSess, false);
+            $('btn-sys-ping')     .addEventListener('click', sysPing, false);
+            $('btn-sys-load')     .addEventListener('click', () => {
+                app.isMonitoringSysLoad = true;
+                sysGetLoad();
+            }, false);
+
+            $('btn-sim-flu-reset')  .addEventListener('click', simFluReset,         false);
+            $('btn-sim-flu-run-1')  .addEventListener('click', () => simFluRun(1),  false);
+            $('btn-sim-flu-run-5')  .addEventListener('click', () => simFluRun(5),  false);
+            $('btn-sim-flu-run-10') .addEventListener('click', () => simFluRun(10), false);
+            $('btn-sim-flu-a-run')  .addEventListener('click', simFluARun,  false);
+            $('btn-sim-flu-a-stop') .addEventListener('click', simFluAStop, false);
+            $('btn-sim-test-run')   .addEventListener('click', simTestRun,  false);
+            $('btn-sim-test-stop')  .addEventListener('click', simTestStop, false);
+
+            // (2) Init the UI:
+            document.querySelectorAll('.icon-sim-inf').forEach((el) => el.innerHTML = ui.iconSimInf);
+            document.querySelectorAll('.icon-sim-ctl').forEach((el) => el.innerHTML = ui.iconSimCtl);
+            document.querySelectorAll('.icon-sim-out').forEach((el) => el.innerHTML = ui.iconSimOut);
+
+            // M.AutoInit();
+            M.FloatingActionButton.init(document.querySelectorAll('.fixed-action-btn'), {});
+            M.Tabs.init(document.querySelectorAll('.tabs'), { swipeable: false });
+            M.Collapsible.init(document.querySelectorAll('.collapsible'), { accordion: false, inDuration: 150, outDuration: 150 });
+            M.Tooltip.init(document.querySelectorAll('.tooltipped'), {});
+            M.Modal.init($('win-sys-load'), { onCloseStart: () => { app.isMonitoringSysLoad = false; } });
+
+            // (3) Sync the UI with the server:
+            show('btn-sim-flu-a-run');
+            hide('btn-sim-flu-a-stop');
+
+            show('btn-sim-test-run');
+            hide('btn-sim-test-stop');
+
+            usrGetSess();
+            usrIsRoot();
+            sysPing();
+        });
+    </script>
+</head>
+
+
+<body>
+    <!-- Navbar -->
+    <nav class="nav-extended">
+        <div class="nav-wrapper">
+            <a href="#" class="brand-logo left" style="font-family: 'Exo 2'; font-weight: bold; padding-left: 10px;">PRAM Demo</a>
+            <ul class="right">
+                <li><a id="btn-usr-toggle" class="waves-effect waves-light btn-small tooltipped" data-tooltip="Access rights level" style="margin-left: 0px;"><i class="material-icons">person_outline</i></a></li>
+                <li><a id="btn-sys-ping" class="waves-effect waves-light btn-small tooltipped" data-tooltip="Ping" style="margin-left: 0px;">... ms</a></li>
+            </ul>
+        </div>
+        <div class="nav-content">
+            <ul class="tabs tabs-transparent">
+                <li class="tab"><a class="active" href="#tab-flu">Flu</a></li>
+                <li class="tab"><a href="#tab-flu-a">Flu: Allegheny</a></li>
+                <li class="tab"><a href="#tab-test">Test</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Tab: Flu Sim -->
+    <div id="tab-flu" class="col s12">
+        <ul class="collapsible">
+            <li>
+                <div class="collapsible-header"><i class="material-icons icon-sim-inf"></i>Description</div>
+                <div class="collapsible-body">
+                    A simple simulation.
+                </div>
+            </li>
+
+            <li class="active">
+                <div class="collapsible-header"><i class="material-icons icon-sim-ctl"></i>Controls</div>
+                <div class="collapsible-body">
+                    <!-- <form action="#" class="col s6"> -->
+                    <div class="row">
+                        <button id="btn-sim-flu-reset"  class="btn waves-effect waves-light tooltipped" data-tooltip="Reset"><i class="material-icons">cached</i></button>
+                        <button id="btn-sim-flu-run-1"  class="btn waves-effect waves-light">1<i class="material-icons left">play_circle_filled</i></button>
+                        <button id="btn-sim-flu-run-5"  class="btn waves-effect waves-light">5<i class="material-icons left">play_circle_filled</i></button>
+                        <button id="btn-sim-flu-run-10" class="btn waves-effect waves-light">10<i class="material-icons left">play_circle_filled</i></button>
+                    </div>
+                    <!-- </form> -->
+                </div>
+            </li>
+
+            <li>
+                <div class="collapsible-header"><i class="material-icons icon-sim-out"></i>Output</div>
+                <div id="sim-flu-out" class="collapsible-body"></div>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Tab: Flu Allegheny Sim -->
+    <div id="tab-flu-a" class="col s12">
+        <ul class="collapsible">
+            <li>
+                <div class="collapsible-header"><i class="material-icons icon-sim-inf"></i>Description</div>
+                <div class="collapsible-body">
+                    A not-so-simple simulation.
+                </div>
+            </li>
+
+            <li class="active">
+                <div class="collapsible-header"><i class="material-icons icon-sim-ctl"></i>Controls</div>
+                <div class="collapsible-body">
+                    <!--
+                    <div class="row">
+                        <div class="input-field col s3">
+                            <label for="step-cnt">Step count</label>
+                            <input id="step-cnt" type="text" />
+                        </div>
+                    </div>
+                    -->
+                    <div class="row">
+                        <button id="btn-sim-flu-a-run"  class="btn waves-effect waves-light"     name="action"><span>Run</span> <i class="material-icons right">play_circle_filled</i></button>
+                        <button id="btn-sim-flu-a-stop" class="btn waves-effect waves-light red" name="action"><span>Stop</span><i class="material-icons right">stop</i></button>
+                    </div>
+                </div>
+            </li>
+
+            <li>
+                <div class="collapsible-header"><i class="material-icons icon-sim-out"></i>Output</div>
+                <div class="collapsible-body">
+                </div>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Tab: Test Sim -->
+    <div id="tab-test" class="col s12">
+        <ul class="collapsible">
+            <li class="active">
+                <div class="collapsible-header"><i class="material-icons icon-sim-ctl"></i>Controls</div>
+                <div class="collapsible-body">
+                    <div class="row">
+                        <button id="btn-sim-test-run"  class="btn waves-effect waves-light"     name="action"><span>Run</span> <i class="material-icons right">play_circle_filled</i></button>
+                        <button id="btn-sim-test-stop" class="btn waves-effect waves-light red" name="action"><span>Stop</span><i class="material-icons right">stop</i></button>
+                    </div>
+                </div>
+            </li>
+
+            <li>
+                <div class="collapsible-header"><i class="material-icons icon-sim-out"></i>Output</div>
+                <div class="collapsible-body">
+                </div>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Floating action button -->
+    <div id="btn-sys-load" class="fixed-action-btn">
+        <a class="btn-floating btn-large red modal-trigger" data-target="win-sys-load">
+            <i class="large material-icons">memory</i>
+        </a>
+    </div>
+
+    <!-- Window: System load -->
+    <div id="win-sys-load" class="modal">
+        <div class="modal-content">
+            <h4>System Load</h4>
+            <div class="card" style="_width: 400px; margin-top: 20px;">
+                <div class="card-content">
+                    &nbsp;
+                    <span id="sys-load-avg-t1"  class="new badge blue left" data-badge-caption="| 1m" style="margin-left: 0px;margin-right: 0px;">.</span>
+                    <span id="sys-load-avg-t5"  class="new badge blue left" data-badge-caption="| 5m">.</span>
+                    <span id="sys-load-avg-t15" class="new badge blue left" data-badge-caption="| 15m">.</span>
+                </div>
+            </div>
+            <table class="responsive-table">
+                <thead>
+                    <tr> <th>Resource</th> <th>Size</th> <th>Used</th> <th>Free</th> </tr>
+                </thead>
+                <tbody>
+                    <tr> <td><b>CPU</b></td> <td><span id="sys-load-cpu-size">.</span></td> <td><span id="sys-load-cpu-used">.</span></td> <td><span id="sys-load-cpu-free">.</span></td> </tr>
+                    <tr> <td><b>RAM</b></td> <td><span id="sys-load-ram-size">.</span></td> <td><span id="sys-load-ram-used">.</span></td> <td><span id="sys-load-ram-free">.</span></td> </tr>
+                    <tr> <td><b>HDD</b></td> <td><span id="sys-load-hdd-size">.</span></td> <td><span id="sys-load-hdd-used">.</span></td> <td><span id="sys-load-hdd-free">.</span></td> </tr>
+                </tbody>
+            </table>
+            <br />
+            <button id="btn-usr-clr-sess" class="btn waves-effect waves-light">Clear session</button>
+        </div>
+        <div class="modal-footer">
+            <a href="#!" class="modal-close waves-effect waves-green btn-flat">Close</a>
+        </div>
+    </div>
+
+</body>
+
+</html>
+
+                    <!--
+                    <div class="row">
+                        <p class="range-field">
+                            <input type="range" id="test5" min="0" max="100" />
+                        </p>
+
+                        <label>
+                        <input type="checkbox" checked="checked" class="filled-in" />
+                        <span>Yellow</span>
+                        </label>
+
+                        <label>
+                        Off
+                        <input type="checkbox">
+                        <span class="lever"></span>
+                        On
+                        </label>
+                    </div>
+                    -->
+
+                    <!-- <div class="row">
+                        <div class="progress">
+                            <div class="determinate" style="width: 70%"></div>
+                        </div>
+                    </div> -->
+
+                    <!-- <div class="card" style="width:300px">
+                        <div class="card-content">
+                            <p>A simulation framework that fuses relational probabilistic models and agent-based models. This software is in the pre-release stage, so feel free to play with it, but keep in mind that not all pieces may be working. Until there is a release, please don't open issues and flex your own Python muscle to fix problems you encounter.</p>
+                        </div>
+                        <div class="card-tabs">
+                            <ul class="tabs tabs-fixed-width">
+                                <li class="tab"><a class="active" href="#card-01">Sim 1</a></li>
+                                <li class="tab"><a href="#card-02">Sim 2</a></li>
+                                <li class="tab"><a href="#card-03">Sim 3</a></li>
+                            </ul>
+                        </div>
+                        <div class="card-content grey lighten-4">
+                            <div id="card-01">Output 1</div>
+                            <div id="card-02">Output 2</div>
+                            <div id="card-03">Output 3</div>
+                        </div>
+                    </div> -->
+
+                    <!-- <div class="row">
+                        <div class="input-field col s6">
+                            <label for="sum-a">a</label>
+                            <input id="sum-a" type="text" placeholder="10" />
+                        </div>
+                        <div class="input-field col s6">
+                            <label for="sum-b">b</label>
+                            <input id="sum-b" type="text" placeholder="20" />
+                        </div>
+                        <div class="input-field col s6">
+                            <a id="sum" class="waves-effect waves-light btn">Sum!</a>
+                        </div>
+                        <div class="input-field col s6">
+                            <span><span id="sum-out">?</span></span>
+                        </div>
+                    </div> -->
+
+    <!-- Navbar -->
+    <!--
+    <ul id="dropdown-navbar" class="dropdown-content">
+        <li><a href="#!">one</a></li>
+        <li><a href="#!">two</a></li>
+        <li class="divider"></li>
+        <li><a href="#!">three</a></li>
+    </ul>
+    <nav>
+        <div class="nav-wrapper">
+            <a href="#!" lass="brand-logo">PRAM</a>
+            <ul class="right">
+                <li><a class="dropdown-trigger" href="#!" data-target="dropdown-navbar">Options<i class="material-icons right">arrow_drop_down</i></a></li>
+                <li><a id="btn-ping" class="waves-effect waves-light btn">Ping</a></li>
+            </ul>
+        </div>
+    </nav>
+    -->
+
+
+    <!--
+    <footer class="page-footer">
+        <div class="container">
+            <div class="row">
+                <div class="col l6 s12">
+                    <h5 class="white-text">Footer Content</h5>
+                    <p class="grey-text text-lighten-4">You can use rows and columns here to organize your footer content.</p>
+                </div>
+                <div class="col l4 offset-l2 s12">
+                    <h5 class="white-text">Links</h5>
+                    <ul>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 1</a></li>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 2</a></li>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 3</a></li>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 4</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="footer-copyright">
+            <div class="container">
+                © 2014 Copyright Text
+                <a class="grey-text text-lighten-4 right" href="#!">More Links</a>
+            </div>
+        </div>
+    </footer>
+    -->
