@@ -108,10 +108,12 @@ Below is the output of the simulation when it is run synchronously from the term
 [info]         Attributes from table : ['income']
 [info]         Relations  fixed      : {'home': Site(8217927942166902109)}
 [info]         Relations  from table : ['school_id']
+[info]     Generated 350 'school' sites from the 'schools' table
 [info]     Summary
-[info]         Records in table: 200169
+[info]         Records in table: 200,169
 [info]         Groups formed: 696
-[info]         Agent population accounted for by the groups: 200169
+[info]         Sites formed: 350
+[info]         Agent population accounted for by the groups: 200,169
 [info] Running group setup
 [info] Setting simulation duration
 [info] Syncing rule timers
