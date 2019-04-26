@@ -22,7 +22,7 @@ def plot_one_school(tbl, title, marker, fpath, cmap_ps, cmap_pe, cmap_pr):  # ta
     # Data:
     data = { 'i':[], 'ps':[], 'pe':[], 'pr':[] }
     with sqlite3.connect(fpath_db, check_same_thread=False) as c:
-        for r in c.execute(f'SELECT id, ps,pe,pr FROM {tbl}').fetchall():
+        for r in c.execute(f'SELECT i+1, ps,pe,pr FROM {tbl}').fetchall():
             data['i'].append(r[0])
             data['ps'].append(r[1])
             data['pe'].append(r[2])
@@ -41,8 +41,8 @@ def plot_one_school(tbl, title, marker, fpath, cmap_ps, cmap_pe, cmap_pr):  # ta
     plt.grid(alpha=0.25, antialiased=True)
     fig.savefig(os.path.join(os.path.dirname(__file__), 'out', fpath), dpi=300)
 
-# plot_one_school('low_income', 'School with 88% of Low-Income Students', MARKER_LOW, '03-a-low-income-school.png', 0,4,6)
-# plot_one_school('med_income', 'School with 7% of Low-Income Students',  MARKER_MED, '03-b-med-income-school.png', 1,5,7)
+plot_one_school('low_income', 'School with 88% of Low-Income Students', MARKER_LOW, '03-a-low-income-school.png', 0,4,6)
+plot_one_school('med_income', 'School with 7% of Low-Income Students',  MARKER_MED, '03-b-med-income-school.png', 1,5,7)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -52,7 +52,7 @@ def plot_compare_schools(col, name, fpath, cmap_low, cmap_med):  # tab10: 6,9
     # Data:
     data = { 'i':[], 'p.l':[], 'p.m':[] }
     with sqlite3.connect(fpath_db, check_same_thread=False) as c:
-        for r in c.execute('SELECT l.id, l.{0} AS pl, m.{0} AS pm FROM low_income l INNER JOIN med_income m ON l.id = m.id'.format(col)).fetchall():
+        for r in c.execute('SELECT l.i + 1, l.{0} AS pl, m.{0} AS pm FROM low_income l INNER JOIN med_income m ON l.id = m.id'.format(col)).fetchall():
             data['i'].append(r[0])
             data['p.l'].append(r[1])
             data['p.m'].append(r[2])

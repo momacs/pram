@@ -663,7 +663,8 @@ class Group(Entity):
         # (3) Generate sites and groups:
         sites = {}
         groups = []
-        grp_n_tot = 0
+        grp_pop = 0
+        site_n = 0
 
         with DB.open_conn(db_fpath) as c:
             # (3.1) Sites:
@@ -671,10 +672,15 @@ class Group(Entity):
                 # (3.1.1) Sites have been provided:
                 if r.sites is not None:
                     sites[r.name] = r.sites
+                    if inf:
+                        inf(f"    Using the provided {'{:,}'.format(len(sites[r.name]))} '{r.name}' sites")
                 # (3.1.2) Sites have not been provided; generate them from the DB:
                 else:
                     fk = DB.get_fk(c, tbl, r.col)
                     sites[r.name] = Site.gen_from_db(db_fpath, tbl=fk.tbl_to, name_col=fk.col_to)
+                    site_n += len(sites[r.name])
+                    if inf:
+                        inf(f"    Generated {'{:,}'.format(len(sites[r.name]))} '{r.name}' sites from the '{fk.tbl_to}' table")
 
             # (3.2) Groups:
             row_cnt = DB.get_cnt(c, tbl)
@@ -692,13 +698,14 @@ class Group(Entity):
                     g_rel.update({ Site.AT: g_rel.get(rel_at) })
 
                 groups.append(cls(n=row['n'], attr=g_attr, rel=g_rel))
-                grp_n_tot += int(row['n'])
+                grp_pop += int(row['n'])
 
         if inf:
             inf( '    Summary')
-            inf(f'        Records in table: {row_cnt}')
-            inf(f'        Groups formed: {len(groups)}')
-            inf(f'        Agent population accounted for by the groups: {grp_n_tot}')
+            inf(f'        Records in table: {"{:,}".format(row_cnt)}')
+            inf(f'        Groups formed: {"{:,}".format(len(groups))}')
+            inf(f'        Sites formed: {"{:,}".format(site_n)}')
+            inf(f'        Agent population accounted for by the groups: {"{:,}".format(grp_pop)}')
 
         return groups
 
