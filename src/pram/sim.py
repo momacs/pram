@@ -804,8 +804,8 @@ class SimulationSetter(object):
         self.sim.set_iter_cnt(n)
         return self
 
-    def group_setup(self, fn):
-        self.sim.set_group_setup(fn)
+    def fn_group_setup(self, fn):
+        self.sim.set_fn_group_setup(fn)
         return self
 
     def pragma(self, name, value):
@@ -1391,6 +1391,10 @@ class Simulation(object):
     def set(self):
         return SimulationSetter(self)
 
+    def set_fn_group_setup(self, fn):
+        self.fn.group_setup = fn
+        return self
+
     def set_pragma(self, name, value):
         fn = {
             'analyze'                  : self.set_pragma_analyze,
@@ -1470,10 +1474,6 @@ class Simulation(object):
         self.rand_seed = rand_seed
         if self.rand_seed is not None:
             np.random.seed(self.rand_seed)
-        return self
-
-    def set_group_setup(self, fn):
-        self.fn.group_setup = fn
         return self
 
     def show_rule_analysis(self):
