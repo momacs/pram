@@ -120,9 +120,9 @@ Below is the output of the simulation when it is run synchronously from the term
 [info]         Groups formed: 696
 [info]         Sites formed: 350
 [info]         Agent population accounted for by the groups: 200,169
-[info] Running group setup
 [info] Setting simulation duration
 [info] Syncing rule timers
+[info] Running group setup
 [info] Running rule setup
 [info] Compacting the model
 [info] Capturing the initial state
