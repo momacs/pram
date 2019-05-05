@@ -12,10 +12,16 @@ A simulation framework that fuses relational probabilistic models and agent-base
 
 
 ## Dependencies - The Web App
+Backend:
 - [Flask](http://flask.pocoo.org)
 - [Celery](http://www.celeryproject.org)
 - [Redis](https://redis.io)
 - [PSUtil](https://github.com/giampaolo/psutil)
+
+Front-end:
+- [Materialize](https://materializecss.com)
+- [jQuery](https://jquery.com)
+- [Fuse.js](https://fusejs.io)
 
 
 ## Setup
