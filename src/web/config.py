@@ -12,4 +12,8 @@ class DevConfig():
 
 class ProdConfig():
     SECRET_KEY = os.urandom(24)
-    pass
+    SESSION_TYPE = 'redis'
+    SECRET_KEY = os.urandom(24)
+    SESSION_COOKIE_NAME = 'pram'
+    CELERY_BROKER_URL = 'redis://localhost:6379/0'
+    CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'

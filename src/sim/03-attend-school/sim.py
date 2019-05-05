@@ -16,7 +16,7 @@ from pram.sim    import Simulation
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-sites = { s:Site(s) for s in ['home', 'school-a', 'school-b']}
+sites = {s:Site(s) for s in ['home', 'school-a', 'school-b']}
 
 probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across sites')
 

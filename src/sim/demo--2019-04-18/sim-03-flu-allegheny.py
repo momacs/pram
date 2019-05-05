@@ -111,6 +111,7 @@ def grp_setup(pop, group):
         pragma_autocompact(True).
         pragma_live_info(True).
         pragma_live_info_ts(False).
+        fn_group_setup(grp_setup).
         done().
     add().
         rule(FluProgressRule()).
@@ -125,10 +126,9 @@ def grp_setup(pop, group):
             rel_db   = [GroupDBRelSpec(name='school', col='school_id')],
             attr_fix = {},
             rel_fix  = { 'home': site_home },
-            rel_at   = 'school'
+            rel_at   = 'school'  # make sure this works without this passed
         ).
         done().
-    setup_groups(grp_setup).
     run(5)
 )
 

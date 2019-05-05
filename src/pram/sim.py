@@ -379,6 +379,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import ast
+import bz2
 import datetime
 import gc
 import gzip
@@ -584,15 +585,6 @@ class RuleAnalyzer(object):
     '''
 
     def __init__(self):
-        self.attr_used = set()
-        self.rel_used  = set()
-
-        self.attr_unused = set()
-        self.rel_unused  = set()
-
-        self.cnt_rec   = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # recognized
-        self.cnt_unrec = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # unrecognized
-
         self.are_rules_done  = False
         self.are_groups_done = False
 
@@ -688,7 +680,16 @@ class RuleAnalyzer(object):
                 self._analyze(i)
 
     def analyze_rules(self, rules):
-        ''' Can be (an in fact is) called before any groups have been added. '''
+        ''' Can be (and in fact is) called before any groups have been added. '''
+
+        self.attr_used = set()
+        self.rel_used  = set()
+
+        self.attr_unused = set()
+        self.rel_unused  = set()
+
+        self.cnt_rec   = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # recognized
+        self.cnt_unrec = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # unrecognized
 
         for r in rules:
             self.analyze_rule(r)
@@ -803,6 +804,10 @@ class SimulationSetter(object):
         self.sim.set_iter_cnt(n)
         return self
 
+    def group_setup(self, fn):
+        self.sim.set_group_setup(fn)
+        return self
+
     def pragma(self, name, value):
         self.sim.set_pragma(name, value)
         return self
@@ -875,6 +880,10 @@ class Simulation(object):
         self.probes = []
 
         self.timer = None  # value deduced in add_group() based on rule timers
+
+        self.fn = DotMap(
+            group_setup = None  # called before the simulation is run for the very first time
+        )
 
         self.is_setup_done = False  # flag
             # ensures simulation setup is performed only once while enabling multiple incremental simulation runs of
@@ -965,6 +974,8 @@ class Simulation(object):
             raise SimulationConstructionError('A rule is being added but groups already exist; rules need be added before groups.')
 
         self.rules.append(rule)
+        self.rule_analyzer.analyze_rules(self.rules)  # keep the results of the static rule analysis current
+
         return self
 
     def add_rules(self, rules):
@@ -1110,9 +1121,127 @@ class Simulation(object):
 
         self.add_sites(Site.gen_from_db(fpath_db, tbl, name_col, rel_name, attr, limit))
 
+    def get_pragma(self, name):
+        fn = {
+            'analyze'                  : self.get_pragma_analyze,
+            'autocompact'              : self.get_pragma_autocompact,
+            'autoprune_groups'         : self.get_pragma_autoprune_groups,
+            'autostop'                 : self.get_pragma_autostop,
+            'autostop_n'               : self.get_pragma_autostop_n,
+            'autostop_p'               : self.get_pragma_autostop_p,
+            'autostop_t'               : self.get_pragma_autostop_t,
+            'live_info'                : self.get_pragma_live_info,
+            'live_info_ts'             : self.get_pragma_live_info_ts,
+            'probe_capture_init'       : self.get_pragma_probe_capture_init,
+            'rule_analysis_for_db_gen' : self.get_pragma_rule_analysis_for_db_gen
+        }.get(name, None)
+
+        if fn is None:
+            raise TypeError(f"Pragma '{name}' does not exist.")
+
+        return fn()
+
+    def get_pragma_analyze(self):
+        return self.pragma.analyze
+
+    def get_pragma_autocompact(self):
+        return self.pragma.autocompact
+
+    def get_pragma_autoprune_groups(self):
+        return self.pragma.autoprune_groups
+
+    def get_pragma_autostop(self):
+        return self.pragma.autostop
+
+    def get_pragma_autostop_n(self):
+        return self.pragma.autostop_n
+
+    def get_pragma_autostop_p(self):
+        return self.pragma.autostop_p
+
+    def get_pragma_autostop_t(self):
+        return self.pragma.autostop_t
+
+    def get_pragma_live_info(self):
+        return self.pragma.live_info
+
+    def get_pragma_live_info_ts(self):
+        return self.pragma.live_info_ts
+
+    def get_pragma_probe_capture_init(self):
+        return self.pragma.probe_capture_init
+
+    def get_pragma_rule_analysis_for_db_gen(self):
+        return self.pragma.rule_analysis_for_db_gen
+
+    def get_state(self, do_camelize=True):
+        return {
+            'sim': {
+                'runCnt': self.run_cnt,
+                'timer': {
+                    'iter': (self.timer.i if self.timer else -1)
+                },
+                'pragma': {
+                    'analyze'                  : self.get_pragma_analyze(),
+                    'autocompact'              : self.get_pragma_autocompact(),
+                    'autoprune_groups'         : self.get_pragma_autoprune_groups(),
+                    'autostop'                 : self.get_pragma_autostop(),
+                    'autostop_n'               : self.get_pragma_autostop_n(),
+                    'autostop_p'               : self.get_pragma_autostop_p(),
+                    'autostop_t'               : self.get_pragma_autostop_t(),
+                    'live_info'                : self.get_pragma_live_info(),
+                    'live_info_ts'             : self.get_pragma_live_info_ts(),
+                    'probe_capture_init'       : self.get_pragma_probe_capture_init(),
+                    'rule_analysis_for_db_gen' : self.get_pragma_rule_analysis_for_db_gen()
+                }
+            },
+            'pop': {
+                'agentCnt' : self.pop.get_size(),
+                'groupCnt' : self.pop.get_group_cnt(),
+                'siteCnt'  : self.pop.get_site_cnt()
+            },
+            'rules': {
+                'cnt'  : len(self.rules),
+                'analysis': {
+                    'static': {
+                        'attr': {
+                            'used'   : list(self.rule_analyzer.attr_used),
+                            'unused' : list(self.rule_analyzer.attr_unused)
+                        },
+                        'rel': {
+                            'used'    : list(self.rule_analyzer.rel_used),
+                            'unused'  : list(self.rule_analyzer.rel_unused)
+                        }
+                    },
+                    'dynamic': {
+                        'attrUsed' : list(self.last_run.attr_used),
+                        'relUsed'  : list(self.last_run.rel_used),
+                        'attrUnused' : list(self.last_run.attr_unused),
+                        'relUnused'  : list(self.last_run.rel_unused )
+                    }
+                }
+            }
+        }
+
     def new_group(self, n=0.0, name=None):
         # return Group(name or self.pop.get_next_group_name(), n, callee=self)
         return Group(name, n, callee=self)
+
+    def _pickle(self, fpath, fn):
+        with fn(fpath, 'wb') as f:
+            pickle.dump(self, f)
+
+    def pickle(self, fpath):
+        self._pickle(fpath, open)
+        return self
+
+    def pickle_bz2(self, fpath):
+        self._pickle(fpath, bz2.BZ2File)
+        return self
+
+    def pickle_gz(self, fpath):
+        self._pickle(fpath, gzip.GzipFile)
+        return self
 
     def rem_probe(self, probe):
         self.probes.discard(probe)
@@ -1139,7 +1268,7 @@ class Simulation(object):
             print('No groups are present\nExiting')
             return self
 
-        self.pop.freeze()
+        self.pop.freeze()  # need to freeze the population to prevent splitting to count as new group counts
 
         # Decode iterations/duration:
         self._inf('Setting simulation duration')
@@ -1163,8 +1292,11 @@ class Simulation(object):
 
         # Rule setup and simulation compacting:
         if not self.is_setup_done:
-            self._inf('Running rule setup')
+            if self.fn.group_setup:
+                self._inf('Running group setup')
+                self.pop.apply_rules(self.fn.group_setup, 0, self.timer, is_sim_setup=True)
 
+            self._inf('Running rule setup')
             self.pop.apply_rules(self.rules, 0, self.timer, is_rule_setup=True)
             self.is_setup_done = True
         if self.pragma.autocompact:
@@ -1179,7 +1311,7 @@ class Simulation(object):
                 p.run(None, None)
 
         # Run the simulation:
-        self._inf('Initial population info')
+        self._inf('Initial population')
         self._inf(f'    Agents : {"{:,}".format(int(self.pop.get_size()))}')
         self._inf(f'    Groups : {"{:,}".format(self.pop.get_group_cnt())}')
         self._inf(f'    Sites  : {"{:,}".format(self.pop.get_site_cnt())}')
@@ -1261,14 +1393,17 @@ class Simulation(object):
 
     def set_pragma(self, name, value):
         fn = {
-            'analyze'            : self.set_pragma_analyze,
-            'autocompact'        : self.set_pragma_autocompact,
-            'autoprune_groups'   : self.set_pragma_autoprune_groups,
-            'autostop'           : self.set_pragma_autostop,
-            'autostop_n'         : self.set_pragma_autostop_n,
-            'autostop_p'         : self.set_pragma_autostop_p,
-            'autostop_t'         : self.set_pragma_autostop_t,
-            'probe_capture_init' : self.set_pragma_probe_capture_init
+            'analyze'                  : self.set_pragma_analyze,
+            'autocompact'              : self.set_pragma_autocompact,
+            'autoprune_groups'         : self.set_pragma_autoprune_groups,
+            'autostop'                 : self.set_pragma_autostop,
+            'autostop_n'               : self.set_pragma_autostop_n,
+            'autostop_p'               : self.set_pragma_autostop_p,
+            'autostop_t'               : self.set_pragma_autostop_t,
+            'live_info'                : self.set_pragma_live_info,
+            'live_info_ts'             : self.set_pragma_live_info_ts,
+            'probe_capture_init'       : self.set_pragma_probe_capture_init,
+            'rule_analysis_for_db_gen' : self.set_pragma_rule_analysis_for_db_gen
         }.get(name, None)
 
         if fn is None:
@@ -1337,11 +1472,8 @@ class Simulation(object):
             np.random.seed(self.rand_seed)
         return self
 
-    def setup_groups(self, fn):
-        self._inf('Running group setup')
-
-        self.pop.freeze()  # need to freeze the population to prevent splitting to count as new group counts
-        self.pop.apply_rules(fn, 0, self.timer, is_sim_setup=True)
+    def set_group_setup(self, fn):
+        self.fn.group_setup = fn
         return self
 
     def show_rule_analysis(self):
@@ -1353,14 +1485,14 @@ class Simulation(object):
     def show_rule_analysis_pre(self):
         ra = self.rule_analyzer
 
-        print('Rule analyzer')
-        print('    Used')
+        print( 'Rule analyzer')
+        print( '    Used')
         print(f'        Attributes : {list(ra.attr_used)}')
         print(f'        Relations  : {list(ra.rel_used)}')
-        print('    Superfluous')
+        print( '    Superfluous')
         print(f'        Attributes : {list(ra.attr_unused)}')
         print(f'        Relations  : {list(ra.rel_unused)}')
-        # print('    Counts')
+        # print( '    Counts')
         # print(f'        Recognized   : get_attr:{ra.cnt_rec["get_attr"]} get_rel:{ra.cnt_rec["get_rel"]} has_attr:{ra.cnt_rec["has_attr"]} has_rel:{ra.cnt_rec["has_rel"]}')
         # print(f'        Unrecognized : get_attr:{ra.cnt_unrec["get_attr"]} get_rel:{ra.cnt_unrec["get_rel"]} has_attr:{ra.cnt_unrec["has_attr"]} has_rel:{ra.cnt_unrec["has_rel"]}')
 
@@ -1369,16 +1501,16 @@ class Simulation(object):
     def show_rule_analysis_post(self):
         lr = self.last_run
 
-        print('Most recent simulation run')
-        print('    Used')
-        print(f'       Attributes : {list(lr.attr_used)}')
-        print(f'       Relations  : {list(lr.rel_used)}')
-        print('    Groups')
-        print(f'       Attributes : {list(lr.attr_groups)}')
-        print(f'       Relations  : {list(lr.rel_groups)}')
-        print('    Superfluous')
-        print(f'       Attributes : {list(lr.attr_unused)}')
-        print(f'       Relations  : {list(lr.rel_unused)}')
+        print( 'Most recent simulation run')
+        print( '    Used')
+        print(f'        Attributes : {list(lr.attr_used)}')
+        print(f'        Relations  : {list(lr.rel_used)}')
+        print( '    Groups')
+        print(f'        Attributes : {list(lr.attr_groups)}')
+        print(f'        Relations  : {list(lr.rel_groups)}')
+        print( '    Superfluous')
+        print(f'        Attributes : {list(lr.attr_unused)}')
+        print(f'        Relations  : {list(lr.rel_unused)}')
 
         return self
 
@@ -1443,3 +1575,20 @@ class Simulation(object):
         print('\n' * end_line_cnt[1], end='')
 
         return self
+
+    @staticmethod
+    def _unpickle(fpath, fn):
+        with fn(fpath, 'rb') as f:
+            return pickle.load(f)
+
+    @staticmethod
+    def unpickle(fpath):
+        return Simulation._unpickle(fpath, open)
+
+    @staticmethod
+    def unpickle_bz2(fpath):
+        return Simulation._unpickle(fpath, bz2.BZ2File)
+
+    @staticmethod
+    def unpickle_gz(fpath):
+        return Simulation._unpickle(fpath, gzip.GzipFile)
