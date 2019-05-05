@@ -126,10 +126,10 @@ def grp_setup(pop, group):
             rel_db   = [GroupDBRelSpec(name='school', col='school_id')],
             attr_fix = {},
             rel_fix  = { 'home': site_home },
-            rel_at   = 'school'  # make sure this works without this passed
+            rel_at   = 'school'
         ).
         done().
-    run(5)
+    run(2)
 )
 
 
