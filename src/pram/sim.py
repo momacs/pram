@@ -634,17 +634,7 @@ class StaticRuleAnalyzer(object):
     '''
 
     def __init__(self):
-        self.are_rules_done  = False
-        self.are_groups_done = False
-
-        self.attr_used = set()
-        self.rel_used  = set()
-
-        self.attr_unused = set()
-        self.rel_unused  = set()
-
-        self.cnt_rec   = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # recognized
-        self.cnt_unrec = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # unrecognized
+        self.reset()
 
     def _dump(self, node, annotate_fields=True, include_attributes=False, indent='  '):
         '''
@@ -789,6 +779,19 @@ class StaticRuleAnalyzer(object):
     @staticmethod
     def get_str(node):
         return list(ast.iter_fields(node))[0][1]
+
+    def reset(self):
+        self.are_rules_done  = False
+        self.are_groups_done = False
+
+        self.attr_used = set()
+        self.rel_used  = set()
+
+        self.attr_unused = set()
+        self.rel_unused  = set()
+
+        self.cnt_rec   = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # recognized
+        self.cnt_unrec = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # unrecognized
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1340,6 +1343,7 @@ class Simulation(object):
 
     def reset_rules(self):
         self.rules = []
+        self.analysis.rule_static.reset()
         return self
 
     def run(self, iter_or_dur=1, do_disp_t=False):

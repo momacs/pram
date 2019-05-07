@@ -49,15 +49,6 @@
         const sysGetLoadWait  = 500;  // time between get-system-load requests [ms]
         const simUpdWait      = 100;  // time between simulation-update requests [ms]
 
-        var fuseOpts = {  // Fuse.js fuzzy match options; https://fusejs.io/
-            includeScore: true,
-            threshold: 0.4,  // 0 = perfect match; 1 = total mismatch
-            location: 0,
-            distance: 100,
-            maxPatternLength: 32,
-            minMatchCharLength: 2
-        };
-
         var app = {
             dbSchema: null,
             isMonitoringSysLoad: false,
@@ -66,10 +57,22 @@
             state: {
                 client: {
                     dbTbl: null,
+                    dbTblIdx: -1,
+                    dbTblAttr: {},
+                    dbTblRel: {},
                     rule: null
                 },
                 server: null
             }
+        };
+
+        var fuseOpts = {  // Fuse.js fuzzy match options; https://fusejs.io/
+            includeScore: true,
+            threshold: 0.4,  // 0 = perfect match; 1 = total mismatch
+            location: 0,
+            distance: 100,
+            maxPatternLength: 32,
+            minMatchCharLength: 2
         };
 
         var ui = {
@@ -211,6 +214,8 @@
 
         function dbLs() {
             do_server({{ url_for('db_ls')|tojson }}, 'GET', (data) => {
+                app.state.client.dbTblIdx = -1;
+
                 $('#dropdown-db').empty();
                 $('#dropdown-db-tbl').empty();
                 $('#tbl-db-tbl-body').empty();
@@ -236,6 +241,8 @@
             fd.append('fname', fname);
 
             do_server({{ url_for('db_get_schema')|tojson }}, 'POST', (data) => {
+                app.state.client.dbTblIdx = -1;
+
                 $('#dropdown-db-tbl').empty();
                 $('#dropdown-db-tbl-trigger').removeClass('disabled');
                 $('#dropdown-db-col-trigger').addClass('disabled');
@@ -261,7 +268,10 @@
         }
 
         function dbTblSet(tblIdx) {
-            app.state.client.dbTbl = app.dbSchema[tblIdx];
+            app.state.client.dbTblIdx  = tblIdx;
+            app.state.client.dbTbl     = app.dbSchema[tblIdx];
+            app.state.client.dbTblAttr = {};
+            app.state.client.dbTblRel  = {};
 
             $('#dropdown-db-tbl-lbl').html(app.dbSchema[tblIdx].name);
             $('#tbl-db-tbl-body').empty();
@@ -279,14 +289,46 @@
                 let badgesAttr = matchAttr .map((i) => uiGenBadgeRule(i.item, i.score.toPrecision(2))).join('');
                 let badgesRel  = matchRel  .map((i) => uiGenBadgeRule(i.item, i.score.toPrecision(2))).join('');
 
-                let tr   = $$('tr');
-                let td01 = $($$('td', tr)).html(col.name);
-                let td02 = $($$('td', tr)).html(col.type.toLowerCase());
-                let td03 = $($$('td', tr)).html('<label><input type="checkbox" class="filled-in" ' + (badgesAttr .length > 0 ? 'checked="checked"' : '') + '/><span>' + badgesAttr + '</span></label>');
-                let td04 = $($$('td', tr)).html('<label><input type="checkbox" class="filled-in" ' + (badgesRel  .length > 0 ? 'checked="checked"' : '') + '/><span>' + badgesRel  + '</span></label>');
+                if (matchAttr .length > 0) app.state.client.dbTblAttr[col.name] = true;
+                if (matchRel  .length > 0) app.state.client.dbTblRel [col.name] = true;
 
-                $('#tbl-db-tbl-body').append(tr);
+                let tr   = $('<tr>').appendTo($('#tbl-db-tbl-body'));
+                let td01 = $('<td>').appendTo(tr).html(col.name);
+                let td02 = $('<td>').appendTo(tr).html(col.type.toLowerCase());
+                let td03 = $('<td>').appendTo(tr);
+                let td04 = $('<td>').appendTo(tr);
+                let chbox03lbl = $('<label>').appendTo(td03);
+                let chbox04lbl = $('<label>').appendTo(td04);
+                let chbox03 = $('<input />').attr({ type: 'checkbox' }).prop('checked', badgesAttr .length > 0).addClass('filled-in').appendTo(chbox03lbl);
+                let chbox04 = $('<input />').attr({ type: 'checkbox' }).prop('checked', badgesRel  .length > 0).addClass('filled-in').appendTo(chbox04lbl);
+                let chbox03span = $('<span>').html(badgesAttr) .appendTo(chbox03lbl);
+                let chbox04span = $('<span>').html(badgesRel)  .appendTo(chbox04lbl);
+
+                chbox03.change((e) => dbTblChBoxChange($(e.target), col, app.state.client.dbTblAttr));
+                chbox04.change((e) => dbTblChBoxChange($(e.target), col, app.state.client.dbTblRel));
+
+                dbTblSetGenBtn();
             }
+        }
+
+        function dbTblChBoxChange(el, col, state) {
+            state[col.name] = el.is(':checked');
+            dbTblSetGenBtn();
+        }
+
+        function dbTblSetGenBtn() {
+            let isEnabled = false;
+            for (let a in app.state.client.dbTblAttr) isEnabled = isEnabled || app.state.client.dbTblAttr[a];
+            for (let r in app.state.client.dbTblRel)  isEnabled = isEnabled || app.state.client.dbTblRel[r];
+            if (isEnabled) {
+                $('#btn-db-gen').removeClass('disabled');
+            }
+            else {
+                $('#btn-db-gen').addClass('disabled');
+            }
+        }
+
+        function dbTblGen() {
         }
 
 
@@ -302,6 +344,10 @@
                 app.state.server.simFluAC.rules = data.rules;
                 uiInitSim();
                 M.toast({ html: 'Rule has been added', classes: 'amber accent-3' });
+
+                if (app.state.client.dbTblIdx >= 0) {
+                    dbTblSet(app.state.client.dbTblIdx);
+                }
             }, fd);
         }
 
@@ -357,6 +403,10 @@
                 app.state.server.simFluAC = data.state;
                 uiInitSim();
                 M.toast({ html: 'Simulation has been reset', classes: 'teal accent-4' });
+
+                if (app.state.client.dbTblIdx >= 0) {
+                    dbTblSet(app.state.client.dbTblIdx);
+                }
             });
         }
 
@@ -381,6 +431,10 @@
                 app.state.server.simFluAC = data.state;
                 uiInitSim();
                 M.toast({ html: 'Rules have been reset', classes: 'teal accent-4' });
+
+                if (app.state.client.dbTblIdx >= 0) {
+                    dbTblSet(app.state.client.dbTblIdx);
+                }
             });
         }
 
@@ -567,9 +621,10 @@
             $('#dropdown-rule-trigger-null')   .click(() => ruleSetInf('null', 'No info'));
             $('#dropdown-rule-trigger-docstr') .click(() => ruleSetInf('docstr', 'Docstring'));
             $('#dropdown-rule-trigger-src')    .click(() => ruleSetInf('src', 'Source code'));
+            $('#btn-rul-add')                  .click(ruleAdd);
 
             // (1.3) Population section:
-            $('#btn-rul-add').click(ruleAdd);
+            $('#btn-db-gen').click(dbTblGen);
 
             // (1.4) Probes section:
 
@@ -577,16 +632,16 @@
             // $('#btn-sim-flu-ac-run')  .click(simFluACRun);
             // $('#btn-sim-flu-ac-stop') .click(simFluACStop);
 
-            $('#chbox-sim-pragma-autostop')     .change((e) => simFluACSetPragma('autostop',     $(e.target).is(':checked')));
-            $('#chbox-sim-pragma-autocompact')  .change((e) => simFluACSetPragma('autocompact',  $(e.target).is(':checked')));
-            $('#chbox-sim-pragma-live-info')    .change((e) => simFluACSetPragma('live_info',    $(e.target).is(':checked')));
-            $('#chbox-sim-pragma-live-info-ts') .change((e) => simFluACSetPragma('live_info_ts', $(e.target).is(':checked')));
+            $('#btn-sim-reset').click(simFluACReset);
 
             $('#btn-sim-rules-reset')  .click(simFluACResetRules);
             $('#btn-sim-pop-reset')    .click(simFluACResetPop);
             $('#btn-sim-probes-reset') .click(simFluACResetProbes);
 
-            $('#btn-sim-reset').click(simFluACReset);
+            $('#chbox-sim-pragma-autostop')     .change((e) => simFluACSetPragma('autostop',     $(e.target).is(':checked')));
+            $('#chbox-sim-pragma-autocompact')  .change((e) => simFluACSetPragma('autocompact',  $(e.target).is(':checked')));
+            $('#chbox-sim-pragma-live-info')    .change((e) => simFluACSetPragma('live_info',    $(e.target).is(':checked')));
+            $('#chbox-sim-pragma-live-info-ts') .change((e) => simFluACSetPragma('live_info_ts', $(e.target).is(':checked')));
 
             // (1.6) Output section:
 
@@ -664,22 +719,24 @@
     <div id="tab-flu-a" class="col s12">
         <ul class="collapsible">
             <!-- Rules -->
-            <li class="active">
+            <li class="_active">
                 <div class="collapsible-header"><i class="material-icons icon-sim-rul"><script>document.write(ui.iconSimRul)</script></i><b>Rules</b></div>
                 <div class="collapsible-body">
                     <div class="row">
-                        <ul id="dropdown-rule-ls" class="dropdown-content"></ul>
-                        <a id="dropdown-rule-ls-trigger" class="btn dropdown-trigger" href="#" data-target="dropdown-rule-ls"><span id="dropdown-rule-ls-lbl">---</span><i class="material-icons right">arrow_drop_down</i></a>
+                        <div class="col s12">
+                            <ul id="dropdown-rule-ls" class="dropdown-content"></ul>
+                            <a id="dropdown-rule-ls-trigger" class="btn dropdown-trigger" href="#" data-target="dropdown-rule-ls"><span id="dropdown-rule-ls-lbl">---</span><i class="material-icons right">arrow_drop_down</i></a>
 
-                        <ul id="dropdown-rule" class="dropdown-content">
-                            <li><a id="dropdown-rule-trigger-null"   href="#" class="selected">No info</a></li>
-                            <li><a id="dropdown-rule-trigger-docstr" href="#">Docstring</a></li>
-                            <li><a id="dropdown-rule-trigger-src"    href="#">Source code</a></li>
-                        </ul>
-                        <a id="dropdown-rule-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-rule"><span id="dropdown-rule-lbl">No info</span><i class="material-icons right">arrow_drop_down</i></a>
+                            <ul id="dropdown-rule" class="dropdown-content">
+                                <li><a id="dropdown-rule-trigger-null"   href="#" class="selected">No info</a></li>
+                                <li><a id="dropdown-rule-trigger-docstr" href="#">Docstring</a></li>
+                                <li><a id="dropdown-rule-trigger-src"    href="#">Source code</a></li>
+                            </ul>
+                            <a id="dropdown-rule-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-rule"><span id="dropdown-rule-lbl">No info</span><i class="material-icons right">arrow_drop_down</i></a>
 
-                        <a id="btn-rule-nlines" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Lines of code" style="margin-left: 20px;"></a>
-                        <a id="btn-rul-add" class="waves-effect waves-light btn amber accent-3 disabled" style="margin-left: 40px;"><i class="material-icons right">add_circle</i>Add this rule</a>
+                            <a id="btn-rule-nlines" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Lines of code" style="margin-left: 20px;"></a>
+                            <a id="btn-rul-add" class="waves-effect waves-light btn amber accent-3 disabled" style="margin-left: 40px;"><i class="material-icons right">add_circle</i>Add this rule</a>
+                        </div>
                     </div>
 
                     <div id="row-rul-docstr" class="row">
@@ -693,17 +750,19 @@
             </li>
 
             <!-- Population -->
-            <li class="_active">
+            <li class="active">
                 <div class="collapsible-header"><i class="material-icons icon-sim-pop"><script>document.write(ui.iconSimPop)</script></i><b>Population</b></div>
                 <div class="collapsible-body">
                     <div class="row">
-                        <ul id="dropdown-db"     class="dropdown-content"></ul> <a id="dropdown-db-trigger"     class="btn dropdown-trigger"          href="#" data-target="dropdown-db"    ><span id="dropdown-db-lbl"    >---</span><i class="material-icons right">arrow_drop_down</i></a>
-                        <ul id="dropdown-db-tbl" class="dropdown-content"></ul> <a id="dropdown-db-tbl-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-db-tbl"><span id="dropdown-db-tbl-lbl">---</span><i class="material-icons right">arrow_drop_down</i></a>
+                        <div class="col s12">
+                            <ul id="dropdown-db"     class="dropdown-content"></ul> <a id="dropdown-db-trigger"     class="btn dropdown-trigger"          href="#" data-target="dropdown-db"    ><span id="dropdown-db-lbl"    >---</span><i class="material-icons right">arrow_drop_down</i></a>
+                            <ul id="dropdown-db-tbl" class="dropdown-content"></ul> <a id="dropdown-db-tbl-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-db-tbl"><span id="dropdown-db-tbl-lbl">---</span><i class="material-icons right">arrow_drop_down</i></a>
 
-                        <a id="btn-db-tbl-ncol" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Columns" style="margin-left: 20px;"></a>
-                        <a id="btn-db-tbl-nrow" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Rows"></a>
+                            <a id="btn-db-tbl-ncol" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Columns" style="margin-left: 20px;"></a>
+                            <a id="btn-db-tbl-nrow" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Rows"></a>
 
-                        <a id="btn-db-gen" class="waves-effect waves-light btn amber accent-3 disabled" style="margin-left: 40px;"><i class="material-icons right">add_circle</i>Generate population from this table</a>
+                            <a id="btn-db-gen" class="waves-effect waves-light btn amber accent-3 disabled" style="margin-left: 40px;"><i class="material-icons right">add_circle</i>Generate population from this table</a>
+                        </div>
                     </div>
 
                     <div id="row-pop-db-tbl" class="row">

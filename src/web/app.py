@@ -357,6 +357,34 @@ def rules_ls():
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+# ----[ PROBES ]--------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+@app.route('/probes-ls', methods=['GET'])
+def probes_ls():
+    school_l  = Site(450149323)  # 88% low income students
+    school_m  = Site(450067740)  #  7% low income students
+
+    return GroupSizeProbe(
+        name=name or str(school.name),
+        queries=[
+            GroupQry(attr={ 'flu': 's' }, rel={ 'school': school }),
+            GroupQry(attr={ 'flu': 'e' }, rel={ 'school': school }),
+            GroupQry(attr={ 'flu': 'r' }, rel={ 'school': school })
+        ],
+        qry_tot=GroupQry(rel={ 'school': school }),
+        persistance=pp,
+        var_names=['ps', 'pe', 'pr', 'ns', 'ne', 'nr']
+    )
+
+    probes = [
+        { 'name': 'Low-income school',    'inf': '88% low income students', 'persistenceName': 'low-income', 'id': 450149323 },
+        { 'name': 'medium-income school', 'inf':  '7% low income students', 'persistenceName': 'med-income', 'id': 450067740 }
+    ]
+    return jsonify({ 'res': True, 'probes': probes })
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 # ----[ DB ]------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
