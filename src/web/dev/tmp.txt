@@ -1,0 +1,117 @@
+                        <!--
+                        <div class="input-field col s3">
+                            <select id="select-sim-flu-a-db">
+                            </select>
+                            <label>Database</label>
+                        </div>
+                        -->
+                        <!-- <ul id="dropdown-db-col" class="dropdown-content"></ul> <a id="dropdown-db-col-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-db-col"><span id="dropdown-db-col-lbl">---</span><i class="material-icons right">arrow_drop_down</i></a> -->
+
+                    <!--
+                    <div class="row">
+                        <p class="range-field">
+                            <input type="range" id="test5" min="0" max="100" />
+                        </p>
+
+                        <label>
+                        <input type="checkbox" checked="checked" class="filled-in" />
+                        <span>Yellow</span>
+                        </label>
+
+                        <label>
+                        Off
+                        <input type="checkbox">
+                        <span class="lever"></span>
+                        On
+                        </label>
+                    </div>
+                    -->
+
+                    <!-- <div class="row">
+                        <div class="progress">
+                            <div class="determinate" style="width: 70%"></div>
+                        </div>
+                    </div> -->
+
+                    <!-- <div class="card" style="width:300px">
+                        <div class="card-content">
+                            <p>A simulation framework that fuses relational probabilistic models and agent-based models. This software is in the pre-release stage, so feel free to play with it, but keep in mind that not all pieces may be working. Until there is a release, please don't open issues and flex your own Python muscle to fix problems you encounter.</p>
+                        </div>
+                        <div class="card-tabs">
+                            <ul class="tabs tabs-fixed-width">
+                                <li class="tab"><a class="active" href="#card-01">Sim 1</a></li>
+                                <li class="tab"><a href="#card-02">Sim 2</a></li>
+                                <li class="tab"><a href="#card-03">Sim 3</a></li>
+                            </ul>
+                        </div>
+                        <div class="card-content grey lighten-4">
+                            <div id="card-01">Output 1</div>
+                            <div id="card-02">Output 2</div>
+                            <div id="card-03">Output 3</div>
+                        </div>
+                    </div> -->
+
+                    <!-- <div class="row">
+                        <div class="input-field col s6">
+                            <label for="sum-a">a</label>
+                            <input id="sum-a" type="text" placeholder="10" />
+                        </div>
+                        <div class="input-field col s6">
+                            <label for="sum-b">b</label>
+                            <input id="sum-b" type="text" placeholder="20" />
+                        </div>
+                        <div class="input-field col s6">
+                            <a id="sum" class="waves-effect waves-light btn">Sum!</a>
+                        </div>
+                        <div class="input-field col s6">
+                            <span><span id="sum-out">?</span></span>
+                        </div>
+                    </div> -->
+
+    <!-- Navbar -->
+    <!--
+    <ul id="dropdown-navbar" class="dropdown-content">
+        <li><a href="#!">one</a></li>
+        <li><a href="#!">two</a></li>
+        <li class="divider"></li>
+        <li><a href="#!">three</a></li>
+    </ul>
+    <nav>
+        <div class="nav-wrapper">
+            <a href="#!" lass="brand-logo">PRAM</a>
+            <ul class="right">
+                <li><a class="dropdown-trigger" href="#!" data-target="dropdown-navbar">Options<i class="material-icons right">arrow_drop_down</i></a></li>
+                <li><a id="btn-ping" class="waves-effect waves-light btn">Ping</a></li>
+            </ul>
+        </div>
+    </nav>
+    -->
+
+
+    <!--
+    <footer class="page-footer">
+        <div class="container">
+            <div class="row">
+                <div class="col l6 s12">
+                    <h5 class="white-text">Footer Content</h5>
+                    <p class="grey-text text-lighten-4">You can use rows and columns here to organize your footer content.</p>
+                </div>
+                <div class="col l4 offset-l2 s12">
+                    <h5 class="white-text">Links</h5>
+                    <ul>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 1</a></li>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 2</a></li>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 3</a></li>
+                        <li><a class="grey-text text-lighten-3" href="#!">Link 4</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="footer-copyright">
+            <div class="container">
+                © 2014 Copyright Text
+                <a class="grey-text text-lighten-4 right" href="#!">More Links</a>
+            </div>
+        </div>
+    </footer>
+    -->

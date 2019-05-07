@@ -7,13 +7,15 @@
         https://materializecss.com/icons.html
     -->
 
-    <meta charset="utf-8">
     <title>PRAM Demo</title>
 
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Exo+2">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="{{url_for('static', filename='css/materialize-pram.css')}}" media="screen,projection" />
+    <link rel="stylesheet" href="{{url_for('static', filename='css/prism-sol-light.css')}}" />
+
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <style type="text/css">
@@ -29,6 +31,7 @@
         #tbl-db-tbl td:nth-child(1)  { width: 80px; padding-left: 10px; padding-right: 10px; }
         #tbl-db-tbl td:nth-child(2)  { width: 80px; padding-left: 10px; padding-right: 10px; }
         input[type=checkbox]  { vertical-align: bottom; }
+        ode  { font: 0.9em courier monospace; _font-smooth: always; _-webkit-font-smoothing: auto; _-moz-osx-font-smoothing: auto; }
     </style>
 
     <!-- <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script> -->
@@ -38,6 +41,7 @@
     <script type="text/javascript" src="https://unpkg.com/whatwg-fetch@2.0.4/fetch.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/3.4.4/fuse.min.js"></script>
     <script type="text/javascript" src="{{url_for('static', filename='js/materialize.min.js')}}"></script>
+    <script type="text/javascript" src="{{url_for('static', filename='js/prism.js')}}" data-manual></script>
 
     <script>
         'use strict';
@@ -57,12 +61,27 @@
         var app = {
             dbSchema: null,
             isMonitoringSysLoad: false,
-            isRoot: false
+            isRoot: false,
+            rules: null,
+            state: {
+                client: {
+                    dbTbl: null,
+                    rule: null
+                },
+                server: null
+            }
         };
 
         var ui = {
             btnUserRootInnerHTML: 'person_add',
             btnUserUserInnerHTML: 'person',
+
+            iconSimRul: 'functions',
+            iconSimPop: 'people',
+            iconSimPrb: 'timeline',  // show_chart data_usage format_list_bulleted format_list_numbered linear_scale
+            iconSimSim: 'tune',
+            iconSimRun: 'play_circle_filled',
+            iconSimOut: 'equalizer'
 
             // iconSimSim: 'looks_one',
             // iconSimRul: 'looks_two',
@@ -70,13 +89,6 @@
             // iconSimEnt: 'looks_4',
             // iconSimRun: 'looks_5',
             // iconSimOut: 'looks_6'
-
-            iconSimSim: 'tune',
-            iconSimRul: 'functions',
-            iconSimPrb: 'timeline',  // show_chart data_usage format_list_bulleted format_list_numbered linear_scale
-            iconSimEnt: 'people',
-            iconSimRun: 'play_circle_filled',
-            iconSimOut: 'equalizer'
         };
 
 
@@ -88,6 +100,15 @@
             let el = document.createElement(tag);
             if (parent) parent.appendChild(el);
             return el;
+        }
+
+        function do_server(url, method, cb, formData=null) {
+            fetch(url, { method: method, cache: 'no-cache', body: formData }).
+            then(res => res.json()).
+            then(data => {
+                if (data.res) cb(data);
+                else M.toast({ html: data.err });  // classes: 'red darken-1'
+            });
         }
 
         function utilDoFuzzyMatch(lst, qry) {
@@ -108,29 +129,24 @@
         // -------------------------------------------------------------------------------------------------------------
 
         function sysGetLoad() {
-            fetch({{ url_for('sys_get_load')|tojson }}, { method: 'GET', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
-                if (data.res) {
-                    $('#sys-load-cpu-size').text(data.size.cpu);
-                    $('#sys-load-ram-size').text(data.size.ram);
-                    $('#sys-load-hdd-size').text(data.size.hdd);
-                    $('#sys-load-cpu-used').text(data.used.cpu);
-                    $('#sys-load-ram-used').text(data.used.ram);
-                    $('#sys-load-hdd-used').text(data.used.hdd);
-                    $('#sys-load-cpu-free').text(data.free.cpu);
-                    $('#sys-load-ram-free').text(data.free.ram);
-                    $('#sys-load-hdd-free').text(data.free.hdd);
+            do_server({{ url_for('sys_get_load')|tojson }}, 'GET', (data) => {
+                $('#sys-load-cpu-size').text(data.size.cpu);
+                $('#sys-load-ram-size').text(data.size.ram);
+                $('#sys-load-hdd-size').text(data.size.hdd);
+                $('#sys-load-cpu-used').text(data.used.cpu);
+                $('#sys-load-ram-used').text(data.used.ram);
+                $('#sys-load-hdd-used').text(data.used.hdd);
+                $('#sys-load-cpu-free').text(data.free.cpu);
+                $('#sys-load-ram-free').text(data.free.ram);
+                $('#sys-load-hdd-free').text(data.free.hdd);
 
-                    $('#sys-load-avg-t1') .text(data.avg.t1);
-                    $('#sys-load-avg-t5') .text(data.avg.t5);
-                    $('#sys-load-avg-t15').text(data.avg.t15);
+                $('#sys-load-avg-t1') .text(data.avg.t1);
+                $('#sys-load-avg-t5') .text(data.avg.t5);
+                $('#sys-load-avg-t15').text(data.avg.t15);
 
-                    if (app.isMonitoringSysLoad) {
-                        window.setTimeout(sysGetLoad, sysGetLoadWait);
-                    }
+                if (app.isMonitoringSysLoad) {
+                    window.setTimeout(sysGetLoad, sysGetLoadWait);
                 }
-                else M.toast({ html: data.err });
             });
         }
 
@@ -150,42 +166,28 @@
         // -------------------------------------------------------------------------------------------------------------
 
         function usrGetSess() {
-            fetch({{ url_for('usr_get_sess')|tojson }}, { method: 'GET', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
-                if (data.res) {
-                    app.state = data.state;
+            do_server({{ url_for('usr_get_sess')|tojson }}, 'GET', (data) => {
+               app.state.server = data.state;
 
-                    uiInitSim();
-                    uiInitRules();
-                    uiInitProbes();
-                    uiInitEntities();
-                    uiInitRun();
-                    uiInitOutput();
-                }
-                else M.toast({ html: data.err });
+               uiInitRules();
+               uiInitPop();
+               uiInitProbes();
+               uiInitSim();
+               uiInitOutput();
             });
         }
 
         function usrResetSess() {
-            fetch({{ url_for('usr_reset_sess')|tojson }}, { method: 'GET', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
-                if (data.res) {
-                    // $('#sim-flu-out').empty();
-                    usrIsRoot();
-                    M.toast({ html: 'User session has been cleared' });
-                    usrGetSess();
-                }
-                else M.toast({ html: data.err });
+            do_server({{ url_for('usr_reset_sess')|tojson }}, 'GET', (data) => {
+                usrIsRoot();
+                M.toast({ html: 'User session has been cleared' });
+                usrGetSess();
             });
         }
 
         function usrIsRoot() {
-            fetch({{ url_for('usr_is_root')|tojson }}, { method: 'GET', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
-                app.isRoot = data;
+            do_server({{ url_for('usr_is_root')|tojson }}, 'GET', (data) => {
+                app.isRoot = data.isRoot;
                 $('#btn-usr-toggle').children(0).text(app.isRoot ? ui.btnUserRootInnerHTML : ui.btnUserUserInnerHTML);
             });
         }
@@ -196,12 +198,10 @@
                 fd.append('code', prompt('Code:'));
             }
 
-            fetch({{ url_for('usr_toggle')|tojson }}, { method: 'POST', cache: 'no-cache', body: fd }).
-            then(res => res.json()).
-            then(data => {
-                app.isRoot = data;
+            do_server({{ url_for('usr_toggle')|tojson }}, 'POST', (data) => {
+                app.isRoot = data.isRoot;
                 $('#btn-usr-toggle').children(0).text(app.isRoot ? ui.btnUserRootInnerHTML : ui.btnUserUserInnerHTML);
-            });
+            }, fd);
         }
 
 
@@ -210,31 +210,24 @@
         // -------------------------------------------------------------------------------------------------------------
 
         function dbLs() {
-            fetch({{ url_for('db_ls')|tojson }}, { method: 'GET', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
-                if (data.res) {
-                    $('#dropdown-db').empty();
-                    $('#dropdown-db-tbl').empty();
-                    $('#tbl-db-tbl-body').empty();
-                    $('#row-ent-db-tbl').hide();
-                    $('#row-ent-db-ctl').hide();
+            do_server({{ url_for('db_ls')|tojson }}, 'GET', (data) => {
+                $('#dropdown-db').empty();
+                $('#dropdown-db-tbl').empty();
+                $('#tbl-db-tbl-body').empty();
+                $('#row-pop-db-tbl').hide();
+                $('#row-pop-db-ctl').hide();
 
-                    data.ls.forEach(i => {
-                        let li = $$('li');
-                        let a  = $($$('a', li)).html(i);
-                        a.attr('href', '#').on('click', () => dbSet(i));
-                        $('#dropdown-db').append(li);
-                    });
+                data.dbs.forEach(i => {
+                    let li = $$('li');
+                    let a  = $($$('a', li)).html(i);
+                    a.attr('href', '#').click(() => dbSet(i));
+                    $('#dropdown-db').append(li);
+                });
 
-                    M.Dropdown.init($('#dropdown-db-trigger'), { constrainWidth: false, coverTrigger: false, inDuration: 150, outDuration: 250, hover: true });
-                    $('#row-ent-db-tbl').hide();
-                    $('#row-ent-db-ctl').hide();
-                    $('#dropdown-db-tbl-trigger').addClass('disabled');
-                    $('#dropdown-db-col-trigger').addClass('disabled');
-                    $('#dropdown-db-lbl').html('---');
-                }
-                else M.toast({ html: data.err });
+                M.Dropdown.init($('#dropdown-db-trigger'), { constrainWidth: false, coverTrigger: false, inDuration: 150, outDuration: 250, hover: true });
+                $('#dropdown-db-tbl-trigger').addClass('disabled');
+                $('#dropdown-db-col-trigger').addClass('disabled');
+                $('#dropdown-db-lbl').html('---');
             });
         }
 
@@ -242,69 +235,46 @@
             let fd = new FormData();
             fd.append('fname', fname);
 
-            fetch({{ url_for('db_get_schema')|tojson }}, { method: 'POST', cache: 'no-cache', body: fd }).
-            then(res => res.json()).
-            then(data => {
-                if (data.res) {
-                    $('#dropdown-db-tbl').empty();
-                    $('#tbl-db-tbl-body').empty();
-                    $('#row-ent-db-tbl').hide();
-                    $('#row-ent-db-ctl').hide();
-                    $('#dropdown-db-lbl').html(fname);
+            do_server({{ url_for('db_get_schema')|tojson }}, 'POST', (data) => {
+                $('#dropdown-db-tbl').empty();
+                $('#dropdown-db-tbl-trigger').removeClass('disabled');
+                $('#dropdown-db-col-trigger').addClass('disabled');
+                $('#dropdown-db-tbl-lbl').html('---');
+                $('#tbl-db-tbl-body').empty();
+                $('#row-pop-db-tbl').hide();
+                $('#row-pop-db-ctl').hide();
+                $('#dropdown-db-lbl').html(fname);
+                $('#btn-db-tbl-ncol').html('');
+                $('#btn-db-tbl-nrow').html('');
 
-                    app.dbSchema = data.schema;
-                    for (let i = 0; i < app.dbSchema.length; i++) {
-                        let tbl = app.dbSchema[i];
-                        let li = $$('li');
-                        let a  = $($$('a', li)).html(tbl.name + '<span class="tbl badge">' + tbl.cols.length + '</span>');
-                        a.attr('href', '#').on('click', () => dbTblSet(i));
-                        $('#dropdown-db-tbl').append(li);
-                    }
-
-                    M.Dropdown.init($('#dropdown-db-tbl-trigger'), { constrainWidth: false, coverTrigger: false, inDuration: 150, outDuration: 250, hover: true });
-                    $('#dropdown-db-tbl-trigger').removeClass('disabled');
-                    $('#dropdown-db-col-trigger').addClass('disabled');
-                    $('#dropdown-db-tbl-lbl').html('---');
+                app.dbSchema = data.schema;
+                for (let i = 0; i < app.dbSchema.length; i++) {
+                    let tbl = app.dbSchema[i];
+                    let li = $$('li');
+                    let a  = $($$('a', li)).html(tbl.name + '<span class="badge">' + tbl.cols.length + '</span>');
+                    a.attr('href', '#').click(() => dbTblSet(i));
+                    $('#dropdown-db-tbl').append(li);
                 }
-                else M.toast({ html: data.err });
-            });
-        }
 
-        function dbTblSet2(name) {
-            /**
-             * Use the dropdown box for columns.
-             */
-
-            $('#dropdown-db-col').empty();
-            $('#dropdown-db-tbl-lbl').html(name);
-
-            for (let i = 0; i < app.dbSchema[tblIdx].cols.length; i++) {
-                let col = app.dbSchema[tblIdx].cols[i];
-                let li = $$('li');
-                let a  = $($$('a', li)).html(col_name + '<span class="type badge">' + col.type + '</span>');
-                a.attr('href', '#').on('click', () => dbColSet(col_name));
-                $('#dropdown-db-col').append(li);
-            }
-            M.Dropdown.init($('#dropdown-db-col-trigger'), { constrainWidth: false, coverTrigger: false, inDuration: 150, outDuration: 250, hover: true });
-            $('#dropdown-db-col-trigger').removeClass('disabled');
-            $('#dropdown-db-col-lbl').html('---');
+                M.Dropdown.init($('#dropdown-db-tbl-trigger'), { constrainWidth: false, coverTrigger: false, inDuration: 150, outDuration: 250, hover: true });
+            }, fd);
         }
 
         function dbTblSet(tblIdx) {
-            /**
-             * Use the table for columns.
-             */
+            app.state.client.dbTbl = app.dbSchema[tblIdx];
 
             $('#dropdown-db-tbl-lbl').html(app.dbSchema[tblIdx].name);
             $('#tbl-db-tbl-body').empty();
-            $('#row-ent-db-tbl').show();
-            $('#row-ent-db-ctl').show();
+            $('#row-pop-db-tbl').show();
+            $('#row-pop-db-ctl').show();
+            $('#btn-db-tbl-ncol').html('Columns: <b>' + app.dbSchema[tblIdx].cols.length + '</b>');
+            $('#btn-db-tbl-nrow').html('Rows: <b>'    + app.dbSchema[tblIdx].rowCnt + '</b>');
 
             for (let i = 0; i < app.dbSchema[tblIdx].cols.length; i++) {
                 let col = app.dbSchema[tblIdx].cols[i];
 
-                let matchAttr = utilDoFuzzyMatch(app.state.simFluAC.rules.analysis.static.attr.used, col.name);
-                let matchRel  = utilDoFuzzyMatch(app.state.simFluAC.rules.analysis.static.rel.used,  col.name);
+                let matchAttr = utilDoFuzzyMatch(app.state.server.simFluAC.rules.analysis.static.attr.used, col.name);
+                let matchRel  = utilDoFuzzyMatch(app.state.server.simFluAC.rules.analysis.static.rel.used,  col.name);
 
                 let badgesAttr = matchAttr .map((i) => uiGenBadgeRule(i.item, i.score.toPrecision(2))).join('');
                 let badgesRel  = matchRel  .map((i) => uiGenBadgeRule(i.item, i.score.toPrecision(2))).join('');
@@ -319,25 +289,98 @@
             }
         }
 
-        function dbColSet(name) {
-            $('#dropdown-db-col-lbl').html(name);
 
-            console.log(name);
+        // -------------------------------------------------------------------------------------------------------------
+        // ----[ RULES ]------------------------------------------------------------------------------------------------
+        // -------------------------------------------------------------------------------------------------------------
+
+        function ruleAdd() {
+            let fd = new FormData();
+            fd.append('cls', app.state.client.rule.cls);
+
+            do_server({{ url_for('sim_flu_ac_add_rule')|tojson }}, 'POST', (data) => {
+                app.state.server.simFluAC.rules = data.rules;
+                uiInitSim();
+                M.toast({ html: 'Rule has been added', classes: 'amber accent-3' });
+            }, fd);
+        }
+
+        function ruleLs() {
+            do_server({{ url_for('rules_ls')|tojson }}, 'GET', (data) => {
+                $('#dropdown-rule-ls').empty();
+
+                app.rules = data.rules;
+                for (let i = 0; i < app.rules.length; i++) {
+                    let rule = app.rules[i];
+                    let li = $$('li');
+                    let a  = $($$('a', li)).html(rule.name + '<span class="badge">' + rule.srcLines.length + '</span>');
+                    a.attr('href', '#').click(() => ruleSet(i));
+                    $('#dropdown-rule-ls').append(li);
+                }
+
+                M.Dropdown.init($('#dropdown-rule-ls-trigger'), { constrainWidth: false, coverTrigger: false, inDuration: 150, outDuration: 250, hover: true });
+                $('#row-rul-docstr').hide();
+                $('#row-rul-src').hide();
+                $('#btn-rul-add').addClass('disabled');
+            });
+        }
+
+        function ruleSet(ruleIdx) {
+            let rule = app.rules[ruleIdx];
+            app.state.client.rule = rule;
+
+            $('#dropdown-rule-ls-lbl').html(rule.name);
+            $('#row-rul-docstr-card').html(rule.docstr.join('<br />'));
+            $('#row-rul-src').html('<pre><code>' + rule.srcLines.join('') + '</code></pre>');
+            $('#dropdown-rule-trigger').removeClass('disabled');
+            $('#btn-rul-add').removeClass('disabled');
+            $('#btn-rule-nlines').html(rule.srcLines.length + ' lines');
+
+            Prism.highlightElement($('#row-rul-src').children(0).children(0)[0]);
+        }
+
+        function ruleSetInf(section, name) {
+            $('#dropdown-rule-lbl').html(name);
+
+            $('#row-rul-docstr')    .hide();
+            $('#row-rul-src')       .hide();
+            $('#row-rul-' + section).show();
         }
 
 
         // -------------------------------------------------------------------------------------------------------------
-        // ----[ SIM: FLU ALLEGHENY ]-----------------------------------------------------------------------------------
+        // ----[ SIM: FLU ALLEGHENY COUNTY ]----------------------------------------------------------------------------
         // -------------------------------------------------------------------------------------------------------------
 
         function simFluACReset() {
-            fetch({{ url_for('sim_flu_ac_reset')|tojson }}, { method: 'GET', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
-                if (data.res) {
-                    usrGetSess();
-                }
-                else M.toast({ html: data.err });
+            do_server({{ url_for('sim_flu_ac_reset')|tojson }}, 'GET', (data) => {
+                app.state.server.simFluAC = data.state;
+                uiInitSim();
+                M.toast({ html: 'Simulation has been reset', classes: 'teal accent-4' });
+            });
+        }
+
+        function simFluACResetPop() {
+            do_server({{ url_for('sim_flu_ac_reset_pop')|tojson }}, 'GET', (data) => {
+                app.state.server.simFluAC = data.state;
+                uiInitSim();
+                M.toast({ html: 'Population has been reset', classes: 'teal accent-4' });
+            });
+        }
+
+        function simFluACResetProbes() {
+            do_server({{ url_for('sim_flu_ac_reset_probes')|tojson }}, 'GET', (data) => {
+                app.state.server.simFluAC = data.state;
+                uiInitSim();
+                M.toast({ html: 'Probes have been reset', classes: 'teal accent-4' });
+            });
+        }
+
+        function simFluACResetRules() {
+            do_server({{ url_for('sim_flu_ac_reset_rules')|tojson }}, 'GET', (data) => {
+                app.state.server.simFluAC = data.state;
+                uiInitSim();
+                M.toast({ html: 'Rules have been reset', classes: 'teal accent-4' });
             });
         }
 
@@ -346,36 +389,24 @@
             fd.append('name', name);
             fd.append('value', value);
 
-            fetch({{ url_for('sim_flu_ac_set_pragma')|tojson }}, { method: 'POST', cache: 'no-cache', body: fd }).
-            then(res => res.json()).
-            then(data => {
-                if (data.res) {
-                    app.state.simFluAC.sim.pragma[name] = !app.state.simFluAC.sim.pragma[name];
-                }
-                else M.toast({ html: data.err });
+            do_server({{ url_for('sim_flu_ac_set_pragma')|tojson }}, 'POST', (data) => {
+                app.state.server.simFluAC.sim.pragma[name] = !app.state.server.simFluAC.sim.pragma[name];
                 uiInitSim();
-            });
+            }, fd);
         }
 
         function simFluACRun() {
-            fetch({{ url_for('sim_flu_ac_run')|tojson }}, { method: 'POST', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
-                if (data.res) {
-                    $('#btn-sim-flu-ac-stop').css('background', 'linear-gradient(90deg, #ff0000 0%, #ffbdbd 0%)');
-                    $('#btn-sim-flu-ac-run').hide();
-                    $('#btn-sim-flu-ac-stop').show();
+            do_server({{ url_for('sim_flu_ac_run')|tojson }}, 'POST', (data) => {
+                $('#btn-sim-flu-ac-stop').css('background', 'linear-gradient(90deg, #ff0000 0%, #ffbdbd 0%)');
+                $('#btn-sim-flu-ac-run').hide();
+                $('#btn-sim-flu-ac-stop').show();
 
-                    window.setTimeout(simFluAStatus, simUpdWait);
-                }
-                if (data.err)M.toast({ html: data.err });
+                window.setTimeout(simFluAStatus, simUpdWait);
             });
         }
 
         function simFluACStatus() {
-            fetch({{ url_for('sim_flu_ac_status')|tojson }}, { method: 'GET', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
+            do_server({{ url_for('sim_flu_ac_status')|tojson }}, 'GET', (data) => {
                 if (data.isRunning) {
                     $('#btn-sim-flu-ac-run').hide();
                     $('#btn-sim-flu-ac-stop').show();
@@ -392,9 +423,7 @@
         }
 
         function simFluACStop() {
-            fetch({{ url_for('sim_flu_ac_stop')|tojson }}, { method: 'GET', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
+            do_server({{ url_for('sim_flu_ac_stop')|tojson }}, 'GET', (data) => {
                 window.setTimeout(simFluAStatus, simUpdWait);
             });
         }
@@ -405,12 +434,8 @@
         // -------------------------------------------------------------------------------------------------------------
 
         function simFluReset() {
-            fetch({{ url_for('sim_flu_reset')|tojson }}, { method: 'GET', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
-                if (data.res) {
-                    $('#sim-flu-out').empty();
-                }
+            do_server({{ url_for('sim_flu_reset')|tojson }}, 'GET', (data) => {
+                $('#sim-flu-out').empty();
             });
         }
 
@@ -418,14 +443,10 @@
             let fd = new FormData();
             fd.append('iter-n', iterN);
 
-            fetch({{ url_for('sim_flu_run')|tojson }}, { method: 'POST', cache: 'no-cache', body: fd }).
-            then(res => res.json()).
-            then(data => {
-                if (data.res) {
-                    let div = $($$('div')).html(data.out)
-                    $('#sim-flu-out').append(div);
-                }
-            });
+            do_server({{ url_for('sim_flu_run')|tojson }}, 'GET', (data) => {
+                let div = $($$('div')).html(data.out)
+                $('#sim-flu-out').append(div);
+            }, fd);
         }
 
 
@@ -434,24 +455,17 @@
         // -------------------------------------------------------------------------------------------------------------
 
         function simTestRun() {
-            fetch({{ url_for('sim_test_run')|tojson }}, { method: 'POST', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
-                if (data.res) {
-                    $('#btn-sim-test-stop').css('background', 'linear-gradient(90deg, #ff0000 0%, #ffbdbd 0%)');
-                    $('#btn-sim-test-run').hide();
-                    $('#btn-sim-test-stop').show();
+            do_server({{ url_for('sim_test_run')|tojson }}, 'GET', (data) => {
+                $('#btn-sim-test-stop').css('background', 'linear-gradient(90deg, #ff0000 0%, #ffbdbd 0%)');
+                $('#btn-sim-test-run').hide();
+                $('#btn-sim-test-stop').show();
 
-                    window.setTimeout(simTestStatus, simUpdWait);
-                }
-                else M.toast({ html: data.err });
+                window.setTimeout(simTestStatus, simUpdWait);
             });
         }
 
         function simTestStatus() {
-            fetch({{ url_for('sim_test_status')|tojson }}, { method: 'GET', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
+            do_server({{ url_for('sim_test_status')|tojson }}, 'GET', (data) => {
                 if (data.isRunning) {
                     $('#btn-sim-test-run').hide();
                     $('#btn-sim-test-stop').show();
@@ -468,9 +482,7 @@
         }
 
         function simTestStop() {
-            fetch({{ url_for('sim_test_stop')|tojson }}, { method: 'GET', cache: 'no-cache' }).
-            then(res => res.json()).
-            then(data => {
+            do_server({{ url_for('sim_test_stop')|tojson }}, 'GET', (data) => {
                 window.setTimeout(simTestStatus, simUpdWait);
             });
         }
@@ -481,42 +493,58 @@
         // -------------------------------------------------------------------------------------------------------------
 
         function uiGenBadgeRule(value='', caption='') {
-            return '<span class="new badge green left" data-badge-caption="' + caption + '" style="margin-right: 4px;">' + value + '</span>';
-        }
-
-        function uiInitEntities() {
-            $('#row-ent-stat').html('Agents: <b>' + app.state.simFluAC.pop.agentCnt + '</b><br />Groups: <b>' + app.state.simFluAC.pop.groupCnt + '</b><br />Sites: <b>' + app.state.simFluAC.pop.siteCnt + '</b><br />');
-            dbLs();
+            return '<span class="new badge deep-purple lighten-2 left" data-badge-caption="' + caption + '" style="margin-right: 4px; padding-left: 10px; padding-right: 10px; font-weight: bold;">' + value + '</span>';
         }
 
         function uiInitOutput() {
+        }
+
+        function uiInitPop() {
+            dbLs();
         }
 
         function uiInitProbes() {
         }
 
         function uiInitRules() {
-            let badgesAttr = app.state.simFluAC.rules.analysis.static.attr.used.map((i) => uiGenBadgeRule('ATTR: ', i)).join('');
-            let badgesRel  = app.state.simFluAC.rules.analysis.static.rel .used.map((i) => uiGenBadgeRule('REL: ', i)).join('');
-            $('#row-rul').html('Count: <b>' + app.state.simFluAC.rules.cnt + '</b><br /><br />' + badgesAttr + badgesRel);
-        }
-
-        function uiInitRun() {
-            /*
-            switch (data.sim) {
-                case 2:
-                    simFluAStatus();
-                    break;
-                case 'test':
-                    simTestStatus();
-                    break;
-            }
-            */
+            ruleLs();
         }
 
         function uiInitSim() {
-            $('#chbox-sim-pragma-live-info')    .prop('checked', app.state.simFluAC.sim.pragma.live_info);
-            $('#chbox-sim-pragma-live-info-ts') .prop('checked', app.state.simFluAC.sim.pragma.live_info_ts);
+            // (1) Pragmas:
+            $('#chbox-sim-pragma-autocompact')  .prop('checked', app.state.server.simFluAC.sim.pragma.autocompact);
+            $('#chbox-sim-pragma-autostop')     .prop('checked', app.state.server.simFluAC.sim.pragma.autostop);
+            $('#chbox-sim-pragma-live-info')    .prop('checked', app.state.server.simFluAC.sim.pragma.live_info);
+            $('#chbox-sim-pragma-live-info-ts') .prop('checked', app.state.server.simFluAC.sim.pragma.live_info_ts);
+
+            // (2) Rules:
+            if (app.state.server.simFluAC.rules.ls.length == 0) {
+                $('#row-sim-rules-inf').html('No rules');
+            }
+            else {
+                let ruleLst = '<ul><li><b>' + app.state.server.simFluAC.rules.ls.map((i) => i.name).join('</b></li><li><b>') + '</b></li></ul>';
+                let badgesAttr = app.state.server.simFluAC.rules.analysis.static.attr.used.map((i) => uiGenBadgeRule('ATTR: ', i)).join('');
+                let badgesRel  = app.state.server.simFluAC.rules.analysis.static.rel .used.map((i) => uiGenBadgeRule('REL: ', i)).join('');
+
+                $('#row-sim-rules-inf').html(ruleLst + '<br />' + badgesAttr + badgesRel);
+            }
+
+            // (3) Population:
+            if (app.state.server.simFluAC.pop.agentCnt == 0 && app.state.server.simFluAC.pop.groupCnt == 0 && app.state.server.simFluAC.pop.siteCnt == 0) {
+                $('#row-sim-pop-inf').html('No population');
+            }
+            else {
+                $('#row-sim-pop-inf').html('Agents: <b>' + app.state.server.simFluAC.pop.agentCnt + '</b><br />Groups: <b>' + app.state.server.simFluAC.pop.groupCnt + '</b><br />Sites: <b>' + app.state.server.simFluAC.pop.siteCnt + '</b><br />');
+            }
+
+            // (4) Probes:
+            if (app.state.server.simFluAC.probes.ls.length == 0) {
+                $('#row-sim-probes-inf').html('No probes');
+            }
+            else {
+            }
+
+            // (5) control:
         }
 
 
@@ -526,6 +554,7 @@
 
         document.addEventListener('DOMContentLoaded', function () {
             // (1) Attach events:
+            // (1.1) Main:
             $('#btn-usr-toggle')     .click(usrToggle);
             $('#btn-usr-reset-sess') .click(usrResetSess);
             $('#btn-sys-ping')       .click(sysPing);
@@ -534,49 +563,76 @@
                 sysGetLoad();
             });
 
-            /*
-            $('#btn-sim-flu-reset')   .click(simFluReset);
-            $('#btn-sim-flu-run-1')   .click(() => simFluRun(1));
-            $('#btn-sim-flu-run-5')   .click(() => simFluRun(5));
-            $('#btn-sim-flu-run-10')  .click(() => simFluRun(10));
-            */
+            // (1.2) Rules section:
+            $('#dropdown-rule-trigger-null')   .click(() => ruleSetInf('null', 'No info'));
+            $('#dropdown-rule-trigger-docstr') .click(() => ruleSetInf('docstr', 'Docstring'));
+            $('#dropdown-rule-trigger-src')    .click(() => ruleSetInf('src', 'Source code'));
 
+            // (1.3) Population section:
+            $('#btn-rul-add').click(ruleAdd);
+
+            // (1.4) Probes section:
+
+            // (1.5) Simulation section:
             // $('#btn-sim-flu-ac-run')  .click(simFluACRun);
             // $('#btn-sim-flu-ac-stop') .click(simFluACStop);
-            $('#btn-sim-test-run')    .click(simTestRun);
-            $('#btn-sim-test-stop')   .click(simTestStop);
 
-            $('#btn-sim-reset').click(simFluACReset);
-
+            $('#chbox-sim-pragma-autostop')     .change((e) => simFluACSetPragma('autostop',     $(e.target).is(':checked')));
+            $('#chbox-sim-pragma-autocompact')  .change((e) => simFluACSetPragma('autocompact',  $(e.target).is(':checked')));
             $('#chbox-sim-pragma-live-info')    .change((e) => simFluACSetPragma('live_info',    $(e.target).is(':checked')));
             $('#chbox-sim-pragma-live-info-ts') .change((e) => simFluACSetPragma('live_info_ts', $(e.target).is(':checked')));
 
-            // (2) Init the UI:
-            /*
-            $('.icon-sim-sim').each(() => $(this).html(ui.iconSimSim));
-            $('.icon-sim-rul').each(() => $(this).html(ui.iconSimRul));
-            $('.icon-sim-prb').each(() => $(this).html(ui.iconSimPrb));
-            $('.icon-sim-ent').each(() => $(this).html(ui.iconSimEnt));
-            $('.icon-sim-run').each(() => $(this).html(ui.iconSimRun));
-            $('.icon-sim-out').each(() => $(this).html(ui.iconSimOut));
-            */
+            $('#btn-sim-rules-reset')  .click(simFluACResetRules);
+            $('#btn-sim-pop-reset')    .click(simFluACResetPop);
+            $('#btn-sim-probes-reset') .click(simFluACResetProbes);
 
+            $('#btn-sim-reset').click(simFluACReset);
+
+            // (1.6) Output section:
+
+            // (1.7) Misc:
+            // $('#btn-sim-flu-reset')   .click(simFluReset);
+            // $('#btn-sim-flu-run-1')   .click(() => simFluRun(1));
+            // $('#btn-sim-flu-run-5')   .click(() => simFluRun(5));
+            // $('#btn-sim-flu-run-10')  .click(() => simFluRun(10));
+
+            $('#btn-sim-test-run')    .click(simTestRun);
+            $('#btn-sim-test-stop')   .click(simTestStop);
+
+            // (2) Init Materialize:
             // M.AutoInit();
             M.Collapsible          .init($('.collapsible'), { accordion: false, inDuration: 75, outDuration: 75 });
-            M.Dropdown             .init($('.dropdown-trigger'), {});
+            // M.Dropdown             .init($('.dropdown-trigger'), {});
+            M.Dropdown             .init($('.dropdown-trigger'), { constrainWidth: false, coverTrigger: false, inDuration: 150, outDuration: 250, hover: true });
             M.FloatingActionButton .init($('.fixed-action-btn'), {});
             M.FormSelect           .init($('select'), {});
             M.Modal                .init($('#win-sys-load'), { onCloseStart: () => { app.isMonitoringSysLoad = false; } });
             M.Tabs                 .init($('.tabs'), { swipeable: false });
             M.Tooltip              .init($('.tooltipped'), {});
 
-            $('#btn-sim-flu-ac-run').show();
-            $('#btn-sim-flu-ac-stop').hide();
+            // (3) Show and hide elements:
+            // (3.1) Main:
 
-            $('#btn-sim-test-run').show();
-            $('#btn-sim-test-stop').hide();
+            // (3.2) Rules section:
+            $('#row-rul-docstr') .hide();
+            $('#row-rul-src')    .hide();
 
-            // (3) Sync the UI with the server:
+            // (3.3) Population section:
+            $('#row-pop-db-tbl').hide();
+
+            // (3.4) Probes section:
+
+            // (3.5) Simulation section:
+            $('#btn-sim-flu-ac-run')  .show();
+            $('#btn-sim-flu-ac-stop') .hide();
+
+            // (3.6) Output section:
+
+            // (3.7) Misc:
+            $('#btn-sim-test-run')  .show();
+            $('#btn-sim-test-stop') .hide();
+
+            // (4) Sync the UI with the server:
             usrGetSess();
             usrIsRoot();
             sysPing();
@@ -607,29 +663,57 @@
     <!-- Tab: Flu Allegheny Sim -->
     <div id="tab-flu-a" class="col s12">
         <ul class="collapsible">
-            <!-- Simulation -->
+            <!-- Rules -->
             <li class="active">
-                <div class="collapsible-header"><i class="material-icons icon-sim-sim"><script>document.write(ui.iconSimSim)</script></i><b>Simulation</b></div>
+                <div class="collapsible-header"><i class="material-icons icon-sim-rul"><script>document.write(ui.iconSimRul)</script></i><b>Rules</b></div>
                 <div class="collapsible-body">
                     <div class="row">
-                        <div class="col s1"><nobr>Live info</nobr></div>
-                        <div class="col s1"><div class="switch"><label>Off<input id="chbox-sim-pragma-live-info" type="checkbox" checked="checked"><span class="lever"></span>On</label></div></div>
+                        <ul id="dropdown-rule-ls" class="dropdown-content"></ul>
+                        <a id="dropdown-rule-ls-trigger" class="btn dropdown-trigger" href="#" data-target="dropdown-rule-ls"><span id="dropdown-rule-ls-lbl">---</span><i class="material-icons right">arrow_drop_down</i></a>
+
+                        <ul id="dropdown-rule" class="dropdown-content">
+                            <li><a id="dropdown-rule-trigger-null"   href="#" class="selected">No info</a></li>
+                            <li><a id="dropdown-rule-trigger-docstr" href="#">Docstring</a></li>
+                            <li><a id="dropdown-rule-trigger-src"    href="#">Source code</a></li>
+                        </ul>
+                        <a id="dropdown-rule-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-rule"><span id="dropdown-rule-lbl">No info</span><i class="material-icons right">arrow_drop_down</i></a>
+
+                        <a id="btn-rule-nlines" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Lines of code" style="margin-left: 20px;"></a>
+                        <a id="btn-rul-add" class="waves-effect waves-light btn amber accent-3 disabled" style="margin-left: 40px;"><i class="material-icons right">add_circle</i>Add this rule</a>
                     </div>
-                    <div class="row">
-                        <div class="col s1"><nobr>Live info timestamp</nobr></div>
-                        <div class="col s1"><div class="switch"><label>Off<input id="chbox-sim-pragma-live-info-ts" type="checkbox"><span class="lever"></span>On</label></div></div>
+
+                    <div id="row-rul-docstr" class="row">
+                        <div class="card">
+                            <div id="row-rul-docstr-card" class="card-content"></div>
+                        </div>
                     </div>
-                    <div class="row">
-                        <button id="btn-sim-reset" class="btn waves-effect waves-light">Reset<i class="material-icons right">cached</i></button>
-                    </div>
+
+                    <div id="row-rul-src" class="row lang-python"></div>
                 </div>
             </li>
 
-            <!-- Rules -->
+            <!-- Population -->
             <li class="_active">
-                <div class="collapsible-header"><i class="material-icons icon-sim-rul"><script>document.write(ui.iconSimRul)</script></i><b>Rules</b></div>
+                <div class="collapsible-header"><i class="material-icons icon-sim-pop"><script>document.write(ui.iconSimPop)</script></i><b>Population</b></div>
                 <div class="collapsible-body">
-                    <div id="row-rul" class="row">
+                    <div class="row">
+                        <ul id="dropdown-db"     class="dropdown-content"></ul> <a id="dropdown-db-trigger"     class="btn dropdown-trigger"          href="#" data-target="dropdown-db"    ><span id="dropdown-db-lbl"    >---</span><i class="material-icons right">arrow_drop_down</i></a>
+                        <ul id="dropdown-db-tbl" class="dropdown-content"></ul> <a id="dropdown-db-tbl-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-db-tbl"><span id="dropdown-db-tbl-lbl">---</span><i class="material-icons right">arrow_drop_down</i></a>
+
+                        <a id="btn-db-tbl-ncol" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Columns" style="margin-left: 20px;"></a>
+                        <a id="btn-db-tbl-nrow" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Rows"></a>
+
+                        <a id="btn-db-gen" class="waves-effect waves-light btn amber accent-3 disabled" style="margin-left: 40px;"><i class="material-icons right">add_circle</i>Generate population from this table</a>
+                    </div>
+
+                    <div id="row-pop-db-tbl" class="row">
+                        <table id="tbl-db-tbl" class="responsive-table z-depth-1">
+                            <thead><tr> <th class="blue-grey lighten-5">Column</th> <th class="blue-grey lighten-5">Type</th> <th class="blue-grey lighten-5">Attributes</th> <th class="blue-grey lighten-5">Relations</th> </tr></thead>
+                            <tbody id="tbl-db-tbl-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="row-pop-db-ctl" class="row">
                     </div>
                 </div>
             </li>
@@ -641,53 +725,78 @@
                 </div>
             </li>
 
-            <!-- Entities -->
+            <!-- Simulation -->
             <li class="active">
-                <div class="collapsible-header"><i class="material-icons icon-sim-ent"><script>document.write(ui.iconSimEnt)</script></i><b>Entities</b></div>
+                <div class="collapsible-header"><i class="material-icons icon-sim-sim"><script>document.write(ui.iconSimSim)</script></i><b>Simulation</b></div>
                 <div class="collapsible-body">
                     <div class="row">
                         <div class="col s12" style="padding: 0px;">
                             <ul class="tabs z-depth-1">
-                                <li class="tab col s1"><a href="#tab-ent-stat">Status</a></li>
-                                <li class="tab col s1"><a href="#tab-ent-db" class="active">Databases</a></li>
+                                <li class="tab col s1"><a href="#tab-sim-ctl">Control</a></li>
+                                <li class="tab col s1"><a href="#tab-sim-rules">Rules</a></li>
+                                <li class="tab col s1"><a href="#tab-sim-pop">Population</a></li>
+                                <li class="tab col s1"><a href="#tab-sim-probes">Probes</a></li>
+                                <li class="tab col s1"><a href="#tab-sim-pragma">Settings</a></li>
                             </ul>
                         </div>
-                        <div id="tab-ent-stat" class="col s12" style="padding-top: 10px;">
-                            <div id="row-ent-stat" class="row">
-                            </div>
+
+                        <!-- Tab: Control -->
+                        <div id="tab-sim-ctl" class="col s12" style="padding-top: 10px;">
                             <div class="row">
-                                <a id="btn-ent-rem" class="waves-effect waves-light btn"><i class="material-icons right">delete</i>Remove All Entities</a>
+                                <button id="btn-sim-flu-ac-run"  class="btn waves-effect waves-light amber accent-3"><span>Run</span> <i class="material-icons right">play_circle_filled</i></button>
+                                <button id="btn-sim-flu-ac-stop" class="btn waves-effect waves-light red"><span>Stop</span><i class="material-icons right">stop</i></button>
+                                <button id="btn-sim-reset"       class="btn waves-effect waves-light teal accent-4" style="margin-left: 40px;">Reset the simulation<i class="material-icons right">cached</i></button>
                             </div>
                         </div>
-                        <div id="tab-ent-db" class="col s12" style="padding-top: 10px;">
+
+                        <!-- Tab: Rules -->
+                        <div id="tab-sim-rules" class="col s12" style="padding-top: 10px;">
+                            <div id="row-sim-rules-inf" class="row">
+                            </div>
                             <div class="row">
-                                <ul id="dropdown-db"     class="dropdown-content"></ul> <a id="dropdown-db-trigger"     class="btn dropdown-trigger"          href="#" data-target="dropdown-db"    ><span id="dropdown-db-lbl"    >---</span><i class="material-icons right">arrow_drop_down</i></a>
-                                <ul id="dropdown-db-tbl" class="dropdown-content"></ul> <a id="dropdown-db-tbl-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-db-tbl"><span id="dropdown-db-tbl-lbl">---</span><i class="material-icons right">arrow_drop_down</i></a>
+                                <a id="btn-sim-rules-reset" class="waves-effect waves-light btn teal accent-4"><i class="material-icons right">delete</i>Reset the rules</a>
                             </div>
+                        </div>
 
-                            <div id="row-ent-db-tbl" class="row">
-                                <table id="tbl-db-tbl" class="responsive-table z-depth-1">
-                                    <thead><tr> <th class="blue-grey lighten-5">Column</th> <th class="blue-grey lighten-5">Type</th> <th class="blue-grey lighten-5">Attributes</th> <th class="blue-grey lighten-5">Relations</th> </tr></thead>
-                                    <tbody id="tbl-db-tbl-body"></tbody>
-                                </table>
+                        <!-- Tab: Population -->
+                        <div id="tab-sim-pop" class="col s12" style="padding-top: 10px;">
+                            <div id="row-sim-pop-inf" class="row">
                             </div>
+                            <div class="row">
+                                <a id="btn-sim-pop-reset" class="waves-effect waves-light btn teal accent-4"><i class="material-icons right">delete</i>Reset the population</a>
+                            </div>
+                        </div>
 
-                            <div id="row-ent-db-ctl" class="row">
-                                <a id="btn-db-gen" class="waves-effect waves-light btn"><i class="material-icons right">add_circle</i>Generate Entities</a>
+                        <!-- Tab: Probes -->
+                        <div id="tab-sim-probes" class="col s12" style="padding-top: 10px;">
+                            <div id="row-sim-probes-inf" class="row">
+                            </div>
+                            <div class="row">
+                                <a id="btn-sim-probes-reset" class="waves-effect waves-light btn teal accent-4"><i class="material-icons right">delete</i>Reset the probes</a>
+                            </div>
+                        </div>
+
+                        <!-- Tab: Settings -->
+                        <div id="tab-sim-pragma" class="col s12" style="padding-top: 10px;">
+                            <div class="row">
+                                <div class="col s1"><nobr>Autocompact</nobr></div>
+                                <div class="col s1"><div class="switch"><label>Off<input id="chbox-sim-pragma-autocompact" type="checkbox" checked="checked"><span class="lever"></span>On</label></div></div>
+                            </div>
+                            <div class="row">
+                                <div class="col s1"><nobr>Autostop</nobr></div>
+                                <div class="col s1"><div class="switch"><label>Off<input id="chbox-sim-pragma-autostop" type="checkbox" checked="checked"><span class="lever"></span>On</label></div></div>
+                            </div>
+                            <div class="row">
+                                <div class="col s1"><nobr>Live info</nobr></div>
+                                <div class="col s1"><div class="switch"><label>Off<input id="chbox-sim-pragma-live-info" type="checkbox" checked="checked"><span class="lever"></span>On</label></div></div>
+                            </div>
+                            <div class="row">
+                                <div class="col s1"><nobr>Live info timestamp</nobr></div>
+                                <div class="col s1"><div class="switch"><label>Off<input id="chbox-sim-pragma-live-info-ts" type="checkbox"><span class="lever"></span>On</label></div></div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </li>
 
-            <!-- Run -->
-            <li class="_active">
-                <div class="collapsible-header"><i class="material-icons icon-sim-run"><script>document.write(ui.iconSimRun)</script></i><b>Run</b></div>
-                <div class="collapsible-body">
-                    <div class="row">
-                        <button id="btn-sim-flu-ac-run"  class="btn waves-effect waves-light"     name="action"><span>Run</span> <i class="material-icons right">play_circle_filled</i></button>
-                        <button id="btn-sim-flu-ac-stop" class="btn waves-effect waves-light red" name="action"><span>Stop</span><i class="material-icons right">stop</i></button>
-                    </div>
                 </div>
             </li>
 
@@ -776,121 +885,3 @@
 </body>
 
 </html>
-
-                        <!--
-                        <div class="input-field col s3">
-                            <select id="select-sim-flu-a-db">
-                            </select>
-                            <label>Database</label>
-                        </div>
-                        -->
-                        <!-- <ul id="dropdown-db-col" class="dropdown-content"></ul> <a id="dropdown-db-col-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-db-col"><span id="dropdown-db-col-lbl">---</span><i class="material-icons right">arrow_drop_down</i></a> -->
-
-                    <!--
-                    <div class="row">
-                        <p class="range-field">
-                            <input type="range" id="test5" min="0" max="100" />
-                        </p>
-
-                        <label>
-                        <input type="checkbox" checked="checked" class="filled-in" />
-                        <span>Yellow</span>
-                        </label>
-
-                        <label>
-                        Off
-                        <input type="checkbox">
-                        <span class="lever"></span>
-                        On
-                        </label>
-                    </div>
-                    -->
-
-                    <!-- <div class="row">
-                        <div class="progress">
-                            <div class="determinate" style="width: 70%"></div>
-                        </div>
-                    </div> -->
-
-                    <!-- <div class="card" style="width:300px">
-                        <div class="card-content">
-                            <p>A simulation framework that fuses relational probabilistic models and agent-based models. This software is in the pre-release stage, so feel free to play with it, but keep in mind that not all pieces may be working. Until there is a release, please don't open issues and flex your own Python muscle to fix problems you encounter.</p>
-                        </div>
-                        <div class="card-tabs">
-                            <ul class="tabs tabs-fixed-width">
-                                <li class="tab"><a class="active" href="#card-01">Sim 1</a></li>
-                                <li class="tab"><a href="#card-02">Sim 2</a></li>
-                                <li class="tab"><a href="#card-03">Sim 3</a></li>
-                            </ul>
-                        </div>
-                        <div class="card-content grey lighten-4">
-                            <div id="card-01">Output 1</div>
-                            <div id="card-02">Output 2</div>
-                            <div id="card-03">Output 3</div>
-                        </div>
-                    </div> -->
-
-                    <!-- <div class="row">
-                        <div class="input-field col s6">
-                            <label for="sum-a">a</label>
-                            <input id="sum-a" type="text" placeholder="10" />
-                        </div>
-                        <div class="input-field col s6">
-                            <label for="sum-b">b</label>
-                            <input id="sum-b" type="text" placeholder="20" />
-                        </div>
-                        <div class="input-field col s6">
-                            <a id="sum" class="waves-effect waves-light btn">Sum!</a>
-                        </div>
-                        <div class="input-field col s6">
-                            <span><span id="sum-out">?</span></span>
-                        </div>
-                    </div> -->
-
-    <!-- Navbar -->
-    <!--
-    <ul id="dropdown-navbar" class="dropdown-content">
-        <li><a href="#!">one</a></li>
-        <li><a href="#!">two</a></li>
-        <li class="divider"></li>
-        <li><a href="#!">three</a></li>
-    </ul>
-    <nav>
-        <div class="nav-wrapper">
-            <a href="#!" lass="brand-logo">PRAM</a>
-            <ul class="right">
-                <li><a class="dropdown-trigger" href="#!" data-target="dropdown-navbar">Options<i class="material-icons right">arrow_drop_down</i></a></li>
-                <li><a id="btn-ping" class="waves-effect waves-light btn">Ping</a></li>
-            </ul>
-        </div>
-    </nav>
-    -->
-
-
-    <!--
-    <footer class="page-footer">
-        <div class="container">
-            <div class="row">
-                <div class="col l6 s12">
-                    <h5 class="white-text">Footer Content</h5>
-                    <p class="grey-text text-lighten-4">You can use rows and columns here to organize your footer content.</p>
-                </div>
-                <div class="col l4 offset-l2 s12">
-                    <h5 class="white-text">Links</h5>
-                    <ul>
-                        <li><a class="grey-text text-lighten-3" href="#!">Link 1</a></li>
-                        <li><a class="grey-text text-lighten-3" href="#!">Link 2</a></li>
-                        <li><a class="grey-text text-lighten-3" href="#!">Link 3</a></li>
-                        <li><a class="grey-text text-lighten-3" href="#!">Link 4</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        <div class="footer-copyright">
-            <div class="container">
-                © 2014 Copyright Text
-                <a class="grey-text text-lighten-4 right" href="#!">More Links</a>
-            </div>
-        </div>
-    </footer>
-    -->

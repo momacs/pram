@@ -78,10 +78,10 @@ class RuleAnalyzerTestCase(unittest.TestCase):
         ne = self.assertNotEqual
 
         ra = RuleAnalyzer()
-        ra.analyze(RuleAnalyzerTestRule())
+        ra.analyze_rule(RuleAnalyzerTestRule())
 
-        eq(ra.attr, {'flu-stage', 'a04', 'a05', 'a02', 'a03', 'a01'})                          # attributes deduced
-        eq(ra.rel, {'r01', 'r03', 'r02', 'r05', 'r04'})                                        # relations  deduced
+        eq(ra.attr_used, {'flu-stage', 'a04', 'a05', 'a02', 'a03', 'a01'})                     # attributes deduced
+        eq(ra.rel_used, {'r01', 'r03', 'r02', 'r05', 'r04'})                                   # relations  deduced
         eq(ra.cnt_rec, Counter({'has_attr': 8, 'has_rel': 5, 'get_attr': 0, 'get_rel': 0}))    # counts of recognized
         eq(ra.cnt_unrec, Counter({'has_attr': 8, 'has_rel': 8, 'get_attr': 0, 'get_rel': 0}))  # counts of unrecognized
 

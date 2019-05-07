@@ -5,10 +5,7 @@ Tests of simulation construction exceptions associated with (1) improper order o
 Based on the simulation from: sim/04-flu-prog/sim.py
 '''
 
-import os
-import sys
-from inspect import getsourcefile
-
+import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 

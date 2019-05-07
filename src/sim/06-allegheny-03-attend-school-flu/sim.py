@@ -11,10 +11,7 @@ Based on:
   sim/06-allegheny-02-db-school-large/
 '''
 
-import os
-import sys
-from inspect import getsourcefile
-
+import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 

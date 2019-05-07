@@ -1,6 +1,6 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
-# PRAM - Probabilitistic Relational Agent-based Models
+# PRAMs - Probabilitistic Relational Agent-based Models
 #
 # BSD 3-Clause License
 #
@@ -9,8 +9,11 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #
 # Contributors
-#     Paul R Cohen  (prcohen@pitt.edu; the idea of PRAMs and the original implementation)      [2018.10.01 - ...]
-#     Tomek D Loboda  (tomek.loboda@gmail.com; the present design and implementation)          [2018.12.16 - ...]
+#     Paul R Cohen                                                                                    [2018.10.01 - ...]
+#         The idea of PRAMs
+#         The original implementation found elsewhere
+#     Tomek D Loboda  (https://github.com/ubiq-x)                                                     [2018.12.16 - ...]
+#         The original author of the present design and implementation
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -145,13 +148,16 @@
 #             CalMonthTimer                                                                    [2019.03.31 - ...]
 #         SimulationAdder class                                                                [2019.04.06]
 #         SimulationSetter class                                                               [2019.04.06]
+#         SimulationDBI class                                                                  [2019.04.22]
+#         StaticRuleAnalyzer class                                                             [2019.03.02 - 2019.04.14]
+#         DynamicRuleAnalyzer class                                                            [2019.03.02 - 2019.05.04]
 #         Entities
 #             c Agent                                                                          [2018.12.16 - 2019.01.05]
 #             c Entity                                                                         [2018.12.16 - 2019.03.22]
 #             c Group                                                                          [2019.12.16 - 2019.03.10]
 #                 f Splitting                                                                  [2019.01.04 - 2019.02.11]
 #                 f Freezing                                                                   [2019.03.09]
-#                 f DB generation                                                              [2019.02.20 - 2019.03.22]
+#                 f DB generation                                                              [2019.02.20 - 2019.04.28]
 #             c GroupDBRelSpec                                                                 [2019.02.20]
 #             c GroupQry                                                                       [2019.01.12 - 2019.01.21]
 #             c GroupSplitSpec                                                                 [2019.01.06 - 2019.01.21]
@@ -556,8 +562,7 @@ class YearTimer(Timer):
         super().__init__(Time.MS.y, iter, 0, 2000, 10000, do_disp_zero)
 
 
-# ----------------------------------------------------------------------------------------------------------------------
-# class CalMonthTimer(Timer):
+# ---------------------------------------------------------------------------------------------------------------------- # class CalMonthTimer(Timer):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -565,7 +570,51 @@ class YearTimer(Timer):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class RuleAnalyzer(object):
+class DynamicRuleAnalyzer(object):
+    '''
+    Analyze rule conditioning after running the simulation.  This is done by processing group attributes and
+    relations that the simulation has recorded as accessed by at least one rule.  The evidence of attributes and
+    relations having been actually accessed is a strong one.  However, as tempting as it may be to use this
+    information to prune groups, it's possible that further simulation iterations depend on other sets of
+    attributes and relations.  As a consequence, it is not possible to perform error-free groups auto-pruning based
+    on this analysis alone.
+
+    The sets of attributes and relations used (i.e., conditioned on by at least one rule) are not cleared between
+    simulation runs, only updated.  This way a simulation will always be aware of what was relevant from the very
+    beginning.  This information will also be persisted if the simulation object is serialized to continue
+    execution on another system.
+    '''
+
+    def __init__(self, sim):
+        self.sim = sim
+
+        self.attr_used = set()
+        self.rel_used  = set()
+
+        self.attr_unused = set()
+        self.rel_unused  = set()
+
+    def analyze(self):
+        # Get attributes and relations that define groups:
+        self.attr_groups = set()
+        self.rel_groups  = set()
+        for g in self.sim.pop.groups.values():
+            for ga in g.attr.keys(): self.attr_groups.add(ga)
+            for gr in g.rel.keys():  self.rel_groups. add(gr)
+
+        # Update the set of used (i.e., conditioned on by at least one rule) attributes and relations:
+        # self.attr_used.update(getattr(Group, 'attr_used').copy())
+        # self.rel_used.update(getattr(Group, 'rel_used').copy())
+        self.attr_used.update(getattr(Group, 'attr_used'))
+        self.rel_used.update(getattr(Group, 'rel_used'))
+
+        # Do a set-subtraction to get attributes and relations not conditioned on by even one rule:
+        self.attr_unused = self.attr_groups - self.attr_used
+        self.rel_unused  = self.rel_groups  - self.rel_used
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class StaticRuleAnalyzer(object):
     '''
     Analyzes the syntax (i.e., abstract syntax trees or ASTs) of rule objects to identify group attributes and
     relations these rules condition on.
@@ -587,6 +636,15 @@ class RuleAnalyzer(object):
     def __init__(self):
         self.are_rules_done  = False
         self.are_groups_done = False
+
+        self.attr_used = set()
+        self.rel_used  = set()
+
+        self.attr_unused = set()
+        self.rel_unused  = set()
+
+        self.cnt_rec   = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # recognized
+        self.cnt_unrec = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # unrecognized
 
     def _dump(self, node, annotate_fields=True, include_attributes=False, indent='  '):
         '''
@@ -660,17 +718,17 @@ class RuleAnalyzer(object):
                         call_args = call_args[0]
                         if call_args.__class__.__name__ == 'Str':
                             if attr_name in ('get_attr', 'has_attr'):
-                                self.attr_used.add(RuleAnalyzer.get_str(call_args))
+                                self.attr_used.add(StaticRuleAnalyzer.get_str(call_args))
                             else:
-                                self.rel_used.add(RuleAnalyzer.get_str(call_args))
+                                self.rel_used.add(StaticRuleAnalyzer.get_str(call_args))
                             self.cnt_rec[attr_name] += 1
                         elif call_args.__class__.__name__ in ('List', 'Dict'):
                             for i in list(ast.iter_fields(call_args))[0][1]:
                                 if i.__class__.__name__ == 'Str':
                                     if attr_name in ('get_attr', 'has_attr'):
-                                        self.attr_used.add(RuleAnalyzer.get_str(i))
+                                        self.attr_used.add(StaticRuleAnalyzer.get_str(i))
                                     else:
-                                        self.rel_used.add(RuleAnalyzer.get_str(i))
+                                        self.rel_used.add(StaticRuleAnalyzer.get_str(i))
                                     self.cnt_rec[attr_name] += 1
                                 else:
                                     self.cnt_unrec[attr_name] += 1
@@ -682,6 +740,7 @@ class RuleAnalyzer(object):
     def analyze_rules(self, rules):
         ''' Can be (and in fact is) called before any groups have been added. '''
 
+        # (1) Reset the state:
         self.attr_used = set()
         self.rel_used  = set()
 
@@ -691,6 +750,7 @@ class RuleAnalyzer(object):
         self.cnt_rec   = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # recognized
         self.cnt_unrec = Counter({ 'get_attr': 0, 'get_rel': 0, 'has_attr': 0, 'has_rel': 0 })  # unrecognized
 
+        # (2) Analyze the rules:
         for r in rules:
             self.analyze_rule(r)
 
@@ -865,9 +925,6 @@ class SimulationSetter(object):
 class Simulation(object):
     '''
     A PRAM simulation.
-
-    A simulation stores certain statistics related to the most recent of its runs (in the 'self.last_run'
-    DotMap).
     '''
 
     def __init__(self, rand_seed=None):
@@ -881,15 +938,18 @@ class Simulation(object):
 
         self.timer = None  # value deduced in add_group() based on rule timers
 
-        self.fn = DotMap(
-            group_setup = None  # called before the simulation is run for the very first time
-        )
-
         self.is_setup_done = False  # flag
             # ensures simulation setup is performed only once while enabling multiple incremental simulation runs of
             # arbitrary length thus promoting interactivity (a sine qua non for a user interface)
 
-        self.rule_analyzer = RuleAnalyzer()
+        self.fn = DotMap(
+            group_setup = None  # called before the simulation is run for the very first time
+        )
+
+        self.analysis = DotMap(
+            rule_static  = StaticRuleAnalyzer(),
+            rule_dynamic = DynamicRuleAnalyzer(self)
+        )
 
         self.pragma = DotMap(
             analyze = True,                  # flag: analyze the simulation and suggest improvements?
@@ -904,8 +964,6 @@ class Simulation(object):
             probe_capture_init = True,       # flag: let probes capture the pre-run state of the simulation?
             rule_analysis_for_db_gen = True  # flag: should static rule analysis results help form DB groups
         )
-
-        self.last_run = DotMap()  # dict of the most recent run
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.rand_seed or ""})'
@@ -941,8 +999,8 @@ class Simulation(object):
 
         # No groups present:
         if len(self.pop.groups) == 0:  # run when the first group is being added (because that marks the end of adding rules)
-            if not self.rule_analyzer.are_rules_done:
-                self.analyze_rules_pre_run()
+            if not self.analysis.rule_static.are_rules_done:
+                self.analyze_rules_static()
 
             # Sync simulation and rules timers:
             rule_t_unit_ms = min([r.T_UNIT_MS for r in self.rules])
@@ -974,7 +1032,7 @@ class Simulation(object):
             raise SimulationConstructionError('A rule is being added but groups already exist; rules need be added before groups.')
 
         self.rules.append(rule)
-        self.rule_analyzer.analyze_rules(self.rules)  # keep the results of the static rule analysis current
+        self.analysis.rule_static.analyze_rules(self.rules)  # keep the results of the static rule analysis current
 
         return self
 
@@ -991,7 +1049,7 @@ class Simulation(object):
         self.pop.add_sites(sites)
         return self
 
-    def analyze_rules_pre_run(self):
+    def analyze_rules_static(self):
         '''
         Analyze rule conditioning prior to running the simulation.  This is done by analyzing the syntax (i.e.,
         abstract syntax trees or ASTs) of rule objects to identify group attributes and relations these rules condition
@@ -1005,44 +1063,62 @@ class Simulation(object):
 
         self._inf('Running static rule analysis')
 
-        self.rule_analyzer.analyze_rules(self.rules)
+        self.analysis.rule_static.analyze_rules(self.rules)
 
-        self._inf(f'    Relevant attributes found : {list(self.rule_analyzer.attr_used)}')
-        self._inf(f'    Relevant relations  found : {list(self.rule_analyzer.rel_used)}')
+        self._inf(f'    Relevant attributes found : {list(self.analysis.rule_static.attr_used)}')
+        self._inf(f'    Relevant relations  found : {list(self.analysis.rule_static.rel_used)}')
 
         return self
 
-    def analyze_rules_post_run(self):
+    def analyze_rules_dynamic(self):
+        self._inf('Running dynamic rule analysis')
+
+        rd = self.analysis.rule_dynamic
+        rd.analyze()
+
+        if self.pragma.live_info:
+            self._inf(f'    Accessed attributes    : {list(rd.attr_used)}')
+            self._inf(f'    Accessed relations     : {list(rd.rel_used)}')
+            self._inf(f'    Superfluous attributes : {list(rd.attr_unused)}')
+            self._inf(f'    Superfluous relations  : {list(rd.rel_unused )}')
+        else:
+            if self.pragma.analyze and (len(rd.attr_unused) > 0 or len(rd.rel_unused) > 0):
+                print('Based on the most recent simulation run, the following group attributes A and relations R are superfluous:')
+                print(f'    A: {list(rd.attr_unused)}')
+                print(f'    R: {list(rd.rel_unused )}')
+
+        return self
+
+    def analyze_rules_dynamic_old(self):
         '''
         Analyze rule conditioning after running the simulation.  This is done by processing group attributes and
         relations that the simulation has recorded as accessed by at least one rule.  The evidence of attributes and
         relations having been actually accessed is a strong one.  However, as tempting as it may be to use this
         information to prune groups, it's possible that further simulation iterations depend on other sets of
-        attributes and relations.
-
-        As a consequence, it is not possible to perform error-free groups auto-pruning based on this analysis.
+        attributes and relations.  As a consequence, it is not possible to perform error-free groups auto-pruning based
+        on this analysis alone.
         '''
 
         self._inf('Running dynamic rule analysis')
 
-        lr = self.last_run
+        lr = self.analysis.rule_dynamic
         lr.clear()
 
         lr.attr_used = getattr(Group, 'attr_used').copy()  # attributes conditioned on by at least one rule
-        lr.rel_used  = getattr(Group, 'rel_used').copy()   # ^ (relations)
+        lr.rel_used  = getattr(Group, 'rel_used').copy()   # relations
 
         lr.attr_groups = set()  # attributes defining groups
-        lr.rel_groups  = set()  # ^ (relations)
+        lr.rel_groups  = set()  # relations
         for g in self.pop.groups.values():
             for ga in g.attr.keys(): lr.attr_groups.add(ga)
             for gr in g.rel.keys():  lr.rel_groups. add(gr)
 
         lr.attr_unused = lr.attr_groups - lr.attr_used  # attributes not conditioned on by even one rule
-        lr.rel_unused  = lr.rel_groups  - lr.rel_used   # ^ (relations)
+        lr.rel_unused  = lr.rel_groups  - lr.rel_used   # relations
 
         if self.pragma.live_info:
-            self._inf(f'    Accessed attributes    : {list(self.last_run.attr_used)}')
-            self._inf(f'    Accessed relations     : {list(self.last_run.rel_used)}')
+            self._inf(f'    Accessed attributes    : {list(self.analysis.rule_dynamic.attr_used)}')
+            self._inf(f'    Accessed relations     : {list(self.analysis.rule_dynamic.rel_used)}')
             self._inf(f'    Superfluous attributes : {list(lr.attr_unused)}')
             self._inf(f'    Superfluous relations  : {list(lr.rel_unused )}')
         else:
@@ -1073,30 +1149,30 @@ class Simulation(object):
         return SimulationDBI(self, fpath)
 
     def gen_groups_from_db(self, fpath_db, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, is_verbose=False):
-        if not self.rule_analyzer.are_rules_done:
-            self.analyze_rules_pre_run()  # by now we know all rules have been added
+        if not self.analysis.rule_static.are_rules_done:
+            self.analyze_rules_static()  # by now we know all rules have been added
 
         self._inf(f"Generating groups from a database ({fpath_db}; table '{tbl}')")
 
         if self.pragma.rule_analysis_for_db_gen:
-            attr_db.extend(self.rule_analyzer.attr_used)
-            # rel_db  = self.rule_analyzer.rel_used  # TODO: Need to use entity.GroupDBRelSpec class
+            attr_db.extend(self.analysis.rule_static.attr_used)
+            # rel_db  = self.analysis.rule_static.rel_used  # TODO: Need to use entity.GroupDBRelSpec class
 
         fn_live_info = self._inf if self.pragma.live_info else None
         self.add_groups(Group.gen_from_db(fpath_db, tbl, attr_db, rel_db, attr_fix, rel_fix, rel_at, limit, fn_live_info))
         return self
 
     def gen_groups_from_db_old(self, fpath_db, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0, fpath=None, is_verbose=False):
-        if not self.rule_analyzer.are_rules_done:
-            self.analyze_rules_pre_run()  # by now we know all rules have been added
+        if not self.analysis.rule_static.are_rules_done:
+            self.analyze_rules_static()  # by now we know all rules have been added
 
         self._inf(f"Generating groups from a database ({fpath_db}; table '{tbl}')")
 
         if self.pragma.rule_analysis_for_db_gen:
             # self._inf('    Using relevant attributes and relations')
 
-            attr_db.extend(self.rule_analyzer.attr_used)
-            # rel_db  = self.rule_analyzer.rel_used  # TODO: Need to use entity.GroupDBRelSpec class
+            attr_db.extend(self.analysis.rule_static.attr_used)
+            # rel_db  = self.analysis.rule_static.rel_used  # TODO: Need to use entity.GroupDBRelSpec class
 
         # fn_gen = lambda: Group.gen_from_db(fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
         # fn_gen = lambda: Group.gen_from_db(self, fpath_db, tbl, attr, rel, attr_db, rel_db, rel_at, limit)
@@ -1200,24 +1276,27 @@ class Simulation(object):
                 'groupCnt' : self.pop.get_group_cnt(),
                 'siteCnt'  : self.pop.get_site_cnt()
             },
+            'probes': {
+                'ls': []
+            },
             'rules': {
-                'cnt'  : len(self.rules),
+                'ls': [{ 'cls': r.__class__.__name__, 'name': r.__class__.NAME } for r in self.rules],
                 'analysis': {
                     'static': {
                         'attr': {
-                            'used'   : list(self.rule_analyzer.attr_used),
-                            'unused' : list(self.rule_analyzer.attr_unused)
+                            'used'   : list(self.analysis.rule_static.attr_used),
+                            'unused' : list(self.analysis.rule_static.attr_unused)
                         },
                         'rel': {
-                            'used'    : list(self.rule_analyzer.rel_used),
-                            'unused'  : list(self.rule_analyzer.rel_unused)
+                            'used'    : list(self.analysis.rule_static.rel_used),
+                            'unused'  : list(self.analysis.rule_static.rel_unused)
                         }
                     },
                     'dynamic': {
-                        'attrUsed' : list(self.last_run.attr_used),
-                        'relUsed'  : list(self.last_run.rel_used),
-                        'attrUnused' : list(self.last_run.attr_unused),
-                        'relUnused'  : list(self.last_run.rel_unused )
+                        'attrUsed' : list(self.analysis.rule_dynamic.attr_used),
+                        'relUsed'  : list(self.analysis.rule_dynamic.rel_used),
+                        'attrUnused' : list(self.analysis.rule_dynamic.attr_unused),
+                        'relUnused'  : list(self.analysis.rule_dynamic.rel_unused )
                     }
                 }
             }
@@ -1249,6 +1328,18 @@ class Simulation(object):
 
     def rem_rule(self, rule):
         self.rules.discard(rule)
+        return self
+
+    def reset_pop(self):
+        self.pop = GroupPopulation()
+        return self
+
+    def reset_probes(self):
+        self.probes = []
+        return self
+
+    def reset_rules(self):
+        self.rules = []
         return self
 
     def run(self, iter_or_dur=1, do_disp_t=False):
@@ -1366,8 +1457,8 @@ class Simulation(object):
         self._inf(f'    Groups: {"{:,}".format(self.pop.get_group_cnt())}')
 
         # Rule conditioning 02 -- Analyze and cleanup:
-        self.rule_analyzer.analyze_groups(self.pop.groups.values())
-        self.analyze_rules_post_run()
+        self.analysis.rule_static.analyze_groups(self.pop.groups.values())
+        self.analyze_rules_dynamic()
 
         setattr(Group, 'attr_used', None)
         setattr(Group, 'rel_used',  None)
@@ -1477,13 +1568,29 @@ class Simulation(object):
         return self
 
     def show_rule_analysis(self):
-        self.show_rule_analysis_pre()
-        self.show_rule_analysis_post()
+        self.show_static_rule_analysis()
+        self.show_dynamic_rule_analysis()
 
         return self
 
-    def show_rule_analysis_pre(self):
-        ra = self.rule_analyzer
+    def show_rule_analysis_dynamic(self):
+        rd = self.analysis.rule_dynamic
+
+        print( 'Most recent simulation run')
+        print( '    Used')
+        print(f'        Attributes : {list(rd.attr_used)}')
+        print(f'        Relations  : {list(rd.rel_used)}')
+        print( '    Groups')
+        print(f'        Attributes : {list(rd.attr_groups)}')
+        print(f'        Relations  : {list(rd.rel_groups)}')
+        print( '    Superfluous')
+        print(f'        Attributes : {list(rd.attr_unused)}')
+        print(f'        Relations  : {list(rd.rel_unused)}')
+
+        return self
+
+    def show_rule_analysis_static(self):
+        ra = self.analysis.rule_static
 
         print( 'Rule analyzer')
         print( '    Used')
@@ -1495,22 +1602,6 @@ class Simulation(object):
         # print( '    Counts')
         # print(f'        Recognized   : get_attr:{ra.cnt_rec["get_attr"]} get_rel:{ra.cnt_rec["get_rel"]} has_attr:{ra.cnt_rec["has_attr"]} has_rel:{ra.cnt_rec["has_rel"]}')
         # print(f'        Unrecognized : get_attr:{ra.cnt_unrec["get_attr"]} get_rel:{ra.cnt_unrec["get_rel"]} has_attr:{ra.cnt_unrec["has_attr"]} has_rel:{ra.cnt_unrec["has_rel"]}')
-
-        return self
-
-    def show_rule_analysis_post(self):
-        lr = self.last_run
-
-        print( 'Most recent simulation run')
-        print( '    Used')
-        print(f'        Attributes : {list(lr.attr_used)}')
-        print(f'        Relations  : {list(lr.rel_used)}')
-        print( '    Groups')
-        print(f'        Attributes : {list(lr.attr_groups)}')
-        print(f'        Relations  : {list(lr.rel_groups)}')
-        print( '    Superfluous')
-        print(f'        Attributes : {list(lr.attr_unused)}')
-        print(f'        Relations  : {list(lr.rel_unused)}')
 
         return self
 
@@ -1536,25 +1627,23 @@ class Simulation(object):
             print(f'        Probes      : {"{:,}".format(len(self.probes))}')
 
             if self.pragma.analyze:
-                print('    Static rule analysis')
-                print('        Used')
-                print(f'            Attributes : {list(self.rule_analyzer.attr_used)}')
-                print(f'            Relations  : {list(self.rule_analyzer.rel_used)}')
-                print('        Superfluous')
-                print(f'            Attributes : {list(self.rule_analyzer.attr_unused)}')
-                print(f'            Relations  : {list(self.rule_analyzer.rel_unused)}')
-
-                if self.last_run:
-                    print('    Dynamic rule analysis')
-                    print('        Used')
-                    print(f'            Attributes : {list(self.last_run.attr_used)}')
-                    print(f'            Relations  : {list(self.last_run.rel_used)}')
-                    # print('        Dynamic - Groups')
-                    # print(f'            Attributes : {list(self.last_run.attr_groups)}')
-                    # print(f'            Relations  : {list(self.last_run.rel_groups)}')
-                    print('        Superfluous')
-                    print(f'            Attributes : {list(self.last_run.attr_unused)}')
-                    print(f'            Relations  : {list(self.last_run.rel_unused)}')
+                print( '    Static rule analysis')
+                print( '        Used')
+                print(f'            Attributes : {list(self.analysis.rule_static.attr_used)}')
+                print(f'            Relations  : {list(self.analysis.rule_static.rel_used)}')
+                print( '        Superfluous')
+                print(f'            Attributes : {list(self.analysis.rule_static.attr_unused)}')
+                print(f'            Relations  : {list(self.analysis.rule_static.rel_unused)}')
+                print( '    Dynamic rule analysis')
+                print( '        Used')
+                print(f'            Attributes : {list(self.analysis.rule_dynamic.attr_used)}')
+                print(f'            Relations  : {list(self.analysis.rule_dynamic.rel_used)}')
+                # print('        Dynamic - Groups')
+                # print(f'            Attributes : {list(self.analysis.rule_dynamic.attr_groups)}')
+                # print(f'            Relations  : {list(self.analysis.rule_dynamic.rel_groups)}')
+                print( '        Superfluous')
+                print(f'            Attributes : {list(self.analysis.rule_dynamic.attr_unused)}')
+                print(f'            Relations  : {list(self.analysis.rule_dynamic.rel_unused)}')
 
         if n_groups > 0:
             if len(self.pop.groups) > 0: print(f'    Groups ({"{:,}".format(len(self.pop.groups))})\n' + '\n'.join(['        {}'.format(g) for g in list(self.pop.groups.values())[:n_groups]]))

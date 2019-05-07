@@ -1,7 +1,4 @@
-import os
-import sys
-from inspect import getsourcefile
-
+import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pram.rule import Rule, TimeAlways
@@ -23,8 +20,8 @@ class AttrRule(Rule):
 (Simulation().
     add_rule(AttrRule()).
     new_group(100).
-        set_attr('income', 50).
         set_attr('age', 22).
+        set_attr('income', 50).
         done().
     run(5).
     summary(True, 0,0,0,0)

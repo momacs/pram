@@ -19,10 +19,7 @@ In this simulation, agents attend school irrespective of being sick or not which
 conclusions.  Five schools of different sizes are modeled.
 '''
 
-import os
-import sys
-from inspect import getsourcefile
-
+import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 

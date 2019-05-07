@@ -1,8 +1,7 @@
 #
 # Next
-#     Add output for group setup
+#     Add 'human-name' property to a rule which is displayed in the UI
 #     Add Download simulation button
-#     Keep growing the dynamic rules analysis results after every run instead of reseting it before every run
 #     Session management
 #         Allow saving, loading, deleting, and duplicating sessions (ideally simple via serialized objects)
 #             [+] Pickle the Simulation object
@@ -71,13 +70,11 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 
-import os
-import sys
-from inspect import getsourcefile
-
+import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))  # pram pkg path
 
 
+import inspect
 import os
 import psutil
 import shutil
@@ -93,7 +90,8 @@ from flask_session import Session
 
 from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
 from pram.entity import GroupQry, GroupSplitSpec, Site
-from pram.rule   import Rule, GoToAndBackTimeAtRule, ResetSchoolDayRule, TimeAlways, TimePoint
+from pram.rule   import Rule, GoToAndBackTimeAtRule, ResetSchoolDayRule, SEIRFluRule, TimeAlways, TimePoint
+from pram.rule   import SimpleFluLocationRule, SimpleFluProgressRule
 from pram.sim    import Simulation
 from pram.util   import DB, Size
 
@@ -242,6 +240,9 @@ def usr_reset_sess():
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/usr-get-sess', methods=['GET'])
 def usr_get_sess():
+    if not 'sim-flu-ac' in session:
+        sim_flu_ac_init(session)
+
     return jsonify({ 'res': True, 'state': { 'simFluAC': session['sim-flu-ac'].get_state() }, 'sim': session.get('sim', None) })
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -249,7 +250,7 @@ def usr_get_sess():
 def usr_is_root():
     ''' Check if the user has elevated access right. '''
 
-    return jsonify(session.get('is-root', False))
+    return jsonify({ 'res': True, 'isRoot': session.get('is-root', False) })
 
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/usr-toggle', methods=['POST'])
@@ -258,14 +259,14 @@ def usr_toggle():
 
     code = request.values.get('code', '', type=str)
     session['is-root'] = (code == SUDO_CODE)
-    return jsonify(session['is-root'])
+    return jsonify({ 'res': True, 'isRoot': session.get('is-root', False) })
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # ----[ RULES ]---------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class FluProgressRule(Rule):
+class FluProgressRule2(Rule):
     def __init__(self):
         super().__init__('flu-progress', TimeAlways())
 
@@ -305,7 +306,7 @@ class FluProgressRule(Rule):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class FluLocationRule(Rule):
+class FluLocationRule2(Rule):
     def __init__(self):
         super().__init__('flu-location', TimeAlways())
 
@@ -332,6 +333,27 @@ class FluLocationRule(Rule):
             ]
 
         return None
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def rule_get_inf(rule):
+    cls = rule if inspect.isclass(rule) else rule.__class__
+    return {
+        'cls': cls.__name__,
+        'name': cls.NAME,
+        'docstr': inspect.cleandoc(cls.__doc__).split('\n'),
+        'srcLines': inspect.getsourcelines(cls)[0]
+    }
+
+# ----------------------------------------------------------------------------------------------------------------------
+@app.route('/rules-ls', methods=['GET'])
+def rules_ls():
+    rules = [
+        rule_get_inf(SimpleFluProgressRule),
+        rule_get_inf(SimpleFluLocationRule),
+        rule_get_inf(SEIRFluRule)
+    ]
+    return jsonify({ 'res': True, 'rules': rules })
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -366,18 +388,6 @@ def db_get_schema():
     if not fpath:
         return jsonify({ 'res': False, 'err': 'Incorrect database specified' })
 
-    # with DB.open_conn(fpath) as c:
-    #     # schema = {r[0]: {} for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}  # sql
-    #     schema = OrderedDict((r[0], {}) for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name DESC").fetchall())  # sql
-    #     # schema = [{name: r[0], cols: {}} for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name DESC").fetchall()]  # sql
-    #
-    #     for tbl in schema.keys():
-    #         # schema[tbl]['cols'] = { r['name']: { 'type': r['type'] } for r in c.execute(f"PRAGMA table_info('{tbl}')").fetchall()}  # cid,name,type,notnull,dflt_value,pk
-    #         schema[tbl]['cols'] = OrderedDict((r['name'], { 'type': r['type'] }) for r in c.execute(f"PRAGMA table_info('{tbl}')").fetchall())  # cid,name,type,notnull,dflt_value,pk
-    #
-    #         for row in c.execute(f'PRAGMA foreign_key_list({tbl})').fetchall():  # id,seq,tbl,from,to,on_update,on_delete,match
-    #             schema[tbl]['cols'][row['from']]['fk'] = { 'tbl': row['table'], 'col': row['to'] }
-
     with DB.open_conn(fpath) as c:
         schema = []
         for r01 in c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name DESC").fetchall():  # sql
@@ -389,7 +399,9 @@ def db_get_schema():
             for row in c.execute(f'PRAGMA foreign_key_list({tbl})').fetchall():  # id,seq,tbl,from,to,on_update,on_delete,match
                 cols[row['from']]['fk'] = { 'tbl': row['table'], 'col': row['to'] }
 
-            schema.append({ 'name': tbl, 'cols': [v for v in cols.values()] })
+            row_cnt = c.execute(f'SELECT COUNT(*) FROM {tbl}').fetchone()[0]
+
+            schema.append({ 'name': tbl, 'cols': [v for v in cols.values()], 'rowCnt': row_cnt })
 
     return jsonify({ 'res': True, 'schema': schema })
 
@@ -401,7 +413,7 @@ def db_ls():
     filenames without the path.
     '''
 
-    return jsonify({ 'res': True, 'ls': [f[:-len(f'.{DB_FEXT}')] for f in os.listdir(PATH_DB) if f.endswith(f'.{DB_FEXT}')]})
+    return jsonify({ 'res': True, 'dbs': [f[:-len(f'.{DB_FEXT}')] for f in os.listdir(PATH_DB) if f.endswith(f'.{DB_FEXT}')]})
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -481,6 +493,7 @@ def sim_flu_init(session, do_force=False):
                 done()
     )
 
+# ----------------------------------------------------------------------------------------------------------------------
 @app.route('/sim-flu-reset', methods=['GET'])
 def sim_flu_reset():
     if not session.get('is-root', False):
@@ -515,6 +528,30 @@ def sim_flu_run():
 # ----[ SIM: FLU ALLEGHENY ]--------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
+@app.route('/sim-flu-ac-add-rule', methods=['POST'])
+def sim_flu_ac_add_rule():
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
+
+    sim = session['sim-flu-ac']
+    cls = request.values.get('cls', '', type=str)
+    rule_cls = [r.__class__ for r in sim.rules]
+
+    if cls == 'SimpleFluProgressRule':
+        if SimpleFluProgressRule in rule_cls:
+            return jsonify({ 'res': False, 'err': 'Rule already in the simulation' })
+        sim.add_rule(SimpleFluProgressRule())
+        return jsonify({ 'res': True, 'rules': session['sim-flu-ac'].get_state()['rules'] })
+
+    if cls == 'SimpleFluLocationRule':
+        if SimpleFluLocationRule in rule_cls:
+            return jsonify({ 'res': False, 'err': 'Rule already in the simulation' })
+        sim.add_rule(SimpleFluLocationRule())
+        return jsonify({ 'res': True, 'rules': session['sim-flu-ac'].get_state()['rules'] })
+
+    return jsonify({ 'res': False, 'err': 'Rule not supported by this simulation' })
+
+# ----------------------------------------------------------------------------------------------------------------------
 def sim_flu_ac_init(session, do_force=False):
     if 'sim-flu-ac' in session and not do_force:
         return
@@ -522,9 +559,9 @@ def sim_flu_ac_init(session, do_force=False):
     if 'sim-flu-ac' in session:
         session.pop('sim-flu-ac')
 
-    site_home = Site('home')
-    school_l  = Site(450149323)  # 88% low income students
-    school_m  = Site(450067740)  #  7% low income students
+    # site_home = Site('home')
+    # school_l  = Site(450149323)  # 88% low income students
+    # school_m  = Site(450067740)  #  7% low income students
 
     session['sim-flu-ac'] = (
         Simulation().
@@ -532,13 +569,13 @@ def sim_flu_ac_init(session, do_force=False):
                 pragma_autocompact(True).
                 pragma_live_info(True).
                 pragma_live_info_ts(False).
-                done().
-            add().
-                rule(FluProgressRule()).
-                rule(FluLocationRule()).
-                # probe(probe_flu_at(school_l, 'low-income')).  # the simulation output we care about and want monitored
-                # probe(probe_flu_at(school_m, 'med-income')).  # ^
                 done()
+            # add().
+                # rule(SimpleFluProgressRule()).
+                # rule(SimpleFluLocationRule()).
+                # probe(probe_flu_at(school_l, 'low-income')).
+                # probe(probe_flu_at(school_m, 'med-income')).
+                # done()
     )
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -547,17 +584,72 @@ def sim_flu_ac_reset():
     if not session.get('is-root', False):
         return jsonify({ 'res': False, 'err': 'Insufficient rights' })
 
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
+
     # if session.get('sim', None):
     #     return jsonify({ 'res': False, 'err': 'A simulation is in progress' })
 
     sim_flu_ac_init(session, True)
 
-    return jsonify({ 'res': True })
+    return jsonify({ 'res': True, 'state': session['sim-flu-ac'].get_state() })
 
+# ----------------------------------------------------------------------------------------------------------------------
+@app.route('/sim-flu-ac-reset-pop', methods=['GET'])
+def sim_flu_ac_reset_pop():
+    if not session.get('is-root', False):
+        return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
+
+    # if session.get('sim', None):
+    #     return jsonify({ 'res': False, 'err': 'A simulation is in progress' })
+
+    session['sim-flu-ac'].reset_pop()
+
+    return jsonify({ 'res': True, 'state': session['sim-flu-ac'].get_state() })
+
+# ----------------------------------------------------------------------------------------------------------------------
+@app.route('/sim-flu-ac-reset-probes', methods=['GET'])
+def sim_flu_ac_reset_probes():
+    if not session.get('is-root', False):
+        return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
+
+    # if session.get('sim', None):
+    #     return jsonify({ 'res': False, 'err': 'A simulation is in progress' })
+
+    session['sim-flu-ac'].reset_probes()
+
+    return jsonify({ 'res': True, 'state': session['sim-flu-ac'].get_state() })
+
+# ----------------------------------------------------------------------------------------------------------------------
+@app.route('/sim-flu-ac-reset-rules', methods=['GET'])
+def sim_flu_ac_reset_rules():
+    if not session.get('is-root', False):
+        return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
+
+    # if session.get('sim', None):
+    #     return jsonify({ 'res': False, 'err': 'A simulation is in progress' })
+
+    session['sim-flu-ac'].reset_rules()
+
+    return jsonify({ 'res': True, 'state': session['sim-flu-ac'].get_state() })
+
+# ----------------------------------------------------------------------------------------------------------------------
 @app.route('/sim-flu-ac-run', methods=['POST'])
 def sim_flu_ac_run():
     if not session.get('is-root', False):
         return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
 
     # if session.get('sim', None):
     #     return jsonify({ 'res': False, 'err': 'A simulation is in progress' })
@@ -611,10 +703,7 @@ def sim_flu_ac_set_pragma():
 
     name  = request.values.get('name',  '', type=str)
     value = sim_get_pragma_request_value(name, request)
-    print(f'{name}:{value}:{type(value)}')
-    print(session['sim-flu-ac'].get_pragma(name))
     session['sim-flu-ac'].set_pragma(name, value)
-    print(session['sim-flu-ac'].get_pragma(name))
 
     return jsonify({ 'res': True })
 

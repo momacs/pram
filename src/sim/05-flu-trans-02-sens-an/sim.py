@@ -6,10 +6,7 @@ following simultation parameters:
 - The agent density based formula for infection
 '''
 
-import os
-import sys
-from inspect import getsourcefile
-
+import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 

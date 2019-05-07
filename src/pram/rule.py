@@ -45,11 +45,12 @@ class Rule(ABC):
     '''
 
     T_UNIT_MS = TimeU.MS.h
+    NAME = 'Rule'
 
     pop = None
     compile_spec = None
 
-    def __init__(self, name, t, memo=None):
+    def __init__(self, name, t, name_human=None, memo=None):
         '''
         t: Time
         '''
@@ -59,6 +60,7 @@ class Rule(ABC):
         self.name = name
         self.t = t
         self.memo = memo
+        self.name_human = name_human or name
 
         self.t_unit_ms = None  # set via set_t_unit() by the simulation every time it runs
         self.t_mul = 0.00      # ^
@@ -163,10 +165,11 @@ class SEIRRule(Rule, ABC):
 
     ATTR = 'seir-state'
     T_UNIT_MS = TimeU.MS.d
+    NAME = 'SEIR model'
 
     # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, name='seir', t=TimeAlways(), susceptibility=1.0, p_start_E=0.05, do_clean=True, memo=None):
-        super().__init__(name, t, memo)
+    def __init__(self, name='seir', t=TimeAlways(), susceptibility=1.0, p_start_E=0.05, do_clean=True, name_human=None, memo=None):
+        super().__init__(name, t, name_human, memo)
 
         self.susceptibility = susceptibility
         self.p_start_E = p_start_E    # prob of starting in the E state
@@ -345,10 +348,11 @@ class SEIRFluRule(SEIRRule):
     '''
 
     ATTR = 'flu-state'
+    NAME = 'SEIR flu model'
 
     # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, t=TimeAlways(), susceptibility=1.0, p_start_E=0.05, do_clean=True, memo=None):
-        super().__init__('flu', t, susceptibility, p_start_E, do_clean, memo)
+    def __init__(self, t=TimeAlways(), susceptibility=1.0, p_start_E=0.05, do_clean=True, name_human=None, memo=None):
+        super().__init__('flu', t, susceptibility, p_start_E, do_clean, name_human, memo)
 
         # self.T['E_median']     = lambda: 1.90 * self.t_mul
         # self.T['E_dispersion'] = 1.23
@@ -393,8 +397,10 @@ class GoToRule(Rule):
         - Compel a portion of agents that are at 'home' go to 'work' or vice versa
     '''
 
-    def __init__(self, t, p, rel_from, rel_to, memo=None):
-        super().__init__('goto', t, memo)
+    NAME = 'Goto'
+
+    def __init__(self, t, p, rel_from, rel_to, name_human=None, memo=None):
+        super().__init__('goto', t, name_human, memo)
 
         Err.type(rel_from, 'rel_from', str, True)
         Err.type(rel_to, 'rel_to', str)
@@ -449,11 +455,13 @@ class GoToAndBackTimeAtRule(Rule):
 
     # TODO: Switch from PDF to CDF because it's more natural.
 
+    NAME = 'Goto and back'
+
     TIME_PDF_TO_DEF   = { 8: 0.5, 12:0.5 }
     TIME_PDF_BACK_DEF = { 1: 0.05, 3: 0.2, 4: 0.25, 5: 0.2, 6: 0.1, 7: 0.1, 8: 0.1 }
 
-    def __init__(self, t=TimeInt(8,16), to='school', back='home', time_pdf_to=None, time_pdf_back=None, t_at_attr='t@', do_force_back=True, memo=None):
-        super().__init__('to-and-back', t, memo)
+    def __init__(self, t=TimeInt(8,16), to='school', back='home', time_pdf_to=None, time_pdf_back=None, t_at_attr='t@', do_force_back=True, name_human=None, memo=None):
+        super().__init__('to-and-back', t, name_human, memo)
 
         self.to   = to
         self.back = back
@@ -502,8 +510,10 @@ class GoToAndBackTimeAtRule(Rule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ResetRule(Rule):
-    def __init__(self, t=TimePoint(5), attr_del=None, attr_set=None, rel_del=None, rel_set=None, memo=None):
-        super().__init__('reset', t, memo)
+    NAME = 'Reset'
+
+    def __init__(self, t=TimePoint(5), attr_del=None, attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
+        super().__init__('reset', t, name_human, memo)
 
         self.attr_del = attr_del
         self.attr_set = attr_set
@@ -516,8 +526,10 @@ class ResetRule(Rule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ResetSchoolDayRule(ResetRule):
-    def __init__(self, t=TimePoint(5), attr_del=['t-at-school'], attr_set=None, rel_del=None, rel_set=None, memo=None):
-        super().__init__(t, attr_del, attr_set, rel_del, rel_set, memo)
+    NAME = 'Reset school day'
+
+    def __init__(self, t=TimePoint(5), attr_del=['t-at-school'], attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
+        super().__init__(t, attr_del, attr_set, rel_del, rel_set, name_human, memo)
         self.name = 'reset-school-day'
 
     def is_applicable(self, group, iter, t):
@@ -526,8 +538,10 @@ class ResetSchoolDayRule(ResetRule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ResetWorkDayRule(ResetRule):
-    def __init__(self, t=TimePoint(5), attr_del=None, attr_set=None, rel_del=None, rel_set=None, memo=None):
-        super().__init__(t, attr_del, attr_set, rel_del, rel_set, memo)
+    NAME = 'Reset work day'
+
+    def __init__(self, t=TimePoint(5), attr_del=None, attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
+        super().__init__(t, attr_del, attr_set, rel_del, rel_set, name_human, memo)
         self.name = 'reset-work-day'
 
     def is_applicable(self, group, iter, t):
@@ -536,8 +550,10 @@ class ResetWorkDayRule(ResetRule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class RuleAnalyzerTestRule(Rule):
-    def __init__(self, t=TimeInt(8,20), memo=None):
-        super().__init__('progress-flu', t, memo)
+    NAME = 'Rule analyzer test'
+
+    def __init__(self, t=TimeInt(8,20), name_human=None, memo=None):
+        super().__init__('progress-flu', t, name_human, memo)
 
     def an(self, s): return f'b{s}'  # attribute name
     def rn(self, s): return f's{s}'  # relation  name
@@ -569,56 +585,15 @@ class RuleAnalyzerTestRule(Rule):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class FluProgressSimpleRule(Rule):
+class SimpleFluProgressRule(Rule):
     '''
-    Model introduced in Cohen (2019).
-    '''
-
-    def __init__(self):
-        super().__init__('flu-progress', TimeAlways())
-
-    def apply(self, pop, group, iter, t):
-        # Susceptible:
-        if group.has_attr({ 'flu': 's' }):
-            at  = group.get_rel(Site.AT)
-            n   = at.get_pop_size()                               # total   population at the group's current location
-            n_e = at.get_pop_size(GroupQry(attr={ 'flu': 'e' }))  # exposed population at the group's current location
-
-            p_infection = float(n_e) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
-
-            return [
-                GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'e', 'mood': 'annoyed' }),
-                GroupSplitSpec(p=1 - p_infection, attr_set={ 'flu': 's' })
-            ]
-
-        # Exposed:
-        if group.has_attr({ 'flu': 'e' }):
-            return [
-                GroupSplitSpec(p=0.2, attr_set={ 'flu': 'r', 'mood': 'happy'   }),
-                GroupSplitSpec(p=0.5, attr_set={ 'flu': 'e', 'mood': 'bored'   }),
-                GroupSplitSpec(p=0.3, attr_set={ 'flu': 'e', 'mood': 'annoyed' })
-            ]
-
-        # Recovered:
-        if group.has_attr({ 'flu': 'r' }):
-            return [
-                GroupSplitSpec(p=0.9, attr_set={ 'flu': 'r' }),
-                GroupSplitSpec(p=0.1, attr_set={ 'flu': 's' })
-            ]
-
-        raise ValueError('Unknown flu state')
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-class FluProgressSimpleAlleghenyRule(Rule):
-    '''
-    Same as FluProgressSimpleRule above, but without the mood attribute and with the setup() method to make a portion
-    of the population exposed.  The reason we need to do this is that the population is generated automatically from a
-    database which does not have any intrinsic connection with epidemiology; it is a synthetic population database.
+    Describes how a population transitions between the flu states of susceptible, exposed, and recovered.
     '''
 
-    def __init__(self):
-        super().__init__('flu-progress', TimeAlways())
+    NAME = 'Simple flu progression model'
+
+    def __init__(self, t=TimeAlways(), name_human=None, memo=None):
+        super().__init__('flu-progress-simple', t, name_human, memo)
 
     def apply(self, pop, group, iter, t):
         # Susceptible:
@@ -659,13 +634,61 @@ class FluProgressSimpleAlleghenyRule(Rule):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class FluLocationSimpleRule(Rule):
+class SimpleFluProgressMoodRule(Rule):
     '''
-    Model introduced in Cohen (2019).
+    Describes how a population transitions between the states of susceptible, exposed, and recovered.  Includes the
+    inconsequential 'mood' attribute which improves exposition of how the PRAM framework works.
+
+    Introduced in Cohen (2019).
     '''
 
-    def __init__(self):
-        super().__init__('flu-location', TimeAlways())
+    NAME = 'Simple flu progression model with mood'
+
+    def __init__(self, t=TimeAlways(), name_human=None, memo=None):
+        super().__init__('flu-progress-simple', t, name_human, memo)
+
+    def apply(self, pop, group, iter, t):
+        # Susceptible:
+        if group.has_attr({ 'flu': 's' }):
+            at  = group.get_rel(Site.AT)
+            n   = at.get_pop_size()                               # total   population at the group's current location
+            n_e = at.get_pop_size(GroupQry(attr={ 'flu': 'e' }))  # exposed population at the group's current location
+
+            p_infection = float(n_e) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
+
+            return [
+                GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'e', 'mood': 'annoyed' }),
+                GroupSplitSpec(p=1 - p_infection, attr_set={ 'flu': 's' })
+            ]
+
+        # Exposed:
+        if group.has_attr({ 'flu': 'e' }):
+            return [
+                GroupSplitSpec(p=0.2, attr_set={ 'flu': 'r', 'mood': 'happy'   }),
+                GroupSplitSpec(p=0.5, attr_set={ 'flu': 'e', 'mood': 'bored'   }),
+                GroupSplitSpec(p=0.3, attr_set={ 'flu': 'e', 'mood': 'annoyed' })
+            ]
+
+        # Recovered:
+        if group.has_attr({ 'flu': 'r' }):
+            return [
+                GroupSplitSpec(p=0.9, attr_set={ 'flu': 'r' }),
+                GroupSplitSpec(p=0.1, attr_set={ 'flu': 's' })
+            ]
+
+        raise ValueError('Unknown flu state')
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class SimpleFluLocationRule(Rule):
+    '''
+    Describes how student population changes location conditional upon being exposed to the flu.
+    '''
+
+    NAME = 'Simple flu location model'
+
+    def __init__(self, t=TimeAlways(), name_human=None, memo=None):
+        super().__init__('flu-location', t, name_human, memo)
 
     def apply(self, pop, group, iter, t):
         # Exposed and low income:
