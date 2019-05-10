@@ -1335,6 +1335,7 @@ class Simulation(object):
 
     def reset_pop(self):
         self.pop = GroupPopulation()
+        gc.collect()
         return self
 
     def reset_probes(self):
@@ -1672,7 +1673,10 @@ class Simulation(object):
     @staticmethod
     def _unpickle(fpath, fn):
         with fn(fpath, 'rb') as f:
-            return pickle.load(f)
+            gc.disable()
+            sim = pickle.load(f)
+            gc.enable()
+            return sim
 
     @staticmethod
     def unpickle(fpath):

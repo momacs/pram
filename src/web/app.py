@@ -1,7 +1,12 @@
 #
 # Next
-#     Add 'human-name' property to a rule which is displayed in the UI
-#     Add Download simulation button
+#     Show "working" icon when waiting for server's response
+#     Remove 'name_human' from Rule
+#     On reset calls, update the UI only when the response is Ok
+#     Add another dropdown for DB to select 'schema' or 'content' (first n rows)
+#     Show density plot for group size in the Population tab
+#     Add 'Download simulation' button
+#     Add 'Download results' button
 #     Session management
 #         Allow saving, loading, deleting, and duplicating sessions (ideally simple via serialized objects)
 #             [+] Pickle the Simulation object
@@ -31,7 +36,7 @@
 #         cd /Volumes/d/pitt/sci/pram/
 #         bin/activate
 #         python -m pip install Flask celery psutil
-#         echo 'Install Redis'
+#         echo 'Install Redis manually'
 #     Redis
 #         cd /Volumes/d/pitt/sci/pram/logic/redis-5.0.4/src
 #         ./redis-server
@@ -74,6 +79,7 @@ import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))  # pram pkg path
 
 
+import gc
 import inspect
 import os
 import psutil
@@ -89,10 +95,10 @@ from flask_session import Session
 # from flask.ext.session import Session
 
 from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
-from pram.entity import GroupQry, GroupSplitSpec, Site
+from pram.entity import GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
 from pram.rule   import Rule, GoToAndBackTimeAtRule, ResetSchoolDayRule, SEIRFluRule, TimeAlways, TimePoint
 from pram.rule   import SimpleFluLocationRule, SimpleFluProgressRule
-from pram.sim    import Simulation
+from pram.sim    import Simulation, SimulationConstructionError
 from pram.util   import DB, Size
 
 
@@ -186,7 +192,13 @@ def session_init(session):
 @app.route('/')
 def index():
     session_init(session)
-    return render_template('base.html')
+    return render_template('index.html')
+
+# ----------------------------------------------------------------------------------------------------------------------
+@app.route('/demo')
+def demo():
+    session_init(session)
+    return render_template('demo.html')
 
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/sys-get-load', methods=['GET'])
@@ -235,6 +247,7 @@ def sys_ping():
 @app.route('/usr-reset-sess', methods=['GET'])
 def usr_reset_sess():
     session.clear()
+    gc.collect()
     return usr_get_sess()
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -257,7 +270,7 @@ def usr_is_root():
 def usr_toggle():
     ''' Grant the user elevated access rights if the code submitted is correct. '''
 
-    code = request.values.get('code', '', type=str)
+    code = request.get_json()['code']
     session['is-root'] = (code == SUDO_CODE)
     return jsonify({ 'res': True, 'isRoot': session.get('is-root', False) })
 
@@ -411,8 +424,7 @@ def db_get_schema():
     kept in the order they appear in the DB.
     '''
 
-    fname = request.values.get('fname', '', type=str)
-    fpath = db_get_fpath(fname)
+    fpath = db_get_fpath(request.get_json()['name'])
     if not fpath:
         return jsonify({ 'res': False, 'err': 'Incorrect database specified' })
 
@@ -420,9 +432,14 @@ def db_get_schema():
         schema = []
         for r01 in c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name DESC").fetchall():  # sql
             tbl = r01['name']
+
             cols = OrderedDict((r['name'], { 'name': r['name'], 'type': r['type'] }) for r in c.execute(f"PRAGMA table_info('{tbl}')").fetchall())  # cid,name,type,notnull,dflt_value,pk
                 # We need a dict here to use it below when iterating through the foreign keys; we eventually convert it
                 # into an array though so that the order is preserved on the client side (otherwise, it is lost).
+
+            for col in cols.values():  # add the number of values (i.e., distinct rows)
+                print(f'SELECT COUNT(DISTINCT {col["name"]}) FROM {tbl}')
+                col['valCnt'] = c.execute(f'SELECT COUNT(DISTINCT {col["name"]}) FROM {tbl}').fetchone()[0]
 
             for row in c.execute(f'PRAGMA foreign_key_list({tbl})').fetchall():  # id,seq,tbl,from,to,on_update,on_delete,match
                 cols[row['from']]['fk'] = { 'tbl': row['table'], 'col': row['to'] }
@@ -445,6 +462,50 @@ def db_ls():
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+# ----[ POP ]-----------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+@app.route('/pop-db-gen', methods=['POST'])
+def pop_db_gen():
+    # Add foreign keys to the 'people' table:
+    # BEGIN TRANSACTION;
+    # CREATE TABLE people_tmp (sp_id INTEGER, sp_hh_id INTEGER, age INTEGER, sex TEXT, race INTEGER, relate INTEGER, income INTEGER, school_id INTEGER, work_id INTEGER);
+    # INSERT INTO people_tmp SELECT sp_id, sp_hh_id, age, sex, race, relate, income, school_id, work_id FROM people;
+    # DROP TABLE people;
+    # CREATE TABLE people     (sp_id INTEGER, sp_hh_id INTEGER, age INTEGER, sex TEXT, race INTEGER, relate INTEGER, income INTEGER, school_id INTEGER, work_id INTEGER, CONSTRAINT fk__people__households FOREIGN KEY (sp_hh_id) REFERENCES households (sp_id), CONSTRAINT fk__people__schools FOREIGN KEY (school_id) REFERENCES schools (sp_id), CONSTRAINT fk__people__workplaces FOREIGN KEY (work_id) REFERENCES workplaces (sp_id));
+    # INSERT INTO people     SELECT sp_id, sp_hh_id, age, sex, race, relate, income, school_id, work_id FROM people_tmp;
+    # DROP TABLE people_tmp;
+    # COMMIT;
+
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
+
+    json = request.get_json()
+
+    fpath = db_get_fpath(json['db'])
+    if not fpath:
+        return jsonify({ 'res': False, 'err': 'Incorrect database specified' })
+
+    attr_db = json['attr_db']
+    rel_db = json['rel_db']
+
+    site_home = Site('home')
+
+    sim = session['sim-flu-ac']
+    sim.gen_groups_from_db(
+        fpath_db   = fpath,
+        tbl        = json['tbl'],
+        attr_db    = attr_db,
+        rel_db     = [GroupDBRelSpec(name=rel['name'], col=rel['col']) for rel in rel_db],
+        attr_fix   = {},
+        rel_fix    = { 'home': site_home },
+        rel_at     = 'school',
+        is_verbose = False
+    )
+    return jsonify({ 'res': True, 'pop': sim.get_state()['pop'] })
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 # ----[ SIM ]-----------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -464,24 +525,21 @@ def sim_get_pragma_request_value(name, request):
     '''
     The type of the Simulation object's pragma value varies.  This function takes the 'name' of the pragma and the
     'request' object and returns the associated value passed from the client with the appropriate type.
-
-    Unfortunately, Flask does not seem to handle 'type=bool' well so a string comparison is necessary.  This function
-    declares a value as True if the associated string is equal to either 'true' or '1'; otherwise, a False is returned.
     '''
 
     return {
-        'analyze'                  : request.values.get('value', '', type=str) in ['true', '1'],
-        'autocompact'              : request.values.get('value', '', type=str) in ['true', '1'],
-        'autoprune_groups'         : request.values.get('value', '', type=str) in ['true', '1'],
-        'autostop'                 : request.values.get('value', '', type=str) in ['true', '1'],
-        'autostop_n'               : request.values.get('value', '', type=int),
-        'autostop_p'               : request.values.get('value', '', type=float),
-        'autostop_t'               : request.values.get('value', '', type=int),
-        'live_info'                : request.values.get('value', '', type=str) in ['true', '1'],
-        'live_info_ts'             : request.values.get('value', '', type=str) in ['true', '1'],
-        'probe_capture_init'       : request.values.get('value', '', type=str) in ['true', '1'],
-        'rule_analysis_for_db_gen' : request.values.get('value', '', type=str) in ['true', '1'],
-    }.get(name, None)
+        'analyze'                  : bool,
+        'autocompact'              : bool,
+        'autoprune_groups'         : bool,
+        'autostop'                 : bool,
+        'autostop_n'               : int,
+        'autostop_p'               : float,
+        'autostop_t'               : int,
+        'live_info'                : bool,
+        'live_info_ts'             : bool,
+        'probe_capture_init'       : bool,
+        'rule_analysis_for_db_gen' : bool
+    }.get(name, None)(request.get_json()['value'])
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -562,20 +620,23 @@ def sim_flu_ac_add_rule():
         return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
 
     sim = session['sim-flu-ac']
-    cls = request.values.get('cls', '', type=str)
+    cls = request.get_json()['cls']
     rule_cls = [r.__class__ for r in sim.rules]
 
-    if cls == 'SimpleFluProgressRule':
-        if SimpleFluProgressRule in rule_cls:
-            return jsonify({ 'res': False, 'err': 'Rule already in the simulation' })
-        sim.add_rule(SimpleFluProgressRule())
-        return jsonify({ 'res': True, 'rules': session['sim-flu-ac'].get_state()['rules'] })
+    try:
+        if cls == 'SimpleFluProgressRule':
+            if SimpleFluProgressRule in rule_cls:
+                return jsonify({ 'res': False, 'err': 'Rule already in the simulation' })
+            sim.add_rule(SimpleFluProgressRule())
+            return jsonify({ 'res': True, 'rules': sim.get_state()['rules'] })
 
-    if cls == 'SimpleFluLocationRule':
-        if SimpleFluLocationRule in rule_cls:
-            return jsonify({ 'res': False, 'err': 'Rule already in the simulation' })
-        sim.add_rule(SimpleFluLocationRule())
-        return jsonify({ 'res': True, 'rules': session['sim-flu-ac'].get_state()['rules'] })
+        if cls == 'SimpleFluLocationRule':
+            if SimpleFluLocationRule in rule_cls:
+                return jsonify({ 'res': False, 'err': 'Rule already in the simulation' })
+            sim.add_rule(SimpleFluLocationRule())
+            return jsonify({ 'res': True, 'rules': sim.get_state()['rules'] })
+    except SimulationConstructionError as e:
+        return jsonify({ 'res': False, 'err': str(e) })
 
     return jsonify({ 'res': False, 'err': 'Rule not supported by this simulation' })
 
@@ -586,10 +647,7 @@ def sim_flu_ac_init(session, do_force=False):
 
     if 'sim-flu-ac' in session:
         session.pop('sim-flu-ac')
-
-    # site_home = Site('home')
-    # school_l  = Site(450149323)  # 88% low income students
-    # school_m  = Site(450067740)  #  7% low income students
+        gc.collect()
 
     session['sim-flu-ac'] = (
         Simulation().
@@ -597,10 +655,9 @@ def sim_flu_ac_init(session, do_force=False):
                 pragma_autocompact(True).
                 pragma_live_info(True).
                 pragma_live_info_ts(False).
+                pragma_rule_analysis_for_db_gen(False).
                 done()
             # add().
-                # rule(SimpleFluProgressRule()).
-                # rule(SimpleFluLocationRule()).
                 # probe(probe_flu_at(school_l, 'low-income')).
                 # probe(probe_flu_at(school_m, 'med-income')).
                 # done()
@@ -729,7 +786,7 @@ def sim_flu_ac_set_pragma():
     # if session.get('sim', None):
     #     return jsonify({ 'res': False, 'err': 'A simulation is in progress' })
 
-    name  = request.values.get('name',  '', type=str)
+    name  = request.get_json()['name']
     value = sim_get_pragma_request_value(name, request)
     session['sim-flu-ac'].set_pragma(name, value)
 

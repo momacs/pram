@@ -164,7 +164,6 @@ Var   = namedtuple('Var', ['name', 'type'])           # having this inside of th
 Const = namedtuple('Const', ['name', 'type', 'val'])  # ^
 
 class Probe(ABC):
-
     def __init__(self, name, msg_mode=ProbeMsgMode.DISP, pop=None, memo=None):
         self.name = name
         self.msg_mode = msg_mode
@@ -263,11 +262,6 @@ class GroupSizeProbe(Probe):
             n_tot = sum([g.n for g in self.pop.get_groups(self.qry_tot)])  # TODO: If the total mass never changed, we could memoize this (either here or in GroupPopulation).
             n_qry = [sum([g.n for g in self.pop.get_groups(q)]) for q in self.queries]
 
-        # if iter and iter >= 40:
-        #     # print(f'    {self.name}  {round(n_tot)}  {[round(i) for i in n_qry]}')
-        #     # print(f'    {self.name}\n         {self.pop.get_groups(self.qry_tot)}\n        {[self.pop.get_groups(q) for q in self.queries]}\n')
-        #     pass
-
         # Message:
         if self.msg_mode != 0:
             msg = []
@@ -294,9 +288,6 @@ class GroupSizeProbe(Probe):
             for n in n_qry:
                 vals_p.append(n / n_tot)
                 vals_n.append(n)
-
-            # if iter and iter >= 40:
-            #     print(f'    {self.name}  {round(n_tot)}  {[round(i,2) for i in vals_p]}')
 
             self.persistance.persist(self, vals_p + vals_n, iter, t)
 

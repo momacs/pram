@@ -1,4 +1,5 @@
 import copy
+import gc
 import itertools
 import math
 import numpy as np
@@ -666,6 +667,7 @@ class Group(Entity):
         grp_pop = 0
         site_n = 0
 
+        gc.disable()
         with DB.open_conn(db_fpath) as c:
             # (3.1) Sites:
             for r in rel_db_keep:
@@ -699,6 +701,7 @@ class Group(Entity):
 
                 groups.append(cls(n=row['n'], attr=g_attr, rel=g_rel))
                 grp_pop += int(row['n'])
+        gc.enable()
 
         if inf:
             inf( '    Summary')

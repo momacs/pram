@@ -13,23 +13,26 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Exo+2">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="{{url_for('static', filename='css/materialize-pram.css')}}" media="screen,projection" />
-    <link rel="stylesheet" href="{{url_for('static', filename='css/prism-sol-light.css')}}" />
+    <link rel="stylesheet" href="{{url_for('static', filename='css/prism.css')}}" />
 
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <style type="text/css">
+        body  { -webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; cursor: pointer; }
+        div,span,td,p,input  { cursor: pointer; }
         #server-load-avg    { font-weight: bold; }
         #btn-sim-flu-reset  { margin-right: 40px; }
         #sim-flu-out        { _overflow-y: scroll; _max-height: 300px; _padding: 4px 8px 4px 8px; font: 1em courier; _border: 1px solid #eee; background: #fafafa; white-space: pre; }
         #sim-flu-out > div  { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
-        #tbl-db-tbl         { margin: 0px; border: 1px solid #ccc; }
-        #tbl-db-tbl th      { _padding: 4px 8px 4px 8px; }
-        #tbl-db-tbl td      { _padding: 4px 8px 4px 8px; }
+        #tbl-db-tbl         { border: 1px solid #ccc; }
         #tbl-db-tbl th:nth-child(1)  { width: 80px; padding-left: 10px; padding-right: 10px; }
         #tbl-db-tbl th:nth-child(2)  { width: 80px; padding-left: 10px; padding-right: 10px; }
         #tbl-db-tbl td:nth-child(1)  { width: 80px; padding-left: 10px; padding-right: 10px; }
         #tbl-db-tbl td:nth-child(2)  { width: 80px; padding-left: 10px; padding-right: 10px; }
+        #tbl-db-tbl td:nth-child(3)  { width: 80px; padding-left: 10px; padding-right: 10px; }
+        _#tbl-db-tbl td:nth-child(4)  { width: 80px; padding-left: 10px; padding-right: 10px; }
+        _#tbl-db-tbl td:nth-child(5)  { width: 80px; padding-left: 10px; padding-right: 10px; }
         input[type=checkbox]  { vertical-align: bottom; }
         ode  { font: 0.9em courier monospace; _font-smooth: always; _-webkit-font-smoothing: auto; _-moz-osx-font-smoothing: auto; }
     </style>
@@ -56,10 +59,13 @@
             rules: null,
             state: {
                 client: {
-                    dbTbl: null,
-                    dbTblIdx: -1,
-                    dbTblAttr: {},
-                    dbTblRel: {},
+                    db: {
+                        name: null,
+                        tbl: null,
+                        tblIdx: -1,
+                        tblAttr: new Map(),
+                        tblRel: new Map()
+                    },
                     rule: null
                 },
                 server: null
@@ -67,6 +73,7 @@
         };
 
         var fuseOpts = {  // Fuse.js fuzzy match options; https://fusejs.io/
+            shouldSort: true,
             includeScore: true,
             threshold: 0.4,  // 0 = perfect match; 1 = total mismatch
             location: 0,
@@ -105,8 +112,9 @@
             return el;
         }
 
-        function do_server(url, method, cb, formData=null) {
-            fetch(url, { method: method, cache: 'no-cache', body: formData }).
+        function do_server(url, method, cb, data=null) {
+            if (data != null) data = JSON.stringify(data);
+            fetch(url, { method: method, cache: 'no-cache', headers: { 'Content-Type': 'application/json' }, body: data }).
             then(res => res.json()).
             then(data => {
                 if (data.res) cb(data);
@@ -196,15 +204,10 @@
         }
 
         function usrToggle() {
-            let fd = new FormData();
-            if (!app.isRoot) {
-                fd.append('code', prompt('Code:'));
-            }
-
             do_server({{ url_for('usr_toggle')|tojson }}, 'POST', (data) => {
                 app.isRoot = data.isRoot;
                 $('#btn-usr-toggle').children(0).text(app.isRoot ? ui.btnUserRootInnerHTML : ui.btnUserUserInnerHTML);
-            }, fd);
+            }, { code: prompt('Code:') });
         }
 
 
@@ -214,7 +217,7 @@
 
         function dbLs() {
             do_server({{ url_for('db_ls')|tojson }}, 'GET', (data) => {
-                app.state.client.dbTblIdx = -1;
+                app.state.client.db.tblIdx = -1;
 
                 $('#dropdown-db').empty();
                 $('#dropdown-db-tbl').empty();
@@ -236,12 +239,13 @@
             });
         }
 
-        function dbSet(fname) {
+        function dbSet(name) {
             let fd = new FormData();
-            fd.append('fname', fname);
+            fd.append('name', name);
 
             do_server({{ url_for('db_get_schema')|tojson }}, 'POST', (data) => {
-                app.state.client.dbTblIdx = -1;
+                app.state.client.db.name = name;
+                app.state.client.db.tblIdx = -1;
 
                 $('#dropdown-db-tbl').empty();
                 $('#dropdown-db-tbl-trigger').removeClass('disabled');
@@ -250,7 +254,7 @@
                 $('#tbl-db-tbl-body').empty();
                 $('#row-pop-db-tbl').hide();
                 $('#row-pop-db-ctl').hide();
-                $('#dropdown-db-lbl').html(fname);
+                $('#dropdown-db-lbl').html(name);
                 $('#btn-db-tbl-ncol').html('');
                 $('#btn-db-tbl-nrow').html('');
 
@@ -258,30 +262,32 @@
                 for (let i = 0; i < app.dbSchema.length; i++) {
                     let tbl = app.dbSchema[i];
                     let li = $$('li');
-                    let a  = $($$('a', li)).html(tbl.name + '<span class="badge">' + tbl.cols.length + '</span>');
+                    let a  = $($$('a', li)).html(`${tbl.name}<span class="badge">${tbl.cols.length}</span>`);
                     a.attr('href', '#').click(() => dbTblSet(i));
                     $('#dropdown-db-tbl').append(li);
                 }
 
                 M.Dropdown.init($('#dropdown-db-tbl-trigger'), { constrainWidth: false, coverTrigger: false, inDuration: 150, outDuration: 250, hover: true });
-            }, fd);
+            }, { name: name });
         }
 
         function dbTblSet(tblIdx) {
-            app.state.client.dbTblIdx  = tblIdx;
-            app.state.client.dbTbl     = app.dbSchema[tblIdx];
-            app.state.client.dbTblAttr = {};
-            app.state.client.dbTblRel  = {};
+            app.state.client.db.tblIdx = tblIdx;
+            app.state.client.db.tbl = app.dbSchema[tblIdx];
+            app.state.client.db.tblAttr.clear();
+            app.state.client.db.tblRel.clear();
 
-            $('#dropdown-db-tbl-lbl').html(app.dbSchema[tblIdx].name);
+            let tbl = app.state.client.db.tbl;  // shorthand
+
+            $('#dropdown-db-tbl-lbl').html(tbl.name);
             $('#tbl-db-tbl-body').empty();
             $('#row-pop-db-tbl').show();
             $('#row-pop-db-ctl').show();
-            $('#btn-db-tbl-ncol').html('Columns: <b>' + app.dbSchema[tblIdx].cols.length + '</b>');
-            $('#btn-db-tbl-nrow').html('Rows: <b>'    + app.dbSchema[tblIdx].rowCnt + '</b>');
+            $('#btn-db-tbl-ncol').html(`Col: <b>${tbl.cols.length}</b>`);
+            $('#btn-db-tbl-nrow').html(`Row: <b>${tbl.rowCnt}</b>`);
 
-            for (let i = 0; i < app.dbSchema[tblIdx].cols.length; i++) {
-                let col = app.dbSchema[tblIdx].cols[i];
+            for (let i = 0; i < tbl.cols.length; i++) {
+                let col = tbl.cols[i];
 
                 let matchAttr = utilDoFuzzyMatch(app.state.server.simFluAC.rules.analysis.static.attr.used, col.name);
                 let matchRel  = utilDoFuzzyMatch(app.state.server.simFluAC.rules.analysis.static.rel.used,  col.name);
@@ -289,38 +295,60 @@
                 let badgesAttr = matchAttr .map((i) => uiGenBadgeRule(i.item, i.score.toPrecision(2))).join('');
                 let badgesRel  = matchRel  .map((i) => uiGenBadgeRule(i.item, i.score.toPrecision(2))).join('');
 
-                if (matchAttr .length > 0) app.state.client.dbTblAttr[col.name] = true;
-                if (matchRel  .length > 0) app.state.client.dbTblRel [col.name] = true;
+                // if (matchAttr .length > 0) app.state.client.db.tblAttr[col.name] = true;
+                // if (matchRel  .length > 0) app.state.client.db.tblRel [col.name] = true;
 
                 let tr   = $('<tr>').appendTo($('#tbl-db-tbl-body'));
-                let td01 = $('<td>').appendTo(tr).html(col.name);
-                let td02 = $('<td>').appendTo(tr).html(col.type.toLowerCase());
-                let td03 = $('<td>').appendTo(tr);
-                let td04 = $('<td>').appendTo(tr);
-                let chbox03lbl = $('<label>').appendTo(td03);
-                let chbox04lbl = $('<label>').appendTo(td04);
-                let chbox03 = $('<input />').attr({ type: 'checkbox' }).prop('checked', badgesAttr .length > 0).addClass('filled-in').appendTo(chbox03lbl);
-                let chbox04 = $('<input />').attr({ type: 'checkbox' }).prop('checked', badgesRel  .length > 0).addClass('filled-in').appendTo(chbox04lbl);
-                let chbox03span = $('<span>').html(badgesAttr) .appendTo(chbox03lbl);
-                let chbox04span = $('<span>').html(badgesRel)  .appendTo(chbox04lbl);
+                let td01 = $('<td>').appendTo(tr).html(col.name);                // name
+                let td02 = $('<td>').appendTo(tr).html(col.type.toLowerCase());  // type
+                let td03 = $('<td>').appendTo(tr).html(col.valCnt);              // distinct value count
+                let td04 = $('<td>').appendTo(tr);                               // attribute
+                let td05 = $('<td>').appendTo(tr);                               // relation
+                let td06 = $('<td>').appendTo(tr);                               // relation name
 
-                chbox03.change((e) => dbTblChBoxChange($(e.target), col, app.state.client.dbTblAttr));
-                chbox04.change((e) => dbTblChBoxChange($(e.target), col, app.state.client.dbTblRel));
+                let chBox04lbl = $('<label>').appendTo(td04);
+                let chBox05lbl = $('<label>').appendTo(td05);
+                let chBox04 = $('<input />').attr({ type: 'checkbox' }).prop('checked', badgesAttr .length > 0).addClass('filled-in').appendTo(chBox04lbl);
+                let chBox05 = $('<input />').attr({ type: 'checkbox' }).prop('checked', badgesRel  .length > 0).addClass('filled-in').appendTo(chBox05lbl);
+                $('<span>').html(badgesAttr) .appendTo(chBox04lbl);
+                $('<span>').html(badgesRel)  .appendTo(chBox05lbl);
+
+                let txtBox06 = $('<input />').attr({ type: 'text' }).prop('value', (matchRel.length > 0 ? matchRel[0].item : '')).addClass('browser-default').appendTo(td06).css({ display: (badgesRel.length > 0 ? 'block' : 'none')});
+
+                chBox04.change((e) => dbTblChBoxChangeAttr($(e.target), col.name));
+                chBox05.change((e) => dbTblChBoxChangeRel ($(e.target), col.name, txtBox06));
+
+                if (matchAttr .length > 0) app.state.client.db.tblAttr .set(col.name, col.name);
+                if (matchRel  .length > 0) app.state.client.db.tblRel  .set(col.name, { txtBox: txtBox06, col: col.name });
 
                 dbTblSetGenBtn();
             }
         }
 
-        function dbTblChBoxChange(el, col, state) {
-            state[col.name] = el.is(':checked');
+        function dbTblChBoxChangeAttr(el, colName) {
+            if (el.is(':checked')) {
+                app.state.client.db.tblAttr.set(colName, colName);
+            }
+            else {
+                app.state.client.db.tblAttr.delete(colName);
+            }
+            dbTblSetGenBtn();
+        }
+
+        function dbTblChBoxChangeRel(el, colName, txtBox) {
+            if (el.is(':checked')) {
+                txtBox.show();
+                app.state.client.db.tblRel.set(colName, { txtBox: txtBox, col: colName });
+            }
+            else {
+                txtBox.hide();
+                app.state.client.db.tblRel.delete(colName);
+            }
             dbTblSetGenBtn();
         }
 
         function dbTblSetGenBtn() {
-            let isEnabled = false;
-            for (let a in app.state.client.dbTblAttr) isEnabled = isEnabled || app.state.client.dbTblAttr[a];
-            for (let r in app.state.client.dbTblRel)  isEnabled = isEnabled || app.state.client.dbTblRel[r];
-            if (isEnabled) {
+            if (app.state.client.db.tblAttr.size > 0 || app.state.client.db.tblRel.size > 0) {
                 $('#btn-db-gen').removeClass('disabled');
             }
             else {
@@ -329,6 +357,31 @@
         }
 
         function dbTblGen() {
+            // let rel_db = [];
+            // app.state.client.db.tblRel.forEach((v,k,m) => {
+            //     console.log(v.txtBox.val());
+            //     rel_db.push({ name: v.txtBox.val(), col: v.col });
+            // });
+            // rel_db = [...app.state.client.db.tblRel.values()].map((i) => { return { name: i.txtBox.val(), col: i.col }; });
+
+            let isRelOk = [...app.state.client.db.tblRel.values()].map((i) => i.txtBox.val().length).reduce((acc,i) => acc && (i > 0), true);
+            if (!isRelOk) {
+                return M.toast({ html: 'At least one relation name is empty' });
+            }
+
+            let data = {
+                'db'      : app.state.client.db.name,
+                'tbl'     : app.state.client.db.tbl.name,
+                'attr_db' : [...app.state.client.db.tblAttr.values()],
+                // 'rel_db'  : [...app.state.client.db.tblRel.values()]
+                'rel_db'  : [...app.state.client.db.tblRel.values()].map((i) => { return { name: i.txtBox.val(), col: i.col }; })
+            };
+
+            do_server({{ url_for('pop_db_gen')|tojson }}, 'POST', (data) => {
+                app.state.server.simFluAC.pop = data.pop;
+                uiInitSim();
+                M.toast({ html: 'Population has been generated', classes: 'amber accent-3' });
+            }, data);
         }
 
 
@@ -337,18 +390,15 @@
         // -------------------------------------------------------------------------------------------------------------
 
         function ruleAdd() {
-            let fd = new FormData();
-            fd.append('cls', app.state.client.rule.cls);
-
             do_server({{ url_for('sim_flu_ac_add_rule')|tojson }}, 'POST', (data) => {
                 app.state.server.simFluAC.rules = data.rules;
                 uiInitSim();
                 M.toast({ html: 'Rule has been added', classes: 'amber accent-3' });
 
-                if (app.state.client.dbTblIdx >= 0) {
-                    dbTblSet(app.state.client.dbTblIdx);
+                if (app.state.client.db.tblIdx >= 0) {
+                    dbTblSet(app.state.client.db.tblIdx);
                 }
-            }, fd);
+            }, { cls: app.state.client.rule.cls });
         }
 
         function ruleLs() {
@@ -359,7 +409,7 @@
                 for (let i = 0; i < app.rules.length; i++) {
                     let rule = app.rules[i];
                     let li = $$('li');
-                    let a  = $($$('a', li)).html(rule.name + '<span class="badge">' + rule.srcLines.length + '</span>');
+                    let a  = $($$('a', li)).html(`${rule.name}<span class="badge">${rule.srcLines.length}</span>`);
                     a.attr('href', '#').click(() => ruleSet(i));
                     $('#dropdown-rule-ls').append(li);
                 }
@@ -377,10 +427,10 @@
 
             $('#dropdown-rule-ls-lbl').html(rule.name);
             $('#row-rul-docstr-card').html(rule.docstr.join('<br />'));
-            $('#row-rul-src').html('<pre><code>' + rule.srcLines.join('') + '</code></pre>');
+            $('#row-rul-src').html(`<pre class="line-numbers"><code>${rule.srcLines.join('')}</code></pre>`);
             $('#dropdown-rule-trigger').removeClass('disabled');
             $('#btn-rul-add').removeClass('disabled');
-            $('#btn-rule-nlines').html(rule.srcLines.length + ' lines');
+            $('#btn-rule-nlines').html(`${rule.srcLines.length} lines`);
 
             Prism.highlightElement($('#row-rul-src').children(0).children(0)[0]);
         }
@@ -404,8 +454,8 @@
                 uiInitSim();
                 M.toast({ html: 'Simulation has been reset', classes: 'teal accent-4' });
 
-                if (app.state.client.dbTblIdx >= 0) {
-                    dbTblSet(app.state.client.dbTblIdx);
+                if (app.state.client.db.tblIdx >= 0) {
+                    dbTblSet(app.state.client.db.tblIdx);
                 }
             });
         }
@@ -432,21 +482,17 @@
                 uiInitSim();
                 M.toast({ html: 'Rules have been reset', classes: 'teal accent-4' });
 
-                if (app.state.client.dbTblIdx >= 0) {
-                    dbTblSet(app.state.client.dbTblIdx);
+                if (app.state.client.db.tblIdx >= 0) {
+                    dbTblSet(app.state.client.db.tblIdx);
                 }
             });
         }
 
         function simFluACSetPragma(name, value) {
-            let fd = new FormData();
-            fd.append('name', name);
-            fd.append('value', value);
-
             do_server({{ url_for('sim_flu_ac_set_pragma')|tojson }}, 'POST', (data) => {
                 app.state.server.simFluAC.sim.pragma[name] = !app.state.server.simFluAC.sim.pragma[name];
                 uiInitSim();
-            }, fd);
+            }, { name: name, value: value });
         }
 
         function simFluACRun() {
@@ -547,7 +593,7 @@
         // -------------------------------------------------------------------------------------------------------------
 
         function uiGenBadgeRule(value='', caption='') {
-            return '<span class="new badge deep-purple lighten-2 left" data-badge-caption="' + caption + '" style="margin-right: 4px; padding-left: 10px; padding-right: 10px; font-weight: bold;">' + value + '</span>';
+            return `<span class="new badge deep-purple lighten-2 left" data-badge-caption="${caption}" style="margin-right: 4px; padding-left: 10px; padding-right: 10px; font-weight: bold;">${value}</span>`;
         }
 
         function uiInitOutput() {
@@ -588,7 +634,7 @@
                 $('#row-sim-pop-inf').html('No population');
             }
             else {
-                $('#row-sim-pop-inf').html('Agents: <b>' + app.state.server.simFluAC.pop.agentCnt + '</b><br />Groups: <b>' + app.state.server.simFluAC.pop.groupCnt + '</b><br />Sites: <b>' + app.state.server.simFluAC.pop.siteCnt + '</b><br />');
+                $('#row-sim-pop-inf').html(`Agents: <b>${app.state.server.simFluAC.pop.agentCnt}</b><br />Groups: <b>${app.state.server.simFluAC.pop.groupCnt}</b><br />Sites: <b>${app.state.server.simFluAC.pop.siteCnt}</b><br />`);
             }
 
             // (4) Probes:
@@ -706,17 +752,19 @@
                 <li><a id="btn-sys-ping"   class="waves-effect waves-light btn-small tooltipped" data-tooltip="Ping"                style="margin-left: 0px;">... ms</a></li>
             </ul>
         </div>
+
+        <!--
         <div class="nav-content">
             <ul class="tabs tabs-transparent">
                 <li class="tab"><a href="#tab-flu-a" class="active">Flu in Allegheny County</a></li>
-                <!-- <li class="tab"><a href="#tab-flu">Flu</a></li> -->
                 <li class="tab"><a href="#tab-test">Test</a></li>
             </ul>
         </div>
+        -->
     </nav>
 
     <!-- Tab: Flu Allegheny Sim -->
-    <div id="tab-flu-a" class="col s12">
+    <!-- <div id="tab-flu-a" class="col s12"> -->
         <ul class="collapsible">
             <!-- Rules -->
             <li class="_active">
@@ -755,8 +803,9 @@
                 <div class="collapsible-body">
                     <div class="row">
                         <div class="col s12">
-                            <ul id="dropdown-db"     class="dropdown-content"></ul> <a id="dropdown-db-trigger"     class="btn dropdown-trigger"          href="#" data-target="dropdown-db"    ><span id="dropdown-db-lbl"    >---</span><i class="material-icons right">arrow_drop_down</i></a>
-                            <ul id="dropdown-db-tbl" class="dropdown-content"></ul> <a id="dropdown-db-tbl-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-db-tbl"><span id="dropdown-db-tbl-lbl">---</span><i class="material-icons right">arrow_drop_down</i></a>
+                            <ul id="dropdown-db"          class="dropdown-content"></ul> <a id="dropdown-db-trigger"          class="btn dropdown-trigger"          href="#" data-target="dropdown-db"         ><span id="dropdown-db-lbl"         >---   </span><i class="material-icons right">arrow_drop_down</i></a>
+                            <ul id="dropdown-db-tbl"      class="dropdown-content"></ul> <a id="dropdown-db-tbl-trigger"      class="btn dropdown-trigger disabled" href="#" data-target="dropdown-db-tbl"     ><span id="dropdown-db-tbl-lbl"     >---   </span><i class="material-icons right">arrow_drop_down</i></a>
+                            <ul id="dropdown-db-tbl-mode" class="dropdown-content"></ul> <a id="dropdown-db-tbl-mode-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-db-tbl-mode"><span id="dropdown-db-tbl-mode-lbl">Schema</span><i class="material-icons right">arrow_drop_down</i></a>
 
                             <a id="btn-db-tbl-ncol" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Columns" style="margin-left: 20px;"></a>
                             <a id="btn-db-tbl-nrow" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Rows"></a>
@@ -766,11 +815,22 @@
                     </div>
 
                     <div id="row-pop-db-tbl" class="row">
-                        <table id="tbl-db-tbl" class="responsive-table z-depth-1">
+                        <div class="col s8">
+                            <table id="tbl-db-tbl" class="responsive-table z-depth-1">
+                                <thead><tr> <th class="blue-grey lighten-5">Column</th> <th class="blue-grey lighten-5">Type</th> <th class="blue-grey lighten-5">Values</th> <th class="blue-grey lighten-5">Attribute</th> <th class="blue-grey lighten-5">Relation</th> <th class="blue-grey lighten-5">Relation name</th> </tr></thead>
+                                <tbody id="tbl-db-tbl-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!--
+                    <div id="row-pop-db-tbl-cont" class="row">
+                        <table id="tbl-db-tbl-cont" class="responsive-table z-depth-1">
                             <thead><tr> <th class="blue-grey lighten-5">Column</th> <th class="blue-grey lighten-5">Type</th> <th class="blue-grey lighten-5">Attributes</th> <th class="blue-grey lighten-5">Relations</th> </tr></thead>
-                            <tbody id="tbl-db-tbl-body"></tbody>
+                            <tbody id="tbl-db-tbl-cont-body"></tbody>
                         </table>
                     </div>
+                    -->
 
                     <div id="row-pop-db-ctl" class="row">
                     </div>
@@ -866,7 +926,7 @@
                 </div>
             </li>
         </ul>
-    </div>
+    <!-- </div> -->
 
     <!-- Tab: Flu Sim -->
     <!--
@@ -889,6 +949,7 @@
     -->
 
     <!-- Tab: Test Sim -->
+    <!--
     <div id="tab-test" class="col s12">
         <ul class="collapsible">
             <li class="active">
@@ -903,7 +964,7 @@
             </li>
         </ul>
     </div>
-
+    -->
     <!-- Floating action button -->
     <div class="fixed-action-btn">
         <a id="btn-sys-load" class="btn-floating btn-large modal-trigger" data-target="win-sys-load">
