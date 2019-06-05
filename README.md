@@ -161,7 +161,7 @@ Below is the output of the simulation when it is run synchronously from the term
 
 ## Web App
 
-The Web app located in the [`web`](web/) directory demonstrates how the `Simulation` object can be used asynchronously via a Web user interface.  A production-grade server-side logic handles client requests.  As shown of the screenshots below, the UI itself is organized into a logical sequence of five sections: Rules, Population, Probes, Simulation, and Output.
+The Web app located in the [`web`](src/web/) directory demonstrates how the `Simulation` object can be used asynchronously via a Web user interface.  A production-grade server-side logic handles client requests.  As shown of the screenshots below, the UI itself is organized into a logical sequence of five sections: Rules, Population, Probes, Simulation, and Output.
 
 ![Web UI 01](media/flu-ac-04.png)
 ![Web UI 02](media/flu-ac-05.png)
