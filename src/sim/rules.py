@@ -16,21 +16,23 @@ from pram.util   import Err
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProgressFluRule(Rule):
+    '''
+    Time-homogenous Markov chain with a finite state space with the initial state distribution:
+
+        flu-stage: (1 0 0)
+
+    and the transition model:
+
+              N     A     S
+        N  0.95  0.00  0.10
+        A  0.05  0.50  0
+        S  0     0.50  0.90
+    '''
+
     def __init__(self, t=TimeInt(8,20), memo=None):
         super().__init__('progress-flu', t, memo)
 
     def apply(self, pop, group, iter, t):
-        # An equivalent Dynamic Bayesian net has the initial state distribution:
-        #
-        #     flu-stage: (1 0 0)
-        #
-        # and the transition model:
-        #
-        #           N     A     S
-        #     N  0.95  0.00  0.10
-        #     A  0.05  0.50  0
-        #     S  0     0.50  0.90
-
         p = 0.05  # prob of infection
 
         if group.get_attr('flu-stage') == AttrFluStage.NO:

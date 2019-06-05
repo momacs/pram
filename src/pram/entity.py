@@ -1,10 +1,13 @@
 import copy
 import gc
+import hashlib
 import itertools
+import json
 import math
 import numpy as np
 import os
 import sqlite3
+import xxhash
 
 from abc             import ABC
 from attr            import attrs, attrib, converters, validators
@@ -168,6 +171,15 @@ class Resource(Entity):
             return
 
         self.capacity = max(0, self.capacity - n)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class SiteJSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Site):
+            # return {'__Site__': o.__hash__()}
+            return {'__Site__': o.name}
+        return json.JSONEncoder.default(self, o)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -501,7 +513,7 @@ class Group(Entity):
                 used_set.update(qry.keys())
             return qry.items() <= d.items()
 
-        if isinstance(qry, str):  # needs to be above the Iterable check because a string is an Iterable
+        if isinstance(qry, str):  # needs to be above the Iterable check because a string itself is an Iterable
             if used_set is not None:
                 used_set.add(qry)
             return qry in d.keys()
@@ -555,7 +567,21 @@ class Group(Entity):
             ss_comb = GroupSplitSpec(p=1.0, attr_set={}, attr_del=set(), rel_set={}, rel_del=set())  # the combined split spec
             for i in ss_lst:
                 ss_comb.p *= i.p  # this assumes rule independence
-                ss_comb.attr_set.update(i.attr_set)
+
+                for k,v_new in i.attr_set.items():
+                    v_curr = ss_comb.attr_set.get(k)
+                    if v_curr is None:
+                        ss_comb.attr_set[k] = v_new
+                    else:
+                        if isinstance(v_curr, int) or isinstance(v_curr, float):
+                            ss_comb.attr_set[k] = ss_comb.attr_set[k] + v_new
+                        elif isinstance(v_curr, bool):
+                            ss_comb.attr_set[k] = ss_comb.attr_set[k] and v_curr  # TODO: allow 'or'
+                        else:
+                            if v_new != v_curr:
+                                raise ValueError(f'The result of rule application results in an attribute update conflict:\n    Name: {k}\n    Type: {type(v_curr)}\n    Current value: {v_curr}\n    New value: {v_new}')
+
+                # ss_comb.attr_set.update(i.attr_set)  # this update has been subsistuted by the logic above
                 ss_comb.attr_del.update(i.attr_del)
                 ss_comb.rel_set.update(i.rel_set)
                 ss_comb.rel_del.update(i.rel_del)
@@ -584,23 +610,30 @@ class Group(Entity):
         Generates a hash for the attributes and relations dictionaries.  This sort of hash is desired because groups
         are judged functionally equivalent or not based on the content of those two dictionaries alone and nothing else
         (e.g., the name and the size of a group does not affect its identity assessment).
+
+        The following non-cryptographic hashing algorithms have been tested:
+
+        - hash()
+        - hashlib.sha1()
+        - xxhash.xxh32()
+        - xxhash.xxh64()
+
+        As is evident from the source code, each of the algorithms required a slightly different treatment of the
+        attribute and relation dictionaries.  All these options are legitimate and they don't differ much in terms of
+        speed.  They do howeve differ in terms of reproducability.  Namely, the results of the built-in hash() function
+        cannot be compared between-runs while the other ones can.  This behavior of the hash() function is to prevent
+        attackers from reusing hashes and it can be disabled by setting 'PYTHONHASHSEED=0'.
+
+        Uncomment the desired method to use it.
         '''
-
-        # TODO: The current implementation assumes dictionaries are not nested.  Properly hash nested dictionaries (via
-        #       recursion) when that becomes necessary.
-        #
-        #       https://stackoverflow.com/questions/5884066/hashing-a-dictionary
-
-        # TODO: The current implementation guarantees equality of hashes only within the lifespan of a Python
-        #       interpreter.  Use another, deterministic, hashing algorithm when moving to a concurrent/distributed
-        #       computation paradigm.
-        #
-        #       https://stackoverflow.com/questions/27522626/hash-function-in-python-3-3-returns-different-results-between-sessions/27522708#27522708
 
         attr = attr or {}
         rel  = rel  or {}
 
-        return hash(tuple([frozenset(attr.items()), frozenset(rel.items())]))
+        # return hash(tuple([frozenset(attr.items()), frozenset(rel.items())]))
+        # return hashlib.sha1(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder).encode('utf-8')).hexdigest()
+        # return xxhash.xxh32(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder)).hexdigest()
+        return xxhash.xxh64(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder)).hexdigest()
 
     @classmethod
     def gen_from_db(cls, db_fpath, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, fn_live_info=None):
@@ -972,7 +1005,7 @@ class Group(Entity):
         A note on performance.  The biggest performance hit is likley going to be generating a hash which happens as
         part of instantiating a new Group object.  While this may seem like a good reason to avoid crearing new groups,
         that line of reasoning is deceptive in that a group's hash is needed regardless.  Other than that, a group
-        object is light so its impact on perfornace should be negligeable.  Furthermore, this also grants access to
+        object is light so its impact on performance should be negligeable.  Furthermore, this also grants access to
         full functionality of the Group class to any function that uses the result of the present method.
         '''
 
@@ -1003,9 +1036,9 @@ class Group(Entity):
             #     g.name = self.name
             # groups.append(g)
 
-            groups.append(Group(None, n, attr, rel))
+            groups.append(Group(None, n, attr, rel))  # do not use group name any more
 
-            if p_sum == 1.0:
+            if p_sum == 1.0:  # the remaining split specs must have p=0 so we might as well skip them
                 break
 
         return groups

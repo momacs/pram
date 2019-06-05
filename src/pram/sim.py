@@ -1,5 +1,3 @@
-#
-# ----------------------------------------------------------------------------------------------------------------------
 # PRAMs - Probabilitistic Relational Agent-based Models
 #
 # BSD 3-Clause License
@@ -11,7 +9,7 @@
 # Contributors
 #     Paul R Cohen                                                                                    [2018.10.01 - ...]
 #         The idea of PRAMs
-#         The original implementation found elsewhere
+#         The original implementation (not available here)
 #     Tomek D Loboda  (https://github.com/ubiq-x)                                                     [2018.12.16 - ...]
 #         The original author of the present design and implementation
 #
@@ -391,12 +389,14 @@ import gc
 import gzip
 import inspect
 import math
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pickle
 
 from collections import namedtuple, Counter
 from dotmap      import DotMap
+from scipy.stats import gaussian_kde
 
 from .data   import GroupSizeProbe, Probe
 from .entity import Agent, Group, GroupQry, Site
@@ -852,6 +852,19 @@ class SimulationDBI(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+class SimulationPlotter(object):
+    def __init__(self, sim):
+        self.sim = sim
+
+    def done(self):
+        return self.sim
+
+    def group_size(self, do_log=False, fpath=None, title='Distribution of Group Size', nx=250):
+        self.sim.plot_group_size(do_log, fpath, title, nx)
+        return self
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class SimulationSetter(object):
     def __init__(self, sim):
         self.sim = sim
@@ -944,6 +957,12 @@ class Simulation(object):
         self.is_setup_done = False  # flag
             # ensures simulation setup is performed only once while enabling multiple incremental simulation runs of
             # arbitrary length thus promoting interactivity (a sine qua non for a user interface)
+
+        self.running = DotMap(
+            is_running = False,
+            progress = 0.0,
+            step = 1.0
+        )
 
         self.fn = DotMap(
             group_setup = None  # called before the simulation is run for the very first time
@@ -1258,7 +1277,11 @@ class Simulation(object):
             'sim': {
                 'runCnt': self.run_cnt,
                 'timer': {
-                    'iter': (self.timer.i if self.timer else -1)
+                    'iter': (self.timer.i if self.timer else 0)
+                },
+                'run': {
+                    'isRunning': self.running.is_running,
+                    'progress': self.running.progress
                 },
                 'pragma': {
                     'analyze'                  : self.get_pragma_analyze(),
@@ -1280,7 +1303,7 @@ class Simulation(object):
                 'siteCnt'  : self.pop.get_site_cnt()
             },
             'probes': {
-                'ls': []
+                'ls': [{ 'name': p.name } for p in self.probes]
             },
             'rules': {
                 'ls': [{ 'cls': r.__class__.__name__, 'name': r.__class__.NAME } for r in self.rules],
@@ -1325,6 +1348,75 @@ class Simulation(object):
         self._pickle(fpath, gzip.GzipFile)
         return self
 
+    def plot(self):
+        return SimulationPlotter(self)
+
+    def plot_group_size(self, do_log=False, fpath=None, title='Distribution of Group Size', nx=250):
+        '''
+        nx - Number of x-axis points
+        '''
+
+        # Data:
+        data = [g.n for g in self.pop.groups.values()]
+        density = gaussian_kde(data)
+        x = np.linspace(min(data), max(data), nx)
+        density.covariance_factor = lambda: .25
+        density._compute_covariance()
+
+        # Figure:
+        fig = plt.figure(figsize=(12,2))
+        if title:
+            plt.title(title)
+        plt.plot(x, density(x), lw=1, linestyle='-', c='#666666', mfc='none', antialiased=True)  # marker='o', markersize=5
+        # plt.legend(['Susceptible', 'Exposed', 'Recovered'], loc='upper right')
+        plt.ylabel('Density')
+        if do_log:
+            plt.xlabel('Group size (log)')
+            plt.xscale('log')
+        else:
+            plt.xlabel('Group size')
+        plt.grid(alpha=0.25, antialiased=True)
+
+        # Return:
+        if fpath:
+            fig.savefig(fpath, dpi=300, bbox_inches='tight')
+            return self
+        else:
+            return fig
+
+    def plot_site_size(self, do_log=False, fpath=None, title='Distribution of Site Size', nx=250):
+        '''
+        nx - Number of x-axis points
+        '''
+
+        # Data:
+        data = [g.n for g in self.pop.groups.values()]
+        density = gaussian_kde(data)
+        x = np.linspace(min(data), max(data), nx)
+        density.covariance_factor = lambda: .25
+        density._compute_covariance()
+
+        # Figure:
+        fig = plt.figure(figsize=(12,2))
+        if title:
+            plt.title(title)
+        plt.plot(x, density(x), lw=1, linestyle='-', c='#666666', mfc='none', antialiased=True)  # marker='o', markersize=5
+        # plt.legend(['Susceptible', 'Exposed', 'Recovered'], loc='upper right')
+        plt.ylabel('Density')
+        if do_log:
+            plt.xlabel('Group size (log)')
+            plt.xscale('log')
+        else:
+            plt.xlabel('Group size')
+        plt.grid(alpha=0.25, antialiased=True)
+
+        # Return:
+        if fpath:
+            fig.savefig(fpath, dpi=300, bbox_inches='tight')
+            return self
+        else:
+            return fig
+
     def rem_probe(self, probe):
         self.probes.discard(probe)
         return self
@@ -1334,6 +1426,8 @@ class Simulation(object):
         return self
 
     def reset_pop(self):
+        self.run_cnt = 0
+        self.is_setup_done = False
         self.pop = GroupPopulation()
         gc.collect()
         return self
@@ -1369,10 +1463,14 @@ class Simulation(object):
         # Decode iterations/duration:
         self._inf('Setting simulation duration')
 
+        self.running.is_running = True
+        self.running.progress = 0.0
         if isinstance(iter_or_dur, int):
             self.timer.add_iter(iter_or_dur)
+            self.running.step = 1.0 / float(iter_or_dur)
         elif isinstance(iter_or_dur, str):
             self.timer.add_dur(Time.dur2ms(iter_or_dur))
+            # self.running.step = ...  # TODO
         else:
             raise ValueError(f'Number of iterations or duration must be an integer or a string: {iter_or_dur}')
 
@@ -1395,6 +1493,7 @@ class Simulation(object):
             self._inf('Running rule setup')
             self.pop.apply_rules(self.rules, 0, self.timer, is_rule_setup=True)
             self.is_setup_done = True
+
         if self.pragma.autocompact:
             self._inf('Compacting the model')
             self.compact()
@@ -1418,7 +1517,7 @@ class Simulation(object):
 
         for i in range(self.timer.get_i_left()):
             if self.pragma.live_info:
-                self._inf(f'Iteration {i+1} of {self.timer.i_max}')
+                self._inf(f'Iteration {self.timer.i + 1} of {self.timer.i_max}')
                 self._inf(f'    Group count: {self.pop.get_group_cnt()}')
             elif do_disp_t:
                 print(f't:{self.timer.get_t()}')
@@ -1426,14 +1525,18 @@ class Simulation(object):
             # Apply rules:
             self.pop.apply_rules(self.rules, self.timer.get_i(), self.timer.get_t())
             n_moved = self.pop.n_distrib_last
-            p_moved = float(n_moved) / float(self.pop.get_size())
+            pop_size = float(self.pop.get_size())
+            if pop_size > 0:
+                p_moved = float(n_moved) / pop_size
+            else:
+                p_moved = None
 
             # Run probes:
             for p in self.probes:
                 p.run(self.timer.get_i(), self.timer.get_t())
 
             # Autostop:
-            if self.pragma.autostop:
+            if self.pragma.autostop and p_moved is not None:
                 if n_moved < self.pragma.autostop_n or p_moved < self.pragma.autostop_p:
                     self.autostop_i += 1
                 else:
@@ -1452,6 +1555,7 @@ class Simulation(object):
 
             # Advance timer:
             self.timer.step()
+            self.running.progress += self.running.step
 
             # Autocompact:
             if self.pragma.autocompact:
@@ -1481,6 +1585,9 @@ class Simulation(object):
             self.compact()
 
         self._inf('Finishing simulation')
+        self.running.is_running = False
+        self.running.progress = 1.0
+        self.running.step = 1.0
 
         return self
 

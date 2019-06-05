@@ -102,39 +102,51 @@ def grp_setup(pop, group):
     ]
 
 
-(Simulation().
-    set().
-        rand_seed(1928).
-        pragma_autocompact(True).
-        pragma_live_info(True).
-        pragma_live_info_ts(False).
-        fn_group_setup(grp_setup).
-        done().
-    add().
-        rule(FluProgressRule()).
-        rule(FluLocationRule()).
-        probe(probe_flu_at(school_l, 'low-income')).  # the simulation output we care about and want monitored
-        probe(probe_flu_at(school_m, 'med-income')).  # ^
-        done().
-    db(fpath_db).
-        gen_groups(
-            tbl      = 'students',
-            attr_db  = [],
-            rel_db   = [GroupDBRelSpec(name='school', col='school_id')],
-            attr_fix = {},
-            rel_fix  = { 'home': site_home },
-            rel_at   = 'school'
-        ).
-        done()
-    run(2)
-)
+def run(iter):
+    (Simulation().
+        set().
+            rand_seed(1928).
+            pragma_autocompact(True).
+            pragma_live_info(True).
+            pragma_live_info_ts(False).
+            fn_group_setup(grp_setup).
+            done().
+        add().
+            rule(FluProgressRule()).
+            rule(FluLocationRule()).
+            probe(probe_flu_at(school_l, 'low-income')).  # the simulation output we care about and want monitored
+            probe(probe_flu_at(school_m, 'med-income')).  # ^
+            done().
+        db(fpath_db).
+            gen_groups(
+                tbl      = 'students',
+                attr_db  = [],
+                rel_db   = [GroupDBRelSpec(name='school', col='school_id')],
+                attr_fix = {},
+                rel_fix  = { 'home': site_home },
+                rel_at   = 'school'
+            ).
+            done().
+        run(iter)
+    )
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Key points
-#     Static rule analysis  - Automatically form groups based on rules
-#     Dynamic rule analysis - Alert the modeler they might have missed something
-#
-# After 100 iterations
-#     Low    income school - 24% of exposed kids
-#     Medium income school - 14% of exposed kids
+# (3) Profile:
+
+import cProfile
+import pstats
+
+# cProfile.run('run(10)', os.path.join('restats', '10-iter-01')  # 190.718 s; the original implementation (2019.05.19)
+# cProfile.run('run(10)', os.path.join('restats', '10-iter-02')  # 189.658 s; Site: self.hash = hash(self.name)
+# cProfile.run('run(10)', os.path.join('restats', '10-iter-03')  # 180.142 s; no probes
+# cProfile.run('run(10)', os.path.join('restats', '10-iter-04')  # 509.688 s; (Group.gen_hash(qry.attr, qry.rel) == g.__hash__()) in GroupPopulation.get_groups()
+# cProfile.run('run(10)', os.path.join('restats', '10-iter-05')  # 302.901 s; previous implementation
+# cProfile.run('run(10)', os.path.join('restats', '10-iter-06')  # 183.736 s; xxhash.xxh64(_).hexdigest() instead of hash(); JSON: return {'__Site__': o.__hash__()}
+# cProfile.run('run(10)', os.path.join('restats', '10-iter-07')  # 180.579 s; xxhash.xxh64(_).hexdigest() instead of hash(); JSON: return {'__Site__': o.name}
+# cProfile.run('run(10)', os.path.join('restats', '10-iter-08')  # 185.307 s; xxhash.xxh64(_).intdigest() instead of hash(); JSON: return {'__Site__': o.__hash__()}
+# cProfile.run('run(10)', os.path.join('restats', '10-iter-09')  # 187.754 s; hashlib.sha1() instead of hash(); JSON: return {'__Site__': o.__hash__()}
+# cProfile.run('run(10)', os.path.join('restats', '10-iter-10')  # 185.294 s; xxhash.xxh32(_).intdigest() instead of hash(); JSON: return {'__Site__': o.__hash__()}
+# cProfile.run('run(10)', os.path.join('restats', '10-iter-11'))
+
+# pstats.Stats(os.path.join('restats', '10-iter-11')).sort_stats('time', 'cumulative').print_stats(10)

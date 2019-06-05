@@ -15,16 +15,16 @@ class ProgressFluRule(Rule):
         super().__init__('progress-flu', t, memo)
 
     def apply(self, pop, group, iter, t):
-        # An equivalent Dynamic Bayesian net has the initial state distribution:
+        # A Dynamic Bayesian net with the initial state distribution:
         #
         #     flu: (1 0 0)
         #
         # and the transition model:
         #
-        #           S     E     R
-        #     S  0.95  0.00  0.10
-        #     E  0.05  0.50  0
-        #     R  0     0.50  0.90
+        #           s     e     r
+        #     s  0.95  0.00  0.10
+        #     e  0.05  0.50  0
+        #     r  0     0.50  0.90
 
         p = 0.05  # prob of infection
 
@@ -62,13 +62,13 @@ class ProgressFluIncomeRule(Rule):
         super().__init__('progress-flu-income', t, memo)
 
     def apply(self, pop, group, iter, t):
-        # An equivalent Dynamic Bayesian net has the initial state distribution:
+        # A Dynamic Bayesian net.
         #
+        # Initial state distribution:
         #     flu: (1 0 0)
         #     income: (0.5 0.5)
         #
-        # and the transition model:
-        #
+        # Transition model:
         #                 L                    M
         #           S     E     R        S     E     R
         #     S  0.90  0.00  0.20     0.95  0.00  0.10
@@ -137,7 +137,7 @@ class ProgressFluIncomeRule(Rule):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def sim01():
+def sim01(iter_cnt):
     sim = (
         Simulation().
         add([
@@ -145,13 +145,14 @@ def sim01():
             GroupSizeProbe.by_attr('flu', 'flu', ['s', 'e', 'r'], msg_mode=ProbeMsgMode.CUMUL),
             Group(n=1000)
         ]).
-        run(36)
+        run(iter_cnt)
     )
     print(sim.probes[0].get_msg())
+    print()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def sim02():
+def sim02(iter_cnt):
     sim = (
         Simulation().
         add([
@@ -160,13 +161,14 @@ def sim02():
             Group(n=500, attr={ 'income': 'l' }),
             Group(n=500, attr={ 'income': 'm' })
         ]).
-        run(36)
+        run(iter_cnt)
     )
     print(sim.probes[0].get_msg())
+    print()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def sim03():
+def sim03(iter_cnt):
     sim = (
         Simulation().
         add([
@@ -186,12 +188,15 @@ def sim03():
             Group(n=500, attr={ 'income': 'l' }),
             Group(n=500, attr={ 'income': 'm' })
         ]).
-        run(36)
+        run(iter_cnt)
     )
     print(sim.probes[0].get_msg())
+    print()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-sim01()
-sim02()
-sim03()
+iter_cnt = 36
+
+sim01(iter_cnt)
+sim02(iter_cnt)
+sim03(iter_cnt)

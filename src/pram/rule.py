@@ -9,6 +9,12 @@ from scipy.stats import lognorm, rv_discrete
 from .entity import GroupQry, GroupSplitSpec, Site
 from .util   import Err, Time as TimeU
 
+# from enum        import IntEnum
+# A = IntEnum('State', 'S E I R')
+# print(list(A))
+# b = [member.value for name, member in A.__members__.items()]
+# print(b)
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 @attrs(slots=True)
@@ -46,6 +52,7 @@ class Rule(ABC):
 
     T_UNIT_MS = TimeU.MS.h
     NAME = 'Rule'
+    ATTRS = {}  # a dict of attribute names as keys and the list of their values as values
 
     pop = None
     compile_spec = None
@@ -144,6 +151,42 @@ class Rule(ABC):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+class MCRule(Rule):
+    '''
+    Time-homogenous Markov chain with finite state space.
+
+    The following example transition model for the variabled named X:
+
+                   x_1^t   x_2^t
+        x_1^{t+1}    0.1     0.3
+        x_2^{t+1}    0.9     0.7
+
+    Should be specified as:
+
+        { 'x1': [0.1, 0.9], 'x2': [0.3, 0.7] }
+    '''
+
+    def __init__(self, var, tm, name='markov-chain', t=TimeAlways(), memo=None):
+        super().__init__(name, t, memo)
+
+        if sum([i for x in list(tm.values()) for i in x]) != float(len(tm)):
+            raise ValueError(f"'{self.__class__.__name__}' class: Probabilities in the transition model must add up to 1")
+
+        self.var = var
+        self.tm = tm
+        self.states = list(self.tm.keys())  # simplify and speed-up lookup in apply()
+
+    def apply(self, pop, group, iter, t):
+        tm = self.tm.get(group.get_attr(self.var))
+        if tm is None:
+            raise ValueError(f"'{self.__class__.__name__}' class: Unknown state '{group.get_attr(self.var)}' for attribute '{self.var}'")
+        return [GroupSplitSpec(p=tm[i], attr_set={ self.var: self.states[i] }) for i in range(len(self.states)) if tm[i] > 0]
+
+    def is_applicable(self, group, iter, t):
+        return super().is_applicable(group, iter, t) and group.has_attr([ self.var ])
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class SEIRRule(Rule, ABC):
     '''
     The SEIR compartmental epidemiological model.
@@ -164,8 +207,11 @@ class SEIRRule(Rule, ABC):
     State = IntEnum('State', 'S E I R')
 
     ATTR = 'seir-state'
+
     T_UNIT_MS = TimeU.MS.d
     NAME = 'SEIR model'
+    ATTRS = { ATTR: [member.value for name, member in State.__members__.items()] }
+
 
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, name='seir', t=TimeAlways(), susceptibility=1.0, p_start_E=0.05, do_clean=True, name_human=None, memo=None):
@@ -559,11 +605,11 @@ class RuleAnalyzerTestRule(Rule):
     def rn(self, s): return f's{s}'  # relation  name
 
     def apply(self, group, iter, t):
-        if group.has_attr({ 'flu-stage': AttrFluStage.NO }):
+        if group.has_attr({ 'flu-stage': 's' }):
             pass
-        elif group.has_attr({ 'flu-stage': AttrFluStage.ASYMPT }):
+        elif group.has_attr({ 'flu-stage': 'i' }):
             pass
-        elif group.has_attr({ 'flu-stage': AttrFluStage.SYMPT }):
+        elif group.has_attr({ 'flu-stage': 'r' }):
             pass
 
     def is_applicable(self, group, iter, t):
@@ -590,6 +636,7 @@ class SimpleFluProgressRule(Rule):
     Describes how a population transitions between the flu states of susceptible, exposed, and recovered.
     '''
 
+    ATTRS = { 'flu': [ 's', 'e', 'r' ] }
     NAME = 'Simple flu progression model'
 
     def __init__(self, t=TimeAlways(), name_human=None, memo=None):
@@ -610,11 +657,10 @@ class SimpleFluProgressRule(Rule):
             ]
 
         # Exposed:
-        if group.has_attr({ 'flu': 'e' }):
+        if group.has_attr({ 'flu': 'i' }):
             return [
                 GroupSplitSpec(p=0.2, attr_set={ 'flu': 'r' }),
-                GroupSplitSpec(p=0.5, attr_set={ 'flu': 'e' }),
-                GroupSplitSpec(p=0.3, attr_set={ 'flu': 'e' })
+                GroupSplitSpec(p=0.8, attr_set={ 'flu': 'e' }),
             ]
 
         # Recovered:
@@ -685,6 +731,7 @@ class SimpleFluLocationRule(Rule):
     Describes how student population changes location conditional upon being exposed to the flu.
     '''
 
+    ATTRS = { 'flu': [ 's', 'e', 'r' ], 'income': ['l', 'm'] }
     NAME = 'Simple flu location model'
 
     def __init__(self, t=TimeAlways(), name_human=None, memo=None):

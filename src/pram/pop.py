@@ -184,8 +184,8 @@ class GroupPopulation(object):
 
     def get_groups(self, qry=None):
         '''
-        Returns a list of groups that contain the specified attributes and relation.  Both those dictionaries
-        could be empty, in which case all groups would be returned.
+        Returns a list of groups that contain the attributes and relations specified in the query.  If the query is
+        None, all groups are returned.
 
         qry: GroupQry
         '''
