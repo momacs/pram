@@ -1,3 +1,5 @@
+# https://docs.celeryproject.org/en/latest/userguide/configuration.html
+
 import os
 
 class DevConfig():
@@ -9,6 +11,9 @@ class DevConfig():
     # PERMANENT_SESSION_LIFETIME = timedelta(days=31) (2678400 seconds)
     CELERY_BROKER_URL = 'redis://localhost:6379/0'
     CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+    CELERY_TASK_SERIALIZER = 'pickle'
+    CELERY_RESULT_SERIALIZER = 'pickle'
+    CELERY_ACCEPT_CONTENT = ['pickle']
 
 class ProdConfig():
     SECRET_KEY = os.urandom(24)
@@ -17,3 +22,6 @@ class ProdConfig():
     SESSION_COOKIE_NAME = 'pram'
     CELERY_BROKER_URL = 'redis://localhost:6379/0'
     CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+    CELERY_TASK_SERIALIZER = 'pickle'
+    CELERY_RESULT_SERIALIZER = 'pickle'
+    CELERY_ACCEPT_CONTENT = ['pickle']

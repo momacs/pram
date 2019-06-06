@@ -20,7 +20,7 @@
 
     <style type="text/css">
         body  { -webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; cursor: pointer; }
-        div,span,td,p,input  { cursor: pointer; }
+        div,span,table,tbody,th,td,input,button,select,label,p,a,b,i  { cursor: pointer; }
         #server-load-avg    { font-weight: bold; }
         #btn-sim-flu-reset  { margin-right: 40px; }
         #sim-flu-out        { _overflow-y: scroll; _max-height: 300px; _padding: 4px 8px 4px 8px; font: 1em courier; _border: 1px solid #eee; background: #fafafa; white-space: pre; }
@@ -30,11 +30,10 @@
         #tbl-db-tbl th:nth-child(2)  { width: 80px; padding-left: 10px; padding-right: 10px; }
         #tbl-db-tbl td:nth-child(1)  { width: 80px; padding-left: 10px; padding-right: 10px; }
         #tbl-db-tbl td:nth-child(2)  { width: 80px; padding-left: 10px; padding-right: 10px; }
-        #tbl-db-tbl td:nth-child(3)  { width: 80px; padding-left: 10px; padding-right: 10px; }
-        _#tbl-db-tbl td:nth-child(4)  { width: 80px; padding-left: 10px; padding-right: 10px; }
-        _#tbl-db-tbl td:nth-child(5)  { width: 80px; padding-left: 10px; padding-right: 10px; }
+        #tbl-db-tbl td:nth-child(3)  { width: 80px; padding-left: 10px; padding-right: 10px; text-align: right; }
         input[type=checkbox]  { vertical-align: bottom; }
-        ode  { font: 0.9em courier monospace; _font-smooth: always; _-webkit-font-smoothing: auto; _-moz-osx-font-smoothing: auto; }
+        pre.stdout  { font-size: 0.9em; font-family: Consolas, Menlo, "Courier New", monospace; border-top: 1px solid #dddddd; padding-top: 4px; }
+        code        { font-size: 0.9em; font-family: Consolas, Menlo, "Courier New", monospace; font-smooth: always; -webkit-font-smoothing: auto; -moz-osx-font-smoothing: auto; }
     </style>
 
     <!-- <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script> -->
@@ -66,7 +65,11 @@
                         tblAttr: new Map(),
                         tblRel: new Map()
                     },
-                    rule: null
+                    rule: null,
+                    ui: {
+                        divOutSimStdout: null,
+                        dropdownSimPopInfIdx: 0
+                    }
                 },
                 server: null
             }
@@ -85,6 +88,8 @@
         var ui = {
             btnUserRootInnerHTML: 'person_add',
             btnUserUserInnerHTML: 'person',
+
+            dropdownSimPopInf: [ 'No info', 'Group size distribution', 'Group size distribution (log scale)' ],
 
             iconSimRul: 'functions',
             iconSimPop: 'people',
@@ -112,13 +117,21 @@
             return el;
         }
 
-        function do_server(url, method, cb, data=null) {
+        function do_server(url, method, cb, data=null, doForceCb=false) {
+            /**
+             * Normally, the callback function 'cb' is called when 'data.res == true'.  However, the callback call can
+             * be forced with 'doForceCb=true'.
+             */
             if (data != null) data = JSON.stringify(data);
             fetch(url, { method: method, cache: 'no-cache', headers: { 'Content-Type': 'application/json' }, body: data }).
             then(res => res.json()).
             then(data => {
-                if (data.res) cb(data);
-                else M.toast({ html: data.err });  // classes: 'red darken-1'
+                if (data.res || doForceCb) {
+                    cb(data);
+                }
+                else {
+                    if (data.err) M.toast({ html: data.err });  // classes: 'red darken-1'
+                }
             });
         }
 
@@ -177,6 +190,7 @@
         // -------------------------------------------------------------------------------------------------------------
 
         function usrGetSess() {
+            do_server({{ url_for('sim_flu_ac_status')|tojson }}, 'GET', (data) => {  // TODO: Remove later
             do_server({{ url_for('usr_get_sess')|tojson }}, 'GET', (data) => {
                app.state.server = data.state;
 
@@ -185,6 +199,7 @@
                uiInitProbes();
                uiInitSim();
                uiInitOutput();
+            });
             });
         }
 
@@ -255,8 +270,8 @@
                 $('#row-pop-db-tbl').hide();
                 $('#row-pop-db-ctl').hide();
                 $('#dropdown-db-lbl').html(name);
-                $('#btn-db-tbl-ncol').html('');
-                $('#btn-db-tbl-nrow').html('');
+                $('#btn-db-tbl-ncol').empty();
+                $('#btn-db-tbl-nrow').empty();
 
                 app.dbSchema = data.schema;
                 for (let i = 0; i < app.dbSchema.length; i++) {
@@ -283,8 +298,8 @@
             $('#tbl-db-tbl-body').empty();
             $('#row-pop-db-tbl').show();
             $('#row-pop-db-ctl').show();
-            $('#btn-db-tbl-ncol').html(`Col: <b>${tbl.cols.length}</b>`);
-            $('#btn-db-tbl-nrow').html(`Row: <b>${tbl.rowCnt}</b>`);
+            $('#btn-db-tbl-ncol').html(`Col: <b>${tbl.cols.length.toLocaleString()}</b>`);
+            $('#btn-db-tbl-nrow').html(`Row: <b>${tbl.rowCnt.toLocaleString()}</b>`);
 
             for (let i = 0; i < tbl.cols.length; i++) {
                 let col = tbl.cols[i];
@@ -292,19 +307,16 @@
                 let matchAttr = utilDoFuzzyMatch(app.state.server.simFluAC.rules.analysis.static.attr.used, col.name);
                 let matchRel  = utilDoFuzzyMatch(app.state.server.simFluAC.rules.analysis.static.rel.used,  col.name);
 
-                let badgesAttr = matchAttr .map((i) => uiGenBadgeRule(i.item, i.score.toPrecision(2))).join('');
-                let badgesRel  = matchRel  .map((i) => uiGenBadgeRule(i.item, i.score.toPrecision(2))).join('');
-
-                // if (matchAttr .length > 0) app.state.client.db.tblAttr[col.name] = true;
-                // if (matchRel  .length > 0) app.state.client.db.tblRel [col.name] = true;
+                let badgesAttr = matchAttr .map((i) => uiGenBadgeRule(i.item, ` &nbsp;${i.score.toPrecision(2)}`)).join('');
+                let badgesRel  = matchRel  .map((i) => uiGenBadgeRule(i.item, ` &nbsp;${i.score.toPrecision(2)}`)).join('');
 
                 let tr   = $('<tr>').appendTo($('#tbl-db-tbl-body'));
-                let td01 = $('<td>').appendTo(tr).html(col.name);                // name
-                let td02 = $('<td>').appendTo(tr).html(col.type.toLowerCase());  // type
-                let td03 = $('<td>').appendTo(tr).html(col.valCnt);              // distinct value count
-                let td04 = $('<td>').appendTo(tr);                               // attribute
-                let td05 = $('<td>').appendTo(tr);                               // relation
-                let td06 = $('<td>').appendTo(tr);                               // relation name
+                let td01 = $('<td>').appendTo(tr).html(`<b>${col.name}</b>`);         // name
+                let td02 = $('<td>').appendTo(tr).html(col.type.toLowerCase());       // type
+                let td03 = $('<td>').appendTo(tr).html(col.valCnt.toLocaleString());  // distinct value count
+                let td04 = $('<td>').appendTo(tr);                                    // attribute
+                let td05 = $('<td>').appendTo(tr);                                    // relation
+                let td06 = $('<td>').appendTo(tr);                                    // relation name
 
                 let chBox04lbl = $('<label>').appendTo(td04);
                 let chBox05lbl = $('<label>').appendTo(td05);
@@ -357,13 +369,6 @@
         }
 
         function dbTblGen() {
-            // let rel_db = [];
-            // app.state.client.db.tblRel.forEach((v,k,m) => {
-            //     console.log(v.txtBox.val());
-            //     rel_db.push({ name: v.txtBox.val(), col: v.col });
-            // });
-            // rel_db = [...app.state.client.db.tblRel.values()].map((i) => { return { name: i.txtBox.val(), col: i.col }; });
-
             let isRelOk = [...app.state.client.db.tblRel.values()].map((i) => i.txtBox.val().length).reduce((acc,i) => acc && (i > 0), true);
             if (!isRelOk) {
                 return M.toast({ html: 'At least one relation name is empty' });
@@ -373,7 +378,6 @@
                 'db'      : app.state.client.db.name,
                 'tbl'     : app.state.client.db.tbl.name,
                 'attr_db' : [...app.state.client.db.tblAttr.values()],
-                // 'rel_db'  : [...app.state.client.db.tblRel.values()]
                 'rel_db'  : [...app.state.client.db.tblRel.values()].map((i) => { return { name: i.txtBox.val(), col: i.col }; })
             };
 
@@ -381,6 +385,7 @@
                 app.state.server.simFluAC.pop = data.pop;
                 uiInitSim();
                 M.toast({ html: 'Population has been generated', classes: 'amber accent-3' });
+                uiSetStdout(data.stdout);
             }, data);
         }
 
@@ -398,6 +403,8 @@
                 if (app.state.client.db.tblIdx >= 0) {
                     dbTblSet(app.state.client.db.tblIdx);
                 }
+
+                uiSetStdout(data.stdout);
             }, { cls: app.state.client.rule.cls });
         }
 
@@ -445,13 +452,41 @@
 
 
         // -------------------------------------------------------------------------------------------------------------
+        // ----[ PROBES ]-----------------------------------------------------------------------------------------------
+        // -------------------------------------------------------------------------------------------------------------
+
+        // ...
+
+        // -------------------------------------------------------------------------------------------------------------
         // ----[ SIM: FLU ALLEGHENY COUNTY ]----------------------------------------------------------------------------
         // -------------------------------------------------------------------------------------------------------------
+
+        function simFluACClearStdOut() {
+            $('#row-out-stdout').empty();
+        }
+
+        function simFluACClearTS() {
+            $('#row-out-ts').empty();
+        }
+
+        function simFluACPopSetInf(idx) {
+            $('#dropdown-sim-pop-inf-lbl').html(ui.dropdownSimPopInf[idx]);
+
+            switch (idx) {
+                case 0 : $('#row-sim-pop-inf') .html(''); break;
+                case 1 : $('#row-sim-pop-inf') .html('<img src="{{ url_for('sim_flu_ac_plot_group_size')     }}" />'); break;
+                case 2 : $('#row-sim-pop-inf') .html('<img src="{{ url_for('sim_flu_ac_plot_group_size_log') }}" />'); break;
+            }
+
+            app.state.client.ui.dropdownSimPopInfIdx = idx;
+        }
 
         function simFluACReset() {
             do_server({{ url_for('sim_flu_ac_reset')|tojson }}, 'GET', (data) => {
                 app.state.server.simFluAC = data.state;
+                app.state.server.stdout   = data.stdout;
                 uiInitSim();
+                uiInitOutput();
                 M.toast({ html: 'Simulation has been reset', classes: 'teal accent-4' });
 
                 if (app.state.client.db.tblIdx >= 0) {
@@ -464,7 +499,7 @@
             do_server({{ url_for('sim_flu_ac_reset_pop')|tojson }}, 'GET', (data) => {
                 app.state.server.simFluAC = data.state;
                 uiInitSim();
-                M.toast({ html: 'Population has been reset', classes: 'teal accent-4' });
+                M.toast({ html: 'Population has been cleared', classes: 'teal accent-4' });
             });
         }
 
@@ -472,7 +507,7 @@
             do_server({{ url_for('sim_flu_ac_reset_probes')|tojson }}, 'GET', (data) => {
                 app.state.server.simFluAC = data.state;
                 uiInitSim();
-                M.toast({ html: 'Probes have been reset', classes: 'teal accent-4' });
+                M.toast({ html: 'Probes have been cleared', classes: 'teal accent-4' });
             });
         }
 
@@ -480,7 +515,7 @@
             do_server({{ url_for('sim_flu_ac_reset_rules')|tojson }}, 'GET', (data) => {
                 app.state.server.simFluAC = data.state;
                 uiInitSim();
-                M.toast({ html: 'Rules have been reset', classes: 'teal accent-4' });
+                M.toast({ html: 'Rules have been cleared', classes: 'teal accent-4' });
 
                 if (app.state.client.db.tblIdx >= 0) {
                     dbTblSet(app.state.client.db.tblIdx);
@@ -495,36 +530,59 @@
             }, { name: name, value: value });
         }
 
-        function simFluACRun() {
-            do_server({{ url_for('sim_flu_ac_run')|tojson }}, 'POST', (data) => {
-                $('#btn-sim-flu-ac-stop').css('background', 'linear-gradient(90deg, #ff0000 0%, #ffbdbd 0%)');
-                $('#btn-sim-flu-ac-run').hide();
-                $('#btn-sim-flu-ac-stop').show();
+        function simFluACRun(iter) {
+            $('#btn-sim-run-1')  .addClass('disabled');
+            $('#btn-sim-run-5')  .addClass('disabled');
+            $('#btn-sim-run-10') .addClass('disabled');
+            $('#btn-sim-reset')  .addClass('disabled');
 
-                window.setTimeout(simFluAStatus, simUpdWait);
-            });
+            $('#btn-sim-stop').removeClass('disabled');
+            $('#btn-sim-stop').css('background', 'linear-gradient(90deg, #ff0000 0%, #ffbdbd 0%)');
+
+            do_server({{ url_for('sim_flu_ac_run')|tojson }}, 'POST', (data) => {
+                // app.state.client.ui.divOutSimStdout = uiSetStdout('');
+
+                window.setTimeout(simFluACStatus, simUpdWait);
+            }, { iter: iter });
         }
 
         function simFluACStatus() {
             do_server({{ url_for('sim_flu_ac_status')|tojson }}, 'GET', (data) => {
-                if (data.isRunning) {
-                    $('#btn-sim-flu-ac-run').hide();
-                    $('#btn-sim-flu-ac-stop').show();
+                console.log(data);
+                if (data.isDone) {
+                    app.state.client.ui.divOutSimStdout = null;
 
-                    let p = Math.round(data.p * 100);
-                    $('#btn-sim-flu-ac-stop').css('background', 'linear-gradient(90deg, #ff0000 ' + p + '%, #ffbdbd ' + p + '%)');
-                    window.setTimeout(simFluAStatus, simUpdWait);
+                    $('#btn-sim-run-1')  .removeClass('disabled');
+                    $('#btn-sim-run-5')  .removeClass('disabled');
+                    $('#btn-sim-run-10') .removeClass('disabled');
+                    $('#btn-sim-reset')  .removeClass('disabled');
+
+                    $('#btn-sim-stop').addClass('disabled').css('background', '');
+
+                    app.state.server.simFluAC = data.state;
+                    app.state.server.stdout   = data.stdout;
+                    uiInitSim();
+                    uiInitOutput();
                 }
-                else {
-                    $('#btn-sim-flu-ac-stop').hide();
-                    $('#btn-sim-flu-ac-run').show();
+                else if (data.isRunning) {
+                    // if (data.stdout) {
+                    //     app.state.client.ui.divOutSimStdout.html(data.stdout);
+                    // }
+
+                    // let p = Math.round(data.p * 100);
+                    // $('#btn-sim-stop').css('background', 'linear-gradient(90deg, #ff0000 ' + p + '%, #ffbdbd ' + p + '%)');
+                    // window.setTimeout(simFluACStatus, simUpdWait);
+
+                    $('#btn-sim-stop').css('background', `linear-gradient(90deg, #ff0000 ${data.progress * 100}%, #ffbdbd ${data.progress * 100}%)`);
+                    window.setTimeout(simFluACStatus, simUpdWait);
                 }
-            });
+            }, null, true);
         }
 
         function simFluACStop() {
             do_server({{ url_for('sim_flu_ac_stop')|tojson }}, 'GET', (data) => {
-                window.setTimeout(simFluAStatus, simUpdWait);
+                app.state.client.ui.divOutSimStdout = null;
+                window.setTimeout(simFluACStatus, simUpdWait);
             });
         }
 
@@ -532,12 +590,6 @@
         // -------------------------------------------------------------------------------------------------------------
         // ----[ SIM: FLU ]---------------------------------------------------------------------------------------------
         // -------------------------------------------------------------------------------------------------------------
-
-        function simFluReset() {
-            do_server({{ url_for('sim_flu_reset')|tojson }}, 'GET', (data) => {
-                $('#sim-flu-out').empty();
-            });
-        }
 
         function simFluRun(iterN) {
             let fd = new FormData();
@@ -592,11 +644,25 @@
         // ----[ UI ]---------------------------------------------------------------------------------------------------
         // -------------------------------------------------------------------------------------------------------------
 
+        function uiSetStdout(arr) {
+            if (!arr) return;
+            $('#row-out-stdout').empty();
+            arr.filter(i => i.length > 0).reverse().forEach(i => $('#row-out-stdout').append($('<pre>').addClass('stdout').html(i)));
+        }
+
+        function uiAppendStdout(s) {
+            if (!s) return;
+            let div = $('<pre>').addClass('stdout').html(s);
+            $('#row-out-stdout').append(div);
+            return div;
+        }
+
         function uiGenBadgeRule(value='', caption='') {
             return `<span class="new badge deep-purple lighten-2 left" data-badge-caption="${caption}" style="margin-right: 4px; padding-left: 10px; padding-right: 10px; font-weight: bold;">${value}</span>`;
         }
 
         function uiInitOutput() {
+            uiSetStdout(app.state.server.stdout);
         }
 
         function uiInitPop() {
@@ -611,30 +677,53 @@
         }
 
         function uiInitSim() {
-            // (1) Pragmas:
-            $('#chbox-sim-pragma-autocompact')  .prop('checked', app.state.server.simFluAC.sim.pragma.autocompact);
-            $('#chbox-sim-pragma-autostop')     .prop('checked', app.state.server.simFluAC.sim.pragma.autostop);
-            $('#chbox-sim-pragma-live-info')    .prop('checked', app.state.server.simFluAC.sim.pragma.live_info);
-            $('#chbox-sim-pragma-live-info-ts') .prop('checked', app.state.server.simFluAC.sim.pragma.live_info_ts);
+            // (1) Control:
+            $('#btn-sim-run-cnt')  .html(`Runs: <b>${app.state.server.simFluAC.sim.runCnt}</b>`)
+            $('#btn-sim-iter-cnt') .html(`Iterations: <b>${app.state.server.simFluAC.sim.timer.iter}</b>`)
+
+            if (app.state.server.simFluAC.rules.ls.length == 0 || app.state.server.simFluAC.pop.groupCnt == 0 || app.state.server.simFluAC.sim.isRunning) {
+                $('#btn-sim-run-1')  .addClass('disabled');
+                $('#btn-sim-run-5')  .addClass('disabled');
+                $('#btn-sim-run-10') .addClass('disabled');
+            }
+            else {
+                $('#btn-sim-run-1')  .removeClass('disabled');
+                $('#btn-sim-run-5')  .removeClass('disabled');
+                $('#btn-sim-run-10') .removeClass('disabled');
+            }
 
             // (2) Rules:
             if (app.state.server.simFluAC.rules.ls.length == 0) {
                 $('#row-sim-rules-inf').html('No rules');
             }
             else {
-                let ruleLst = '<ul><li><b>' + app.state.server.simFluAC.rules.ls.map((i) => i.name).join('</b></li><li><b>') + '</b></li></ul>';
-                let badgesAttr = app.state.server.simFluAC.rules.analysis.static.attr.used.map((i) => uiGenBadgeRule('ATTR: ', i)).join('');
-                let badgesRel  = app.state.server.simFluAC.rules.analysis.static.rel .used.map((i) => uiGenBadgeRule('REL: ', i)).join('');
+                // let ruleLst = '<ol><li><b>' + app.state.server.simFluAC.rules.ls.map((i) => i.name).join('</b></li><li><b>') + '</b></li></ol>';
+                let ruleLst = app.state.server.simFluAC.rules.ls.map((i) => { return `<a id="btn-sim-rules-reset" class="waves-effect waves-light btn disabled" style="margin-right: 10px;">${i.name}</a>`; }).join('');
+                let badgesAttr = app.state.server.simFluAC.rules.analysis.static.attr.used.map((i) => uiGenBadgeRule('', i)).join('');
+                let badgesRel  = app.state.server.simFluAC.rules.analysis.static.rel .used.map((i) => uiGenBadgeRule('', i)).join('');
 
-                $('#row-sim-rules-inf').html(ruleLst + '<br />' + badgesAttr + badgesRel);
+                $('#row-sim-rules-inf').html(
+                    ruleLst + '<br /><br />' +
+                    '<span class="col" style="width: 85px;"><b>Attributes:</b></span>' +
+                    '<span class="col">' + badgesAttr + '</span>' +
+                    '<span class="col" style="width: 80px;"><b>Relations:</b></span>' +
+                    '<span class="col">' + badgesRel + "</span>" +
+                    '</div>'
+                );
             }
 
             // (3) Population:
-            if (app.state.server.simFluAC.pop.agentCnt == 0 && app.state.server.simFluAC.pop.groupCnt == 0 && app.state.server.simFluAC.pop.siteCnt == 0) {
-                $('#row-sim-pop-inf').html('No population');
+            $('#btn-sim-pop-agents') .html(`Agents: <b>${app.state.server.simFluAC.pop.agentCnt .toLocaleString()}</b>`);
+            $('#btn-sim-pop-groups') .html(`Groups: <b>${app.state.server.simFluAC.pop.groupCnt .toLocaleString()}</b>`);
+            $('#btn-sim-pop-sites')  .html(`Sites:  <b>${app.state.server.simFluAC.pop.siteCnt  .toLocaleString()}</b>`);
+
+            if (app.state.server.simFluAC.pop.agentCnt > 0 || app.state.server.simFluAC.pop.groupCnt > 0 || app.state.server.simFluAC.pop.siteCnt > 0) {
+                $('#dropdown-sim-pop-inf-trigger').removeClass('disabled');
+                simFluACPopSetInf(app.state.client.ui.dropdownSimPopInfIdx);
             }
             else {
-                $('#row-sim-pop-inf').html(`Agents: <b>${app.state.server.simFluAC.pop.agentCnt}</b><br />Groups: <b>${app.state.server.simFluAC.pop.groupCnt}</b><br />Sites: <b>${app.state.server.simFluAC.pop.siteCnt}</b><br />`);
+                $('#row-sim-pop-inf').empty();
+                $('#dropdown-sim-pop-inf-trigger').addClass('disabled');
             }
 
             // (4) Probes:
@@ -642,9 +731,15 @@
                 $('#row-sim-probes-inf').html('No probes');
             }
             else {
+                // $('#row-sim-probes-inf').html('<ul><li><b>' + app.state.server.simFluAC.probes.ls.map((i) => i.name).join('</b></li><li><b>') + '</b></li></ul>');
+                $('#row-sim-probes-inf').html(app.state.server.simFluAC.probes.ls.map((i) => { return `<a id="btn-sim-rules-reset" class="waves-effect waves-light btn disabled" style="margin-right: 10px;">${i.name}</a>`; }).join(''));
             }
 
-            // (5) control:
+            // (5) Settings:
+            $('#chbox-sim-pragma-autocompact')  .prop('checked', app.state.server.simFluAC.sim.pragma.autocompact);
+            $('#chbox-sim-pragma-autostop')     .prop('checked', app.state.server.simFluAC.sim.pragma.autostop);
+            $('#chbox-sim-pragma-live-info')    .prop('checked', app.state.server.simFluAC.sim.pragma.live_info);
+            $('#chbox-sim-pragma-live-info-ts') .prop('checked', app.state.server.simFluAC.sim.pragma.live_info_ts);
         }
 
 
@@ -675,8 +770,11 @@
             // (1.4) Probes section:
 
             // (1.5) Simulation section:
-            // $('#btn-sim-flu-ac-run')  .click(simFluACRun);
-            // $('#btn-sim-flu-ac-stop') .click(simFluACStop);
+            $('#btn-sim-run-1')  .click(() => simFluACRun(1));
+            $('#btn-sim-run-5')  .click(() => simFluACRun(5));
+            $('#btn-sim-run-10') .click(() => simFluACRun(10));
+
+            $('#btn-sim-stop') .click(simFluACStop).addClass('disabled');
 
             $('#btn-sim-reset').click(simFluACReset);
 
@@ -684,18 +782,18 @@
             $('#btn-sim-pop-reset')    .click(simFluACResetPop);
             $('#btn-sim-probes-reset') .click(simFluACResetProbes);
 
+            $('#dropdown-sim-pop-inf-trigger-0') .click(() => simFluACPopSetInf(0));
+            $('#dropdown-sim-pop-inf-trigger-1') .click(() => simFluACPopSetInf(1));
+            $('#dropdown-sim-pop-inf-trigger-2') .click(() => simFluACPopSetInf(2));
+
             $('#chbox-sim-pragma-autostop')     .change((e) => simFluACSetPragma('autostop',     $(e.target).is(':checked')));
             $('#chbox-sim-pragma-autocompact')  .change((e) => simFluACSetPragma('autocompact',  $(e.target).is(':checked')));
             $('#chbox-sim-pragma-live-info')    .change((e) => simFluACSetPragma('live_info',    $(e.target).is(':checked')));
             $('#chbox-sim-pragma-live-info-ts') .change((e) => simFluACSetPragma('live_info_ts', $(e.target).is(':checked')));
 
             // (1.6) Output section:
-
-            // (1.7) Misc:
-            // $('#btn-sim-flu-reset')   .click(simFluReset);
-            // $('#btn-sim-flu-run-1')   .click(() => simFluRun(1));
-            // $('#btn-sim-flu-run-5')   .click(() => simFluRun(5));
-            // $('#btn-sim-flu-run-10')  .click(() => simFluRun(10));
+            $('#btn-out-ts-clear')     .click(simFluACClearTS);
+            $('#btn-out-stdout-clear') .click(simFluACClearStdOut);
 
             $('#btn-sim-test-run')    .click(simTestRun);
             $('#btn-sim-test-stop')   .click(simTestStop);
@@ -724,14 +822,14 @@
             // (3.4) Probes section:
 
             // (3.5) Simulation section:
-            $('#btn-sim-flu-ac-run')  .show();
-            $('#btn-sim-flu-ac-stop') .hide();
+            // $('#row-sim-pop-inf-grp-size')     .hide();
+            // $('#row-sim-pop-inf-grp-size-log') .hide();
 
             // (3.6) Output section:
 
             // (3.7) Misc:
-            $('#btn-sim-test-run')  .show();
-            $('#btn-sim-test-stop') .hide();
+            // $('#btn-sim-test-run')  .show();
+            // $('#btn-sim-test-stop') .hide();
 
             // (4) Sync the UI with the server:
             usrGetSess();
@@ -771,6 +869,7 @@
                 <div class="collapsible-header"><i class="material-icons icon-sim-rul"><script>document.write(ui.iconSimRul)</script></i><b>Rules</b></div>
                 <div class="collapsible-body">
                     <div class="row">
+                        <!-- Lists and controls -->
                         <div class="col s12">
                             <ul id="dropdown-rule-ls" class="dropdown-content"></ul>
                             <a id="dropdown-rule-ls-trigger" class="btn dropdown-trigger" href="#" data-target="dropdown-rule-ls"><span id="dropdown-rule-ls-lbl">---</span><i class="material-icons right">arrow_drop_down</i></a>
@@ -787,6 +886,7 @@
                         </div>
                     </div>
 
+                    <!-- Info -->
                     <div id="row-rul-docstr" class="row">
                         <div class="card">
                             <div id="row-rul-docstr-card" class="card-content"></div>
@@ -798,9 +898,10 @@
             </li>
 
             <!-- Population -->
-            <li class="active">
+            <li class="_active">
                 <div class="collapsible-header"><i class="material-icons icon-sim-pop"><script>document.write(ui.iconSimPop)</script></i><b>Population</b></div>
                 <div class="collapsible-body">
+                    <!-- Lists and controls -->
                     <div class="row">
                         <div class="col s12">
                             <ul id="dropdown-db"          class="dropdown-content"></ul> <a id="dropdown-db-trigger"          class="btn dropdown-trigger"          href="#" data-target="dropdown-db"         ><span id="dropdown-db-lbl"         >---   </span><i class="material-icons right">arrow_drop_down</i></a>
@@ -814,6 +915,7 @@
                         </div>
                     </div>
 
+                    <!-- Table -->
                     <div id="row-pop-db-tbl" class="row">
                         <div class="col s8">
                             <table id="tbl-db-tbl" class="responsive-table z-depth-1">
@@ -849,40 +951,59 @@
                 <div class="collapsible-header"><i class="material-icons icon-sim-sim"><script>document.write(ui.iconSimSim)</script></i><b>Simulation</b></div>
                 <div class="collapsible-body">
                     <div class="row">
+                        <!-- Tabs -->
                         <div class="col s12" style="padding: 0px;">
                             <ul class="tabs z-depth-1">
-                                <li class="tab col s1"><a href="#tab-sim-ctl">Control</a></li>
-                                <li class="tab col s1"><a href="#tab-sim-rules">Rules</a></li>
-                                <li class="tab col s1"><a href="#tab-sim-pop">Population</a></li>
-                                <li class="tab col s1"><a href="#tab-sim-probes">Probes</a></li>
-                                <li class="tab col s1"><a href="#tab-sim-pragma">Settings</a></li>
+                                <li class="tab col"><a href="#tab-sim-ctl" class="active">Control</a></li>
+                                <li class="tab col"><a href="#tab-sim-rules">Rules</a></li>
+                                <li class="tab col"><a href="#tab-sim-pop">Population</a></li>
+                                <li class="tab col"><a href="#tab-sim-probes">Probes</a></li>
+                                <li class="tab col"><a href="#tab-sim-pragma">Settings</a></li>
                             </ul>
                         </div>
 
                         <!-- Tab: Control -->
                         <div id="tab-sim-ctl" class="col s12" style="padding-top: 10px;">
                             <div class="row">
-                                <button id="btn-sim-flu-ac-run"  class="btn waves-effect waves-light amber accent-3"><span>Run</span> <i class="material-icons right">play_circle_filled</i></button>
-                                <button id="btn-sim-flu-ac-stop" class="btn waves-effect waves-light red"><span>Stop</span><i class="material-icons right">stop</i></button>
-                                <button id="btn-sim-reset"       class="btn waves-effect waves-light teal accent-4" style="margin-left: 40px;">Reset the simulation<i class="material-icons right">cached</i></button>
+                                <button id="btn-sim-run-cnt"  class="btn waves-effect waves-light disabled tooltipped" data-tooltip="Number of simulation runs">Runs: <b>0</b></button>
+                                <button id="btn-sim-iter-cnt" class="btn waves-effect waves-light disabled tooltipped" data-tooltip="Number of iterations">Itererations: <b>0</b></button>
+                            </div>
+                            <div class="row">
+                                <button id="btn-sim-run-1"  class="btn waves-effect waves-light amber accent-3" style="margin-right: 5px;"><span>Run 1 step</span> <i class="material-icons right">play_circle_filled</i></button>
+                                <button id="btn-sim-run-5"  class="btn waves-effect waves-light amber accent-3" style="margin-right: 5px;"><span>Run 5 steps</span> <i class="material-icons right">play_circle_filled</i></button>
+                                <button id="btn-sim-run-10" class="btn waves-effect waves-light amber accent-3" style="margin-right: 5px;"><span>Run 10 steps</span> <i class="material-icons right">play_circle_filled</i></button>
+
+                                <button id="btn-sim-stop"   class="btn waves-effect waves-light red"><span>Stop</span><i class="material-icons right">stop</i></button>
+
+                                <button id="btn-sim-reset"  class="btn waves-effect waves-light teal accent-4" style="margin-left: 40px;">Reset the simulation<i class="material-icons right">cached</i></button>
                             </div>
                         </div>
 
                         <!-- Tab: Rules -->
                         <div id="tab-sim-rules" class="col s12" style="padding-top: 10px;">
-                            <div id="row-sim-rules-inf" class="row">
-                            </div>
+                            <div id="row-sim-rules-inf" class="row"></div>
                             <div class="row">
-                                <a id="btn-sim-rules-reset" class="waves-effect waves-light btn teal accent-4"><i class="material-icons right">delete</i>Reset the rules</a>
+                                <a id="btn-sim-rules-reset" class="waves-effect waves-light btn teal accent-4"><i class="material-icons right">clear</i>Clear the rules</a>
                             </div>
                         </div>
 
                         <!-- Tab: Population -->
                         <div id="tab-sim-pop" class="col s12" style="padding-top: 10px;">
-                            <div id="row-sim-pop-inf" class="row">
-                            </div>
                             <div class="row">
-                                <a id="btn-sim-pop-reset" class="waves-effect waves-light btn teal accent-4"><i class="material-icons right">delete</i>Reset the population</a>
+                                <a id="btn-sim-pop-agents" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Agents"></a>
+                                <a id="btn-sim-pop-groups" class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Groups"></a>
+                                <a id="btn-sim-pop-sites"  class="waves-effect waves-light btn disabled tooltipped" data-tooltip="Sites"></a>
+
+                                <ul id="dropdown-sim-pop-inf" class="dropdown-content">
+                                    <li><a id="dropdown-sim-pop-inf-trigger-0" href="#" class="selected">No info</a></li>
+                                    <li><a id="dropdown-sim-pop-inf-trigger-1" href="#">Distribution of group size</a></li>
+                                    <li><a id="dropdown-sim-pop-inf-trigger-2" href="#">Distribution of group size (log scale)</a></li>
+                                </ul>
+                                <a id="dropdown-sim-pop-inf-trigger" class="btn dropdown-trigger disabled" href="#" data-target="dropdown-sim-pop-inf" style="margin-left: 20px;"><span id="dropdown-sim-pop-inf-lbl">No info</span><i class="material-icons right">arrow_drop_down</i></a>
+                            </div>
+                            <div id="row-sim-pop-inf" class="row"></div>
+                            <div class="row">
+                                <a id="btn-sim-pop-reset" class="waves-effect waves-light btn teal accent-4"><i class="material-icons right">clear</i>Clear the population</a>
                             </div>
                         </div>
 
@@ -891,38 +1012,68 @@
                             <div id="row-sim-probes-inf" class="row">
                             </div>
                             <div class="row">
-                                <a id="btn-sim-probes-reset" class="waves-effect waves-light btn teal accent-4"><i class="material-icons right">delete</i>Reset the probes</a>
+                                <a id="btn-sim-probes-reset" class="waves-effect waves-light btn teal accent-4"><i class="material-icons right">clear</i>Clear the probes</a>
                             </div>
                         </div>
 
                         <!-- Tab: Settings -->
                         <div id="tab-sim-pragma" class="col s12" style="padding-top: 10px;">
                             <div class="row">
-                                <div class="col s1"><nobr>Autocompact</nobr></div>
-                                <div class="col s1"><div class="switch"><label>Off<input id="chbox-sim-pragma-autocompact" type="checkbox" checked="checked"><span class="lever"></span>On</label></div></div>
+                                <div class="col"><div class="switch"><label>Off<input id="chbox-sim-pragma-autocompact" type="checkbox" checked="checked"><span class="lever"></span>On</label></div></div>
+                                <div class="col"><nobr>Autocompact</nobr></div>
                             </div>
                             <div class="row">
-                                <div class="col s1"><nobr>Autostop</nobr></div>
-                                <div class="col s1"><div class="switch"><label>Off<input id="chbox-sim-pragma-autostop" type="checkbox" checked="checked"><span class="lever"></span>On</label></div></div>
+                                <div class="col"><div class="switch"><label>Off<input id="chbox-sim-pragma-autostop" type="checkbox" checked="checked"><span class="lever"></span>On</label></div></div>
+                                <div class="col"><nobr>Autostop</nobr></div>
                             </div>
                             <div class="row">
-                                <div class="col s1"><nobr>Live info</nobr></div>
-                                <div class="col s1"><div class="switch"><label>Off<input id="chbox-sim-pragma-live-info" type="checkbox" checked="checked"><span class="lever"></span>On</label></div></div>
+                                <div class="col"><div class="switch"><label>Off<input id="chbox-sim-pragma-live-info" type="checkbox" checked="checked"><span class="lever"></span>On</label></div></div>
+                                <div class="col"><nobr>Live info</nobr></div>
                             </div>
                             <div class="row">
-                                <div class="col s1"><nobr>Live info timestamp</nobr></div>
-                                <div class="col s1"><div class="switch"><label>Off<input id="chbox-sim-pragma-live-info-ts" type="checkbox"><span class="lever"></span>On</label></div></div>
+                                <div class="col"><div class="switch"><label>Off<input id="chbox-sim-pragma-live-info-ts" type="checkbox"><span class="lever"></span>On</label></div></div>
+                                <div class="col"><nobr>Live info timestamp</nobr></div>
                             </div>
                         </div>
                     </div>
-
                 </div>
             </li>
 
             <!-- Output -->
-            <li class="_active">
+            <li class="active">
                 <div class="collapsible-header"><i class="material-icons icon-sim-out"><script>document.write(ui.iconSimOut)</script></i><b>Output</b></div>
                 <div class="collapsible-body">
+                    <div class="row">
+                        <!-- Tabs -->
+                        <div class="col s12" style="padding: 0px;">
+                            <ul class="tabs z-depth-1">
+                                <li class="tab col"><a href="#tab-out-ts">Timeseries</a></li>
+                                <li class="tab col"><a href="#tab-out-stdout" class="active">stdout</a></li>
+                            </ul>
+                        </div>
+
+                        <!-- Tab: Timeseries -->
+                        <div id="tab-out-ts" class="col s12" style="padding-top: 10px;">
+                            <div class="row">
+                                <a id="btn-out-ts-clear" class="waves-effect waves-light btn teal accent-4"><i class="material-icons right">clear</i>Clear timeseries</a>
+                            </div>
+                            <div id="row-out-ts" class="row">
+                                <img src="{{url_for('static', filename='img/03-a-low-income-school.png')}}"           style="width: 100%;" />
+                                <img src="{{url_for('static', filename='img/03-b-med-income-school.png')}}"           style="width: 100%;" />
+                                <img src="{{url_for('static', filename='img/03-c-low-vs-med-income-school-pe.png')}}" style="width: 100%;" />
+                                <img src="{{url_for('static', filename='img/03-d-low-vs-med-income-school-ps.png')}}" style="width: 100%;" />
+                                <img src="{{url_for('static', filename='img/03-e-low-vs-med-income-school-pr.png')}}" style="width: 100%;" />
+                            </div>
+                        </div>
+
+                        <!-- Tab: stdout -->
+                        <div id="tab-out-stdout" class="col s12" style="padding-top: 10px;">
+                            <div class="row">
+                                <a id="btn-out-stdout-clear" class="waves-effect waves-light btn teal accent-4"><i class="material-icons right">clear</i>Clear stdout</a>
+                            </div>
+                            <div id="row-out-stdout" class="row stdout"></div>
+                        </div>
+                    </div>
                 </div>
             </li>
         </ul>

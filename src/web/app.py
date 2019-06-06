@@ -1,10 +1,12 @@
 #
-# Next
-#     Show "working" icon when waiting for server's response
+# TODO
+#     Add ATTR to all rule classes
+#     Add scanning ATTR of a rule class to static rule analysis
+#     Add icons to the stdout
+#     Add Messages tab to the Output section
+#     Show "working" icon when waiting for server's response and invalidate UI actions until done (cursor: wait)
 #     Remove 'name_human' from Rule
-#     On reset calls, update the UI only when the response is Ok
 #     Add another dropdown for DB to select 'schema' or 'content' (first n rows)
-#     Show density plot for group size in the Population tab
 #     Add 'Download simulation' button
 #     Add 'Download results' button
 #     Session management
@@ -17,7 +19,9 @@
 #     REST API
 #         https://stackoverflow.com/questions/44430906/flask-api-typeerror-object-of-type-response-is-not-json-serializable
 #
-# Res
+# ----------------------------------------------------------------------------------------------------------------------
+#
+# Resources
 #     Flask and Celery
 #         https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world
 #         http://flask.pocoo.org/docs/1.0/deploying/
@@ -31,66 +35,68 @@
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-# Dev
-#     Setup
-#         cd /Volumes/d/pitt/sci/pram/
-#         bin/activate
-#         python -m pip install Flask celery psutil
-#         echo 'Install Redis manually'
-#     Redis
-#         cd /Volumes/d/pitt/sci/pram/logic/redis-5.0.4/src
-#         ./redis-server
-#     Celery
-#         cd /Volumes/d/pitt/sci/pram/src/web
-#         celery worker -A app.celery --loglevel=info
-#     Celery - Flower
-#         cd /Volumes/d/pitt/sci/pram/src/web
-#         flower -A app.celery --port=5555
-#     Flask
-#         cd /Volumes/d/pitt/sci/pram/src/web
-#         FLASK_ENV=development FLASK_APP=web flask run --host=0.0.0.0
-#     Materialize
-#         brew install sass/sass/sass
-#         cd /Volumes/d/pitt/sci/pram/src/web/static
-#         sass sass-pram/materialize.scss css/materialize-pram.css
-#
-# Prod (FreeBSD 12R)
-#     Setup
-#         sudo pkg install py36-Flask py36-celery redis py36-psutil
-#     Redis
-#         redis-server
-#     Celery
-#         cd ~/prj/pram/web
-#         celery worker -A app.celery --loglevel=info
-#     Celery - Flower
-#         cd ~/prj/pram/web
-#         flower -A app.celery --port=5555
-#     Flask
-#         cd ~/prj/pram/web
-#         export LANG=en_US.UTF-8
-#         export LC_ALL=en_US.UTF-8
-#         FLASK_ENV=production FLASK_APP=web /usr/local/bin/flask-3.6 run --host=192.168.0.164 --port=5050
-#
-#     http://thesnaken.asuscomm.com:5050
+# Deployment
+#     Development
+#         Setup
+#             cd /Volumes/d/pitt/sci/pram/
+#             bin/activate
+#             python -m pip install Flask celery psutil
+#             echo 'Install Redis manually'
+#         Redis
+#             cd /Volumes/d/pitt/sci/pram/logic/redis-5.0.4/src
+#             ./redis-server
+#         Celery
+#             cd /Volumes/d/pitt/sci/pram/src/web
+#             celery worker -A app.celery --loglevel=info
+#         Celery - Flower
+#             cd /Volumes/d/pitt/sci/pram/src/web
+#             flower -A app.celery --port=5555
+#         Flask
+#             cd /Volumes/d/pitt/sci/pram/src/web
+#             FLASK_ENV=development FLASK_APP=web flask run --host=0.0.0.0
+#         Materialize
+#             brew install sass/sass/sass
+#             cd /Volumes/d/pitt/sci/pram/src/web/static
+#             sass sass-pram/materialize.scss css/materialize-pram.css
+#     Production (FreeBSD 12R)
+#         Setup
+#             sudo pkg install py36-Flask py36-celery redis py36-psutil
+#         Redis
+#             redis-server
+#         Celery
+#             cd ~/prj/pram/web
+#             celery worker -A app.celery --loglevel=info
+#         Celery - Flower
+#             cd ~/prj/pram/web
+#             flower -A app.celery --port=5555
+#         Flask
+#             cd ~/prj/pram/web
+#             export LANG=en_US.UTF-8
+#             export LC_ALL=en_US.UTF-8
+#             FLASK_ENV=production FLASK_APP=web /usr/local/bin/flask-3.6 run --host=192.168.0.164 --port=5050
 #
 # ----------------------------------------------------------------------------------------------------------------------
 
 import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))  # pram pkg path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 
 import gc
 import inspect
+import io
+import matplotlib.pyplot as plt
 import os
+import pickle
 import psutil
 import shutil
 
 import config
 
-from celery import Celery, states
+from celery        import Celery, states
 from celery.task.control import revoke
-from collections import OrderedDict
-from flask import Flask, current_app, jsonify, request, render_template, Response, session, url_for
+from collections   import OrderedDict
+from contextlib    import redirect_stdout
+from flask         import Flask, current_app, jsonify, request, render_template, Response, session, url_for
 from flask_session import Session
 # from flask.ext.session import Session
 
@@ -105,7 +111,8 @@ from pram.util   import DB, Size
 SUDO_CODE = 'catch22'  # TODO: Use env variable
 LOAD_CPU_INT = 1  # CPU load sample interval [s]
 
-PATH_DB = os.path.join(os.path.dirname(__file__), 'db')
+PATH_DB        = os.path.join(os.path.dirname(__file__), 'db')
+PATH_DB_SCHEMA = os.path.join(os.path.dirname(__file__), 'db', 'schema')
 
 DB_FEXT = 'sqlite3'  # database file extension
 
@@ -153,7 +160,7 @@ app.app_context().push()
 
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/status/<task_id>', methods=['GET', 'POST'])
-def task_status(task_id):
+def task_get_status(task_id):
     # task = sim_02_run_bg.AsyncResult(task_id)
     task = tasks.get(task_id, None)
     if not task:
@@ -164,11 +171,15 @@ def task_status(task_id):
         res = { 'res': True, 'i': 0, 'n': 1, 'p': 0, 'isRunning': True, 'isDone': False }
     elif task.state != states.FAILURE:
         res = { 'res': True, 'i': task.info.get('i',0), 'n': task.info.get('n',0), 'p': task.info.get('p',0), 'isRunning': True, 'isDone': (task.state == 'SUCCESS') }
+        if task.state == 'SUCCESS':
+            res['state'] = task.info.get('sim').get_state()
+            res['stdout'] = task.info.get('stdout')
     else:
         res = { 'res': False, 'i': 0, 'n': 1, 'p': 0, 'isRunning': False, 'isDone': True, 'err': str(task.info) }
 
-    if task and task.state in [states.SUCCESS, states.FAILURE, states.REVOKED]:
-        sim_clear(task_id)
+    # if task and task.state in [states.SUCCESS, states.FAILURE, states.REVOKED]:
+    #     # res['taskState'] = task.state
+    #     sim_clear(task_id)
 
     return jsonify(res)
 
@@ -177,7 +188,14 @@ def task_status(task_id):
 # ----[ UTIL ]----------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-# ...
+# ----------------------------------------------------------------------------------------------------------------------
+def ret_img(fig, format='png'):
+    out = io.BytesIO()
+    plt.savefig(out, format=format, bbox_inches='tight')
+    plt.close()
+    bytes = out.getvalue()
+    out.close()
+    return Response(bytes, mimetype=f'image/{format}')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -185,7 +203,6 @@ def task_status(task_id):
 # ----------------------------------------------------------------------------------------------------------------------
 
 def session_init(session):
-    sim_flu_init(session)
     sim_flu_ac_init(session)
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -205,8 +222,8 @@ def demo():
 def sys_get_load():
     ''' Return server load (i.e., resource utilization). '''
 
-    if not session.get('is-root', False):
-        return jsonify({ 'res': False, 'err': 'Insufficient access rights' })
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient access rights' })
 
     avg_1, avg_5, avg_15 = os.getloadavg()
     cpu_used = psutil.cpu_percent(interval=LOAD_CPU_INT)
@@ -256,7 +273,7 @@ def usr_get_sess():
     if not 'sim-flu-ac' in session:
         sim_flu_ac_init(session)
 
-    return jsonify({ 'res': True, 'state': { 'simFluAC': session['sim-flu-ac'].get_state() }, 'sim': session.get('sim', None) })
+    return jsonify({ 'res': True, 'state': { 'simFluAC': session['sim-flu-ac'].get_state(), 'stdout': session['stdout'] } })
 
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/usr-is-root', methods=['GET'])
@@ -279,81 +296,12 @@ def usr_toggle():
 # ----[ RULES ]---------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class FluProgressRule2(Rule):
-    def __init__(self):
-        super().__init__('flu-progress', TimeAlways())
-
-    def apply(self, pop, group, iter, t):
-        # Susceptible:
-        if group.has_attr({ 'flu': 's' }):
-            at  = group.get_rel(Site.AT)
-            n   = at.get_pop_size()                               # total   population at current location
-            n_e = at.get_pop_size(GroupQry(attr={ 'flu': 'e' }))  # exposed population at current location
-
-            p_infection = float(n_e) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
-
-            return [
-                GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'e' }),
-                GroupSplitSpec(p=1 - p_infection, attr_set={ 'flu': 's' })
-            ]
-
-        # Exposed:
-        if group.has_attr({ 'flu': 'e' }):
-            return [
-                GroupSplitSpec(p=0.2, attr_set={ 'flu': 'r' }),  # group size after: 20% of before (recovered)
-                GroupSplitSpec(p=0.8, attr_set={ 'flu': 'e' })   # group size after: 80% of before (still exposed)
-            ]
-
-        # Recovered:
-        if group.has_attr({ 'flu': 'r' }):
-            return [
-                GroupSplitSpec(p=0.9, attr_set={ 'flu': 'r' }),
-                GroupSplitSpec(p=0.1, attr_set={ 'flu': 's' })
-            ]
-
-    def setup(self, pop, group):
-        return [
-            GroupSplitSpec(p=0.9, attr_set={ 'flu': 's' }),
-            GroupSplitSpec(p=0.1, attr_set={ 'flu': 'e' })
-        ]
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-class FluLocationRule2(Rule):
-    def __init__(self):
-        super().__init__('flu-location', TimeAlways())
-
-    def apply(self, pop, group, iter, t):
-        # Exposed and low income:
-        if group.has_attr({ 'flu': 'e', 'income': 'l' }):
-            return [
-                GroupSplitSpec(p=0.1, rel_set={ Site.AT: group.get_rel('home') }),
-                GroupSplitSpec(p=0.9)
-            ]
-
-        # Exposed and medium income:
-        if group.has_attr({ 'flu': 'e', 'income': 'm' }):
-            return [
-                GroupSplitSpec(p=0.6, rel_set={ Site.AT: group.get_rel('home') }),
-                GroupSplitSpec(p=0.4)
-            ]
-
-        # Recovered:
-        if group.has_attr({ 'flu': 'r' }):
-            return [
-                GroupSplitSpec(p=0.8, rel_set={ Site.AT: group.get_rel('school') }),
-                GroupSplitSpec(p=0.2)
-            ]
-
-        return None
-
-
-# ----------------------------------------------------------------------------------------------------------------------
 def rule_get_inf(rule):
     cls = rule if inspect.isclass(rule) else rule.__class__
     return {
         'cls': cls.__name__,
         'name': cls.NAME,
+        'attrs': cls.ATTRS or None,
         'docstr': inspect.cleandoc(cls.__doc__).split('\n'),
         'srcLines': inspect.getsourcelines(cls)[0]
     }
@@ -417,36 +365,50 @@ def db_get_fpath(fname):
     return fpath
 
 # ----------------------------------------------------------------------------------------------------------------------
+def db_get_schema_fpath(fname):
+    return os.path.join(PATH_DB_SCHEMA, f'{fname}.pickle')
+
+# ----------------------------------------------------------------------------------------------------------------------
 @app.route('/db-get-schema', methods=['POST'])
 def db_get_schema():
     '''
     Returns the schema of the DB specified by the 'fname' argument.  The tables are sorted by name and the columns are
     kept in the order they appear in the DB.
+
+    The schema is serialized into a file.  This allows generating it only for the first time.  This is a response to a
+    slow SQLite3 operation (to be expected, honestly).
     '''
 
-    fpath = db_get_fpath(request.get_json()['name'])
-    if not fpath:
+    fpath_db = db_get_fpath(request.get_json()['name'])
+    if not fpath_db:
         return jsonify({ 'res': False, 'err': 'Incorrect database specified' })
 
-    with DB.open_conn(fpath) as c:
-        schema = []
-        for r01 in c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name DESC").fetchall():  # sql
-            tbl = r01['name']
+    fpath_schema = db_get_schema_fpath(request.get_json()['name'])
+    if os.path.isfile(fpath_schema):
+        with open(fpath_schema, 'rb') as f:
+            schema = pickle.load(f)
+    else:
+        with DB.open_conn(fpath_db) as c:
+            schema = []
+            for r01 in c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name DESC").fetchall():  # sql
+                tbl = r01['name']
 
-            cols = OrderedDict((r['name'], { 'name': r['name'], 'type': r['type'] }) for r in c.execute(f"PRAGMA table_info('{tbl}')").fetchall())  # cid,name,type,notnull,dflt_value,pk
-                # We need a dict here to use it below when iterating through the foreign keys; we eventually convert it
-                # into an array though so that the order is preserved on the client side (otherwise, it is lost).
+                cols = OrderedDict((r['name'], { 'name': r['name'], 'type': r['type'] }) for r in c.execute(f"PRAGMA table_info('{tbl}')").fetchall())  # cid,name,type,notnull,dflt_value,pk
+                    # We need a dict here to use it below when iterating through the foreign keys; we eventually convert it
+                    # into an array though so that the order is preserved on the client side (otherwise, it is lost).
 
-            for col in cols.values():  # add the number of values (i.e., distinct rows)
-                print(f'SELECT COUNT(DISTINCT {col["name"]}) FROM {tbl}')
-                col['valCnt'] = c.execute(f'SELECT COUNT(DISTINCT {col["name"]}) FROM {tbl}').fetchone()[0]
+                for col in cols.values():  # add the number of values (i.e., distinct rows)
+                    col['valCnt'] = c.execute(f'SELECT COUNT(DISTINCT {col["name"]}) FROM {tbl}').fetchone()[0]
 
-            for row in c.execute(f'PRAGMA foreign_key_list({tbl})').fetchall():  # id,seq,tbl,from,to,on_update,on_delete,match
-                cols[row['from']]['fk'] = { 'tbl': row['table'], 'col': row['to'] }
+                for row in c.execute(f'PRAGMA foreign_key_list({tbl})').fetchall():  # id,seq,tbl,from,to,on_update,on_delete,match
+                    cols[row['from']]['fk'] = { 'tbl': row['table'], 'col': row['to'] }
 
-            row_cnt = c.execute(f'SELECT COUNT(*) FROM {tbl}').fetchone()[0]
+                row_cnt = c.execute(f'SELECT COUNT(*) FROM {tbl}').fetchone()[0]
 
-            schema.append({ 'name': tbl, 'cols': [v for v in cols.values()], 'rowCnt': row_cnt })
+                schema.append({ 'name': tbl, 'cols': [v for v in cols.values()], 'rowCnt': row_cnt })
+
+        with open(fpath_schema, 'wb') as f:
+            pickle.dump(schema, f)
 
     return jsonify({ 'res': True, 'schema': schema })
 
@@ -491,18 +453,22 @@ def pop_db_gen():
 
     site_home = Site('home')
 
-    sim = session['sim-flu-ac']
-    sim.gen_groups_from_db(
-        fpath_db   = fpath,
-        tbl        = json['tbl'],
-        attr_db    = attr_db,
-        rel_db     = [GroupDBRelSpec(name=rel['name'], col=rel['col']) for rel in rel_db],
-        attr_fix   = {},
-        rel_fix    = { 'home': site_home },
-        rel_at     = 'school',
-        is_verbose = False
-    )
-    return jsonify({ 'res': True, 'pop': sim.get_state()['pop'] })
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        sim = session['sim-flu-ac']
+        sim.gen_groups_from_db(
+            fpath_db   = fpath,
+            tbl        = json['tbl'],
+            attr_db    = attr_db,
+            rel_db     = [GroupDBRelSpec(name=rel['name'], col=rel['col']) for rel in rel_db],
+            attr_fix   = {},
+            rel_fix    = { 'home': site_home },
+            rel_at     = 'school',
+            is_verbose = False
+        )
+    session['stdout'].append(stdout.getvalue())
+
+    return jsonify({ 'res': True, 'pop': sim.get_state()['pop'], 'stdout': session['stdout'] })
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -627,18 +593,49 @@ def sim_flu_ac_add_rule():
         if cls == 'SimpleFluProgressRule':
             if SimpleFluProgressRule in rule_cls:
                 return jsonify({ 'res': False, 'err': 'Rule already in the simulation' })
-            sim.add_rule(SimpleFluProgressRule())
-            return jsonify({ 'res': True, 'rules': sim.get_state()['rules'] })
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                sim.add_rule(SimpleFluProgressRule())
+            print(session)
+            session['stdout'].append(stdout.getvalue())
+            return jsonify({ 'res': True, 'rules': sim.get_state()['rules'], 'stdout': session['stdout'] })
 
         if cls == 'SimpleFluLocationRule':
             if SimpleFluLocationRule in rule_cls:
                 return jsonify({ 'res': False, 'err': 'Rule already in the simulation' })
-            sim.add_rule(SimpleFluLocationRule())
-            return jsonify({ 'res': True, 'rules': sim.get_state()['rules'] })
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                sim.add_rule(SimpleFluLocationRule())
+            session['stdout'].append(stdout.getvalue())
+            return jsonify({ 'res': True, 'rules': sim.get_state()['rules'], 'stdout': session['stdout'] })
     except SimulationConstructionError as e:
         return jsonify({ 'res': False, 'err': str(e) })
 
     return jsonify({ 'res': False, 'err': 'Rule not supported by this simulation' })
+
+# ----------------------------------------------------------------------------------------------------------------------
+@app.route('/sim-flu-ac-plot-group-size')
+def sim_flu_ac_plot_group_size():
+    return ret_img(session['sim-flu-ac'].plot_group_size(do_log=False))
+
+# ----------------------------------------------------------------------------------------------------------------------
+@app.route('/sim-flu-ac-plot-group-size-log')
+def sim_flu_ac_plot_group_size_log():
+    return ret_img(session['sim-flu-ac'].plot_group_size(do_log=True))
+
+# ----------------------------------------------------------------------------------------------------------------------
+def sim_flu_ac_init_get_probe(school, name=None):
+    return GroupSizeProbe(
+        name=name or str(school.name),
+        queries=[
+            GroupQry(attr={ 'flu': 's' }, rel={ 'school': school }),
+            GroupQry(attr={ 'flu': 'e' }, rel={ 'school': school }),
+            GroupQry(attr={ 'flu': 'r' }, rel={ 'school': school })
+        ],
+        qry_tot=GroupQry(rel={ 'school': school }),
+        persistance=None,  # pp,
+        var_names=['ps', 'pe', 'pr', 'ns', 'ne', 'nr']
+    )
 
 # ----------------------------------------------------------------------------------------------------------------------
 def sim_flu_ac_init(session, do_force=False):
@@ -649,6 +646,9 @@ def sim_flu_ac_init(session, do_force=False):
         session.pop('sim-flu-ac')
         gc.collect()
 
+    school_l  = Site(450149323)  # 88% low income students
+    school_m  = Site(450067740)  #  7% low income students
+
     session['sim-flu-ac'] = (
         Simulation().
             set().
@@ -656,40 +656,35 @@ def sim_flu_ac_init(session, do_force=False):
                 pragma_live_info(True).
                 pragma_live_info_ts(False).
                 pragma_rule_analysis_for_db_gen(False).
+                done().
+            add().
+                probe(sim_flu_ac_init_get_probe(school_l, 'low-income')).
+                probe(sim_flu_ac_init_get_probe(school_m, 'med-income')).
                 done()
-            # add().
-                # probe(probe_flu_at(school_l, 'low-income')).
-                # probe(probe_flu_at(school_m, 'med-income')).
-                # done()
     )
+    session['stdout'] = []
 
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/sim-flu-ac-reset', methods=['GET'])
 def sim_flu_ac_reset():
-    if not session.get('is-root', False):
-        return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
 
     if not 'sim-flu-ac' in session:
         return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
 
-    # if session.get('sim', None):
-    #     return jsonify({ 'res': False, 'err': 'A simulation is in progress' })
-
     sim_flu_ac_init(session, True)
 
-    return jsonify({ 'res': True, 'state': session['sim-flu-ac'].get_state() })
+    return jsonify({ 'res': True, 'state': session['sim-flu-ac'].get_state(), 'stdout': session['stdout'] })
 
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/sim-flu-ac-reset-pop', methods=['GET'])
 def sim_flu_ac_reset_pop():
-    if not session.get('is-root', False):
-        return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
 
     if not 'sim-flu-ac' in session:
         return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
-
-    # if session.get('sim', None):
-    #     return jsonify({ 'res': False, 'err': 'A simulation is in progress' })
 
     session['sim-flu-ac'].reset_pop()
 
@@ -698,40 +693,86 @@ def sim_flu_ac_reset_pop():
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/sim-flu-ac-reset-probes', methods=['GET'])
 def sim_flu_ac_reset_probes():
-    if not session.get('is-root', False):
-        return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
 
     if not 'sim-flu-ac' in session:
         return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
 
-    # if session.get('sim', None):
-    #     return jsonify({ 'res': False, 'err': 'A simulation is in progress' })
-
-    session['sim-flu-ac'].reset_probes()
+    # session['sim-flu-ac'].reset_probes()
+        # We don't actually reset the probes at this point because the UI for adding them isn't done yet.
 
     return jsonify({ 'res': True, 'state': session['sim-flu-ac'].get_state() })
 
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/sim-flu-ac-reset-rules', methods=['GET'])
 def sim_flu_ac_reset_rules():
-    if not session.get('is-root', False):
-        return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
 
     if not 'sim-flu-ac' in session:
         return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
-
-    # if session.get('sim', None):
-    #     return jsonify({ 'res': False, 'err': 'A simulation is in progress' })
 
     session['sim-flu-ac'].reset_rules()
 
     return jsonify({ 'res': True, 'state': session['sim-flu-ac'].get_state() })
 
 # ----------------------------------------------------------------------------------------------------------------------
+def sim_flu_ac_run_synchronous():
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
+
+    sim = session['sim-flu-ac']
+    iter = request.get_json()['iter']
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        sim.run(iter)
+    session['stdout'].append(stdout.getvalue())
+    return jsonify({ 'res': True, 'isDone': True, 'isRunning': False, 'progress': 1.0, 'state': sim.get_state(), 'stdout': session['stdout'] })
+
+# ----------------------------------------------------------------------------------------------------------------------
 @app.route('/sim-flu-ac-run', methods=['POST'])
 def sim_flu_ac_run():
-    if not session.get('is-root', False):
-        return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
+
+    iter = int(request.get_json()['iter'])
+
+    sim = session['sim-flu-ac']
+    task_id = session.get('task-id', None)
+    task = tasks.get(task_id, None) if task_id else None
+    if task and task.state in [states.PENDING, states.RECEIVED, states.STARTED, states.RETRY]:
+        return jsonify({ 'res': False, 'err': 'A simulation is already in progress' })
+    else:
+        sim_clear(task_id)
+
+    task = sim_flu_ac_run_bg.apply_async(args=[sim, iter])
+    # task.then(x)
+    tasks[task.id] = task
+
+    session['task-id'] = task.id
+
+    return jsonify({ 'res': True }), 202, { 'Location': url_for('task_get_status', task_id=task.id) }
+
+# ----------------------------------------------------------------------------------------------------------------------
+def x(self):
+    # print(type(self))
+    # print(self)
+    # print(self.__dict__)
+    # print(self.result)
+    pass
+
+# ----------------------------------------------------------------------------------------------------------------------
+def sim_flu_ac_run2():
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
 
     if not 'sim-flu-ac' in session:
         return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
@@ -753,35 +794,86 @@ def sim_flu_ac_run():
     session['sim'] = 'flu-a'
     session['task-id'] = task.id
 
-    return jsonify({ 'res': True }), 202, { 'Location': url_for('task_status', task_id=task.id) }
+    return jsonify({ 'res': True }), 202, { 'Location': url_for('task_get_status', task_id=task.id) }
 
 # ----------------------------------------------------------------------------------------------------------------------
 @celery.task(bind=True)
-def sim_flu_ac_run_bg(self):
-    import time
-    n = 10
-    for i in range(n):
-        time.sleep(0.1)
-        self.update_state(state='PROGRESS', meta={ 'i': i, 'n': n, 'p': float(i) / float(n) })
+def sim_flu_ac_run_bg(self, sim, n):
+    # print(f'status: {type(self)} {n}')
+    # import time
+    # for i in range(n):
+    #     time.sleep(0.1)
+    #     print(f'status: {i}')
+    #     self.update_state(state='PROGRESS', meta={ 'i': i, 'n': n, 'p': float(i) / float(n) })
 
-    return { 'i': n, 'n': n, 'p': 1 }
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        sim.run(n)
+
+    # tasks.pop(session['task-id'])
+    # session.pop('task-id')
+
+    return { 'i': n, 'n': n, 'p': 1, 'sim': sim, 'stdout': stdout.getvalue() }
+
+# ----------------------------------------------------------------------------------------------------------------------
+def sim_flu_ac_status_syncrhonous():
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
+
+    # if session.get('sim', None) == 'flu-a':
+    #     return task_get_status(session.get('task-id', None))
+
+    sim = session['sim-flu-ac']
+
+    return jsonify({ 'res': True, 'isDone': not sim.running.is_running, 'isRunning': sim.running.is_running, 'progress': sim.running.progress, 'state': sim.get_state(), 'stdout': session['stdout'] })
 
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/sim-flu-ac-status', methods=['GET'])
 def sim_flu_ac_status():
-    if not session.get('is-root', False):
-        return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
+
+    if 'task-id' in session:
+        task_id = session.get('task-id', None)
+        ret = task_get_status(task_id)
+        if task_id in tasks:
+            task = tasks[task_id]
+            if task and task.state == states.SUCCESS:
+                # session['sim-flu-ac'] = task.info.get('sim')
+                # session['stdout'].append(task.info.get('stdout'))
+                session['sim-flu-ac'] = task.result['sim']
+                session['stdout'].append(task.result['stdout'])
+                # session['stdout'] = task.result['stdout']
+
+                ret = jsonify({ 'res': True, 'isDone': True, 'isRunning': False, 'state': session['sim-flu-ac'].get_state(), 'stdout': session['stdout'] })
+            if task and task.state in [states.SUCCESS, states.FAILURE, states.REVOKED]:
+                session.pop('task-id')
+                tasks.pop(task_id)
+        return ret
+
+    return jsonify({ 'res': True, 'isDone': True, 'isRunning': False, 'state': session['sim-flu-ac'].get_state(), 'stdout': session['stdout'] })
+
+# ----------------------------------------------------------------------------------------------------------------------
+def sim_flu_ac_status2():
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
 
     if session.get('sim', None) == 'flu-a':
-        return task_status(session.get('task-id', None))
+        return task_get_status(session.get('task-id', None))
 
     return jsonify({ 'res': False, 'isRunning': False })
 
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/sim-flu-ac-set-pragma', methods=['POST'])
 def sim_flu_ac_set_pragma():
-    if not session.get('is-root', False):
-        return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
 
     # if session.get('sim', None):
     #     return jsonify({ 'res': False, 'err': 'A simulation is in progress' })
@@ -795,8 +887,22 @@ def sim_flu_ac_set_pragma():
 # ----------------------------------------------------------------------------------------------------------------------
 @app.route('/sim-flu-ac-stop', methods=['GET'])
 def sim_flu_ac_stop():
-    if not session.get('is-root', False):
-        return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
+
+    if not 'sim-flu-ac' in session:
+        return jsonify({ 'res': False, 'err': 'The simulation has not been initialized' })
+
+    if 'task-id' in session:
+        tasks.pop(session['task-id'])
+        session.pop('task-id', None)
+
+    return jsonify({ 'res': True })
+
+# ----------------------------------------------------------------------------------------------------------------------
+def sim_flu_ac_stop2():
+    # if not session.get('is-root', False):
+    #     return jsonify({ 'res': False, 'err': 'Insufficient rights' })
 
     if session.get('sim', None) == 'flu-a':
         sim_clear(session.get('task-id', None))
@@ -831,7 +937,7 @@ def sim_test_run():
     session['sim'] = 'test'
     session['task-id'] = task.id
 
-    return jsonify({ 'res': True }), 202, { 'Location': url_for('task_status', task_id=task.id) }
+    return jsonify({ 'res': True }), 202, { 'Location': url_for('task_get_status', task_id=task.id) }
 
 # ----------------------------------------------------------------------------------------------------------------------
 @celery.task(bind=True)  # name=
@@ -842,7 +948,7 @@ def sim_test_run_bg(self):
         time.sleep(0.1)
         self.update_state(state='PROGRESS', meta={ 'i': i, 'n': n, 'p': float(i) / float(n) })
 
-    # Marking the simulation as done needs to happen in the task_status() function because the current function runs in
+    # Marking the simulation as done needs to happen in the task_get_status() function because the current function runs in
     # a separate thread and therefore doesn't have access to the Flask's session object.  I've spent north of 24h on
     # trying to solve this and I'm leaving it here for now.
 
@@ -864,7 +970,7 @@ def sim_test_status():
         return jsonify({ 'res': False, 'err': 'Insufficient rights' })
 
     if session.get('sim', None) == 'test':
-        return task_status(session.get('task-id', None))
+        return task_get_status(session.get('task-id', None))
     return jsonify({ 'res': False, 'isRunning': False })
 
 # ----------------------------------------------------------------------------------------------------------------------
