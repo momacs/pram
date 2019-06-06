@@ -704,10 +704,10 @@ class StaticRuleAnalyzer(object):
                     attr = list(ast.iter_fields(node))[0][1]
                     attr_name = list(ast.iter_fields(attr))[1][1]
 
-                    if attr_name in ('get_attr', 'get_rel', 'has_attr', 'has_rel'):
+                    if attr_name in ('get_attr', 'get_rel', 'has_attr', 'has_rel', 'ga', 'gr', 'ha', 'hr'):
                         call_args = call_args[0]
                         if call_args.__class__.__name__ == 'Str':
-                            if attr_name in ('get_attr', 'has_attr'):
+                            if attr_name in ('get_attr', 'has_attr', 'ga', 'ha'):
                                 self.attr_used.add(StaticRuleAnalyzer.get_str(call_args))
                             else:
                                 self.rel_used.add(StaticRuleAnalyzer.get_str(call_args))
@@ -715,7 +715,7 @@ class StaticRuleAnalyzer(object):
                         elif call_args.__class__.__name__ in ('List', 'Dict'):
                             for i in list(ast.iter_fields(call_args))[0][1]:
                                 if i.__class__.__name__ == 'Str':
-                                    if attr_name in ('get_attr', 'has_attr'):
+                                    if attr_name in ('get_attr', 'has_attr', 'ga', 'ha'):
                                         self.attr_used.add(StaticRuleAnalyzer.get_str(i))
                                     else:
                                         self.rel_used.add(StaticRuleAnalyzer.get_str(i))
@@ -1401,7 +1401,6 @@ class Simulation(object):
         if title:
             plt.title(title)
         plt.plot(x, density(x), lw=1, linestyle='-', c='#666666', mfc='none', antialiased=True)  # marker='o', markersize=5
-        # plt.legend(['Susceptible', 'Exposed', 'Recovered'], loc='upper right')
         plt.ylabel('Density')
         if do_log:
             plt.xlabel('Group size (log)')

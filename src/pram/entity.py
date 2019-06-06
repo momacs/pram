@@ -604,6 +604,9 @@ class Group(Entity):
     def freeze(self):
         self.is_frozen = True
 
+    def ga(self, name=None):
+        return self.get_attr(name)
+
     @staticmethod
     def gen_hash(attr, rel):
         '''
@@ -946,6 +949,12 @@ class Group(Entity):
     def get_size(self):
         return self.n
 
+    def gr(self, name=None):
+        return self.get_rel(name)
+
+    def ha(self, qry):
+        return self.has_attr(qry)
+
     def has_attr(self, qry):
         return Group._has(self.attr, qry, self.attr_used)
 
@@ -954,6 +963,9 @@ class Group(Entity):
 
     def has_sites(self, qry):
         return Group._has(self.rel, qry, self.rel_used) and self._isinstance(qry, Site)
+
+    def hr(self, qry, are_sites=False):
+        return self.has_rel(qry, are_sites)
 
     def set_attr(self, name, value, do_force=True):
         if self.is_frozen:
