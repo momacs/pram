@@ -18,7 +18,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pram.data   import ProbePersistanceDB, ProbeMsgMode, GroupSizeProbe
 from pram.entity import AttrFluStage, Group, GroupQry, GroupSplitSpec
-from pram.rule   import Rule, MCRule, TimeAlways
+from pram.rule   import MCRule, TimeAlways
 from pram.sim    import Simulation
 
 
