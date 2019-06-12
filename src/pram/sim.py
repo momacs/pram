@@ -391,6 +391,7 @@ import inspect
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 import os
 import pickle
 
@@ -1675,6 +1676,7 @@ class Simulation(object):
     def set_rand_seed(self, rand_seed):
         self.rand_seed = rand_seed
         if self.rand_seed is not None:
+            random.seed(self.rand_seed)
             np.random.seed(self.rand_seed)
         return self
 

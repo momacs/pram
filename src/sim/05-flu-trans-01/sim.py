@@ -27,7 +27,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from collections import namedtuple
 
 from pram.data   import ProbeMsgMode, ProbePersistanceDB, GroupSizeProbe
-from pram.entity import AttrFluStage, GroupQry, GroupSplitSpec, Site
+from pram.entity import GroupQry, GroupSplitSpec, Site
 from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, TimeInt, TimePoint
 from pram.sim    import Simulation
 
@@ -75,9 +75,9 @@ for s in specs:
         GroupSizeProbe(
             name=f'flu-{s.name}',
             queries=[
-                GroupQry(attr={ 'flu-stage': AttrFluStage.NO     }, rel={ 'school': site }),
-                GroupQry(attr={ 'flu-stage': AttrFluStage.ASYMPT }, rel={ 'school': site }),
-                GroupQry(attr={ 'flu-stage': AttrFluStage.SYMPT  }, rel={ 'school': site })
+                GroupQry(attr={ 'flu': 's' }, rel={ 'school': site }),
+                GroupQry(attr={ 'flu': 'i' }, rel={ 'school': site }),
+                GroupQry(attr={ 'flu': 'r' }, rel={ 'school': site })
             ],
             qry_tot=GroupQry(rel={ 'school': site }),
             var_names=['pn', 'pa', 'ps', 'nn', 'na', 'ns'],
@@ -86,8 +86,8 @@ for s in specs:
         )
     )
 
-probe_grp_size_flu  = GroupSizeProbe.by_attr('flu', 'flu-stage', AttrFluStage,   msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across flu stages')
-probe_grp_size_site = GroupSizeProbe.by_rel ('site', Site.AT,    sites.values(), msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across sites')
+probe_grp_size_flu  = GroupSizeProbe.by_attr('flu', 'flu', ['s', 'i', 'r'], msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across flu stages')
+probe_grp_size_site = GroupSizeProbe.by_rel ('site', Site.AT, sites.values(), msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across sites')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -103,7 +103,7 @@ sim = (Simulation().
 
 for s in specs:
     (sim.new_group(s.n, s.name).
-        set_attr('flu-stage', AttrFluStage.NO).
+        set_attr('flu', 's').
         set_rel(Site.AT,  sites['home']).
         set_rel('home',   sites['home']).
         set_rel('school', sites[f'school-{s.name}']).

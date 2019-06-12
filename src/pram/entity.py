@@ -29,30 +29,6 @@ class AttrSex(IntEnum):
     M = 2
 
 
-@unique
-class AttrFluStage(IntEnum):
-    NO     = auto()
-    ASYMPT = auto()
-    SYMPT  = auto()
-
-
-# @attrs()
-# class Attr(object):
-#     pass
-#
-#
-# @attrs(slots=True)
-# class AttrSex(Attr):
-#     name : str = 'sex'
-#     val  : AttrSexEnum = attrib(default=AttrSexEnum.m, validator=validators.in_(AttrSexEnum))
-#
-#
-# @attrs(slots=True)
-# class AttrFluStage(Attr):
-#     name : str = 'flu-stage'
-#     val  : AttrFluStageEnum = attrib(default=AttrFluStageEnum.no, validator=validators.in_(AttrFluStageEnum))
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 class DistributionAgeSchool(rv_continuous):
     def _pdf(self, x):
@@ -303,7 +279,7 @@ class Site(Resource):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Agent(Entity):
-    __slots__ = ('name', 'sex', 'age', 'flu', 'school', 'work', 'location')
+    __slots__ = ('name', 'sex', 'age', 'school', 'work', 'location')
 
     AGE_MIN =   0
     AGE_MAX = 120
@@ -313,22 +289,21 @@ class Agent(Entity):
     P_STUDENT = 0.25  # unconditional prob. of being a student
     P_WORKER  = 0.60  # unconditional prob. of being a worker
 
-    def __init__(self, name=None, sex=AttrSex.F, age=AGE_M, flu=AttrFluStage.NO, school=None, work=None, location='home'):
+    def __init__(self, name=None, sex=AttrSex.F, age=AGE_M, school=None, work=None, location='home'):
         super().__init__(EntityType.AGENT, '')
 
         self.name     = name or '.'
         self.sex      = sex
         self.age      = age
-        self.flu      = flu
         self.school   = school
         self.work     = work
         self.location = location
 
     def __repr__(self):
-        return '{}(name={}, sex={}, age={}, flu={}, school={}, work={}, location={})'.format(self.__class__.__name__, self.name, self.sex.name, round(self.age, 2), self.flu.name, self.school, self.work, self.location)
+        return '{}(name={}, sex={}, age={}, school={}, work={}, location={})'.format(self.__class__.__name__, self.name, self.sex.name, round(self.age, 2), self.school, self.work, self.location)
 
     def __str__(self):
-        return '{}  name: {:12}  sex:{}  age: {:3}  flu: {:6}  school: {:16}  work: {:16}  location: {:12}'.format(self.__class__.__name__, self.name, self.sex.name, round(self.age), self.flu.name, self.school or '.', self.work or '.', self.location or '.')
+        return '{}  name: {:12}  sex:{}  age: {:3}  school: {:16}  work: {:16}  location: {:12}'.format(self.__class__.__name__, self.name, self.sex.name, round(self.age), self.school or '.', self.work or '.', self.location or '.')
 
     @classmethod
     def gen(cls, name=None):
@@ -339,7 +314,6 @@ class Agent(Entity):
         age      = Agent.random_age()
         school   = None
         work     = None
-        flu      = Agent.random_flu()
         location = 'home'
 
         # Student:
@@ -354,7 +328,7 @@ class Agent(Entity):
             if (np.random.random() > 0.4):
                 location = work
 
-        return cls(name, sex, age, flu, school, work, location)
+        return cls(name, sex, age, school, work, location)
 
     @classmethod
     def gen_lst(cls, n):
@@ -367,10 +341,6 @@ class Agent(Entity):
     @staticmethod
     def random_age():
         return min(Agent.AGE_MAX, max(Agent.AGE_MIN, np.random.normal(Agent.AGE_M, Agent.AGE_SD)))
-
-    @staticmethod
-    def random_flu():
-        return AttrFluStage(np.random.choice(AttrFluStage))
 
     @staticmethod
     def random_sex():
