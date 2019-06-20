@@ -162,29 +162,35 @@ class ProbabilisticAutomaton(Rule, ABC):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class MarkovChain(ProbabilisticAutomaton):
-    '''
-    Time-homogenous Markov chain with finite state space.
+class MarkovChain(ProbabilisticAutomaton, ABC):
+    pass
 
-    The following example transition model for the variables named X:
+
+# ----------------------------------------------------------------------------------------------------------------------
+class TimeInvMarkovChain(MarkovChain):
+    '''
+    Discrete-time homogenous Markov chain with finite state space.
+
+    The following sample transition model for the variables named X:
 
                    x_1^t   x_2^t
         x_1^{t+1}    0.1     0.3
         x_2^{t+1}    0.9     0.7
 
-    Should be specified as:
+    Should be specified as the following list of stochastic vectors:
 
         { 'x1': [0.1, 0.9], 'x2': [0.3, 0.7] }
 
-    ----
+
+    ----[ Notation A ]----
 
     code:
-        MarkovChain('flu', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.50, 0.50], 'r': [0.10, 0.00, 0.90] })
+        TimeInvMarkovChain('flu', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.80, 0.10], 'r': [0.10, 0.00, 0.90] })
 
     init:
         tm = {
             s: [0.95, 0.05, 0.00],
-            i: [0.00, 0.50, 0.50],
+            i: [0.00, 0.80, 0.20],
             r: [0.10, 0.00, 0.90]
         }  # right stochastic matrix
 
@@ -194,9 +200,17 @@ class MarkovChain(ProbabilisticAutomaton):
     apply:
         tm_i = tm[group.attr.flu]
         move-mass:
-            tm_i[0] -> A: flu = s
-            tm_i[1] -> A: flu = i
-            tm_i[2] -> A: flu = r
+            tm_i[0] -> A:flu = 's'
+            tm_i[1] -> A:flu = 'i'
+            tm_i[2] -> A:flu = 'r'
+
+
+    ----[ Notation B ]----
+
+    tm_i = tm[group.attr.flu]
+    tm_i[0] -> A:flu = 's'
+    tm_i[1] -> A:flu = 'i'
+    tm_i[2] -> A:flu = 'r'
     '''
 
     def __init__(self, var, tm, name='markov-chain', t=TimeAlways(), memo=None):
@@ -220,16 +234,70 @@ class MarkovChain(ProbabilisticAutomaton):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class TimeVaryingMarkovChain(MarkovChain):
+class TimeVarMarkovChain(MarkovChain):
     '''
-    Time-homogenous Markov chain with finite state space with a time-varying transition matrix.
+    Discrete-time non-homogenous Markov chain with finite state space.
 
-    Possible alternative names:
-        Time-dependant MC
-        Non-homogenous MC
+
+    ----[ Notation A ]----
+
+    code:
+        fn_flu_s_sv:
+            p_inf = n@_{attr.flu = 'i'} / n@
+            return [1 - p_inf, p_inf, 0.00]
+
+        TimeVarMarkovChain('flu', { 's': fn_flu_s_sv, 'i': [0.00, 0.80, 0.20], 'r': [0.10, 0.00, 0.90] })
+
+    ext:
+        p_inf
+
+    init:
+        tm = {
+            s: [1 - p_inf, p_inf, 0.00],
+            i: [0.00, 0.80, 0.20],
+            r: [0.10, 0.00, 0.90]
+        }  # right stochastic matrix
+
+    is-applicable:
+        has-attr: flu
+
+    apply:
+        tm_i = tm[group.attr.flu]
+        move-mass:
+            tm_i[0] -> A: flu = s
+            tm_i[1] -> A: flu = i
+            tm_i[2] -> A: flu = r
+
+    ----[ Notation B ]----
+
+    tm_i = tm[group.attr.flu]
+    tm_i[0] -> A:flu = 's'
+    tm_i[1] -> A:flu = 'i'
+    tm_i[2] -> A:flu = 'r'
     '''
 
-    pass
+    def __init__(self, var, tm, name='markov-chain', t=TimeAlways(), memo=None):
+        super().__init__(name, t, memo)
+
+        for sv in tm.values():  # stochastic vectors or function pointers
+            if isinstance(sv, list):
+                if sum(sv) != 1.00:
+                    raise ValueError(f"'{self.__class__.__name__}' class: Probabilities in the transition model must add up to 1")
+
+        self.var = var
+        self.tm = tm
+        self.states = list(self.tm.keys())  # simplify and speed-up lookup in apply()
+
+    def apply(self, pop, group, iter, t):
+        tm = self.tm.get(group.get_attr(self.var))
+        if tm is None:
+            raise ValueError(f"'{self.__class__.__name__}' class: Unknown state '{group.get_attr(self.var)}' for attribute '{self.var}'")
+        if hasattr(tm, '__call__'):
+            tm = tm(pop, group, iter, t)
+        return [GroupSplitSpec(p=tm[i], attr_set={ self.var: self.states[i] }) for i in range(len(self.states)) if tm[i] > 0]
+
+    def is_applicable(self, group, iter, t):
+        return super().is_applicable(group, iter, t) and group.has_attr([ self.var ])
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -396,7 +464,7 @@ class BirthDeathProcess(MarkovProcess):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class SISModel(MarkovChain):
+class SISModel(TimeInvMarkovChain):
     '''
     The SIS epidemiological model without vital dynamics.
 
@@ -404,7 +472,8 @@ class SISModel(MarkovChain):
         beta  - transmission rate
         gamma - recovery rate
 
-    ----
+
+    ----[ Notation A ]----
 
     code:
         SISModel('flu', 0.05, 0.10)
@@ -415,7 +484,7 @@ class SISModel(MarkovChain):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class SIRSModel(MarkovChain):
+class SIRSModel(TimeInvMarkovChain):
     '''
     The SIR(S) epidemiological model without vital dynamics.
 
@@ -424,7 +493,8 @@ class SIRSModel(MarkovChain):
         gamma - recovery rate
         alpha - immunity loss rate (alpha = 0 implies life-long immunity)
 
-    ----
+
+    ----[ Notation A ]----
 
     code:
         SIRSModel('flu', 0.05, 0.20, 0.10)  # SIRS
@@ -511,7 +581,8 @@ class PoissonIncidenceProcess(PoissonProcess):
 
     (...)
 
-    ----
+
+    ----[ Notation A ]----
 
     code:
         PoissonIncidenceProcess('ad', 65, 0.01, 2, 5, rate_delta_mode=PoissonIncidenceProcess.RateDeltaMode.EXP))
@@ -524,21 +595,23 @@ class PoissonIncidenceProcess(PoissonProcess):
 
     apply:
         if (group.attr.age >= age_0):
-            l = double_rate(l)  # l0 * c^{(group.attr.age - age_0) / t_c}
+            l = double_rate(l)        # l0 * c^{(group.attr.age - age_0) / t_c}
             p_0 = PoissonPMF(l,0)
             move-mass:
-                    p_0 -> A: age = group.attr.age + 1
-                1 - p_0 -> A: age = group.attr.age + 1, A: ad = True
+                    p_0 -> A:age = group.attr.age + 1
+                1 - p_0 -> A:age = group.attr.age + 1, A:ad = True
 
-    ----
 
-    if (group.attr.age >= age_0):
-        l = double_rate(l)  # l0 * c^{(group.attr.age - age_0) / t_c}
+    ----[ Notation B ]----
+
+    (group.attr.age >= age_0)
+        l = double_rate(l)        # l0 * c^{(group.attr.age - age_0) / t_c}
         p_0 = PoissonPMF(l,0)
-        p_0     -> A: age = group.attr.age + 1
-        1 - p_0 -> A: age = group.attr.age + 1, A: ad = True
+        p_0     -> A:age = group.attr.age + 1
+        1 - p_0 -> A:age = group.attr.age + 1, A:ad = True
 
-    ----
+
+    ----[ Scratchpad ]----
 
     mu = e^(lambda * x)
     log(mu) = lambda * x
@@ -658,7 +731,8 @@ class SegregationModel(Rule):
     '''
     Segregation model.
 
-    ----
+
+    ----[ Notation A ]----
 
     code:
         SegregationModel('team', 2)
@@ -674,12 +748,13 @@ class SegregationModel(Rule):
         p_team = n@_{attr.team = group.attr.team} / n@
         if group.attr.flu = 'r':
             move-mass:
-                p_migrate -> R: @ = get_random_site()
+                p_migrate -> R:@ = get_random_site()
 
-    ----
+
+    ----[ Notation B ]----
 
     p_team = n@_{attr.team = group.attr.team} / n@
-    if (p_team < 0.5) then p_migrate -> R: @ = get_random_site()
+    if (p_team < 0.5) p_migrate -> R:@ = get_random_site()
     '''
 
     def __init__(self, attr, attr_dom_card, p_migrate=0.05):
@@ -1175,13 +1250,11 @@ class SimpleFluProgressRule(Rule):
     '''
     Describes how a population transitions between the flu states of susceptible, infected, and recovered.
 
-    ----
+
+    ----[ Notation A ]----
 
     code:
         SimpleFluProgressRule()
-
-    init:
-        .
 
     is-applicable:
         has-attr: flu
@@ -1190,21 +1263,22 @@ class SimpleFluProgressRule(Rule):
         if group.attr.flu = 's':
             p_inf = n@_{attr.flu = 'i'} / n@
             move-mass:
-                p_inf -> A: flu = 'i'
+                p_inf -> A:flu = 'i'
         if group.attr.flu = 'i':
             move-mass:
-                0.2 -> A: flu = 'r'
+                0.2 -> A:flu = 'r'
         if group.attr.flu = 'r':
             move-mass:
-                0.1 -> A: flu = 's'
+                0.1 -> A:flu = 's'
 
-    ----
+
+    ----[ Notation B ]----
 
     if (flu = s)
         p_inf = n@_{attr.flu = i} / n@
         p_inf -> A: flu = 'i'
-    if (flu = i) then 0.2 > A: flu = r
-    if (flu = r) then 0.1 > A: flu = s
+    if (flu = i) 0.2 > A:flu = r
+    if (flu = r) 0.1 > A:flu = s
     '''
 
     ATTRS = { 'flu': [ 's', 'i', 'r' ] }
@@ -1255,6 +1329,41 @@ class SimpleFluProgressMoodRule(Rule):
     '''
     Describes how a population transitions between the states of susceptible, infected, and recovered.  Includes the
     inconsequential 'mood' attribute which may improve exposition of how the PRAM framework works.
+
+
+    ----[ Notation A ]----
+
+    code:
+        SimpleFluProgressMoodRule()
+
+    is-applicable:
+        has-attr: flu
+
+    apply:
+        if group.attr.flu = 's':
+            p_inf = n@_{attr.flu = 'i'} / n@
+            move-mass:
+                p_inf -> A:flu = 'i', A:mood = 'annoyed'
+        if group.attr.flu = 'i':
+            move-mass:
+                0.2 -> A:flu = 'r', A:mood = 'happy'
+                0.5 ->              A:mood = 'bored'
+                0.3 ->              A:mood = 'annoyed'
+        if group.attr.flu = 'r':
+            move-mass:
+                0.1 -> A:flu = 's'
+
+
+    ----[ Notation B ]----
+
+    if (flu = s)
+        p_inf = n@_{attr.flu = i} / n@
+        p_inf -> A:flu = 'i', A:mood = 'annoyed'
+    if (flu = i)
+        0.2 -> A:flu = 'r', A:mood = 'happy'
+        0.5 ->              A:mood = 'bored'
+        0.3 ->              A:mood = 'annoyed'
+    if (flu = r) 0.1 > A:flu = s
     '''
 
     NAME = 'Simple flu progression model with mood'
@@ -1273,22 +1382,22 @@ class SimpleFluProgressMoodRule(Rule):
 
             return [
                 GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'i', 'mood': 'annoyed' }),
-                GroupSplitSpec(p=1 - p_infection, attr_set={ 'flu': 's' })
+                GroupSplitSpec(p=1 - p_infection)
             ]
 
         # Infected:
         if group.has_attr({ 'flu': 'i' }):
             return [
                 GroupSplitSpec(p=0.2, attr_set={ 'flu': 'r', 'mood': 'happy'   }),
-                GroupSplitSpec(p=0.5, attr_set={ 'flu': 'i', 'mood': 'bored'   }),
-                GroupSplitSpec(p=0.3, attr_set={ 'flu': 'i', 'mood': 'annoyed' })
+                GroupSplitSpec(p=0.5, attr_set={             'mood': 'bored'   }),
+                GroupSplitSpec(p=0.3, attr_set={             'mood': 'annoyed' })
             ]
 
         # Recovered:
         if group.has_attr({ 'flu': 'r' }):
             return [
-                GroupSplitSpec(p=0.9, attr_set={ 'flu': 'r' }),
-                GroupSplitSpec(p=0.1, attr_set={ 'flu': 's' })
+                GroupSplitSpec(p=0.1, attr_set={ 'flu': 's' }),
+                GroupSplitSpec(p=0.9)
             ]
 
         raise ValueError('Unknown flu state')
@@ -1299,13 +1408,11 @@ class SimpleFluLocationRule(Rule):
     '''
     Describes how student population changes location conditional upon being exposed to the flu.
 
-    ----
+
+    ----[ Notation A ]----
 
     code:
         SimpleFluLocationRule()
-
-    init:
-        .
 
     is-applicable:
         has-attr: flu
@@ -1315,20 +1422,21 @@ class SimpleFluLocationRule(Rule):
         if group.attr.flu = 'i':
             if group.attr.income = 'l':
                 move-mass:
-                    0.1 -> R: @ = group.rel.home
+                    0.1 -> R:@ = group.rel.home
             if group.attr.income = 'm':
                 move-mass:
-                    0.6 -> R: @ = group.rel.home
+                    0.6 -> R:@ = group.rel.home
         if group.attr.flu = 'r':
             move-mass:
-                0.8 -> R: @ = group.rel.school
+                0.8 -> R:@ = group.rel.school
 
-    ----
+
+    ----[ Notation B ]----
 
     if (flu = i)
-        if (income = l) then 0.1 > R: @ = home
-        if (income = m) then 0.6 > R: @ = home
-    if (flu = r) then 0.8 > R: @ = school
+        if (income = l) 0.1 > R:@ = home
+        if (income = m) 0.6 > R:@ = home
+    if (flu = r) 0.8 > R:@ = school
     '''
 
     ATTRS = { 'flu': [ 's', 'i', 'r' ], 'income': ['l', 'm'] }
