@@ -20,12 +20,12 @@ def plot_one_school(tbl, title, marker, fpath, cmap_ps, cmap_pe, cmap_pr):  # ta
     ''' Plot one of the schools (i.e., a low- or medium-income one). '''
 
     # Data:
-    data = { 'i':[], 'ps':[], 'pe':[], 'pr':[] }
+    data = { 'i':[], 'ps':[], 'pi':[], 'pr':[] }
     with sqlite3.connect(fpath_db, check_same_thread=False) as c:
-        for r in c.execute(f'SELECT i+1, ps,pe,pr FROM {tbl}').fetchall():
+        for r in c.execute(f'SELECT i+1, ps,pi,pr FROM {tbl}').fetchall():
             data['i'].append(r[0])
             data['ps'].append(r[1])
-            data['pe'].append(r[2])
+            data['pi'].append(r[2])
             data['pr'].append(r[3])
 
     # Plot:
@@ -33,7 +33,7 @@ def plot_one_school(tbl, title, marker, fpath, cmap_ps, cmap_pe, cmap_pr):  # ta
     fig = plt.figure(figsize=(16,6))
     plt.title(title)
     plt.plot(data['i'], data['ps'], lw=1, linestyle='--', marker=marker, color=cmap(cmap_ps), markersize=5, mfc='none', antialiased=True)
-    plt.plot(data['i'], data['pe'], lw=1, linestyle='-',  marker=marker, color=cmap(cmap_pe), markersize=5, mfc='none', antialiased=True)
+    plt.plot(data['i'], data['pi'], lw=1, linestyle='-',  marker=marker, color=cmap(cmap_pe), markersize=5, mfc='none', antialiased=True)
     plt.plot(data['i'], data['pr'], lw=1, linestyle=':',  marker=marker, color=cmap(cmap_pr), markersize=5, mfc='none', antialiased=True)
     plt.legend(['Susceptible', 'Exposed', 'Recovered'], loc='upper right')
     plt.xlabel('Iteration')
@@ -70,5 +70,5 @@ def plot_compare_schools(col, name, fpath, cmap_low, cmap_med):  # tab10: 6,9
     fig.savefig(os.path.join(os.path.dirname(__file__), 'out', fpath), dpi=300)
 
 plot_compare_schools('ps', 'Susceptible', '03-d-low-vs-med-income-school-ps.png', 0,1)
-plot_compare_schools('pe', 'Exposed',     '03-c-low-vs-med-income-school-pe.png', 4,5)
+plot_compare_schools('pe', 'Infected',    '03-c-low-vs-med-income-school-pe.png', 4,5)
 plot_compare_schools('pr', 'Recovered',   '03-e-low-vs-med-income-school-pr.png', 6,7)

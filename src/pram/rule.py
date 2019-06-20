@@ -1,13 +1,15 @@
 import math
+import random
 
 from abc         import abstractmethod, ABC
 from attr        import attrs, attrib
 from dotmap      import DotMap
 from enum        import IntEnum
-from scipy.stats import lognorm, rv_discrete
+from scipy.stats import lognorm, poisson, rv_discrete
 
 from .entity import GroupQry, GroupSplitSpec, Site
 from .util   import Err, Time as TimeU
+
 
 # from enum        import IntEnum
 # A = IntEnum('State', 'S E I R')
@@ -151,11 +153,20 @@ class Rule(ABC):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class MCRule(Rule):
+class ProbabilisticAutomaton(Rule, ABC):
+    '''
+    Probabilistic automaton.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class MarkovChain(ProbabilisticAutomaton):
     '''
     Time-homogenous Markov chain with finite state space.
 
-    The following example transition model for the variabled named X:
+    The following example transition model for the variables named X:
 
                    x_1^t   x_2^t
         x_1^{t+1}    0.1     0.3
@@ -164,6 +175,28 @@ class MCRule(Rule):
     Should be specified as:
 
         { 'x1': [0.1, 0.9], 'x2': [0.3, 0.7] }
+
+    ----
+
+    code:
+        MarkovChain('flu', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.50, 0.50], 'r': [0.10, 0.00, 0.90] })
+
+    init:
+        tm = {
+            s: [0.95, 0.05, 0.00],
+            i: [0.00, 0.50, 0.50],
+            r: [0.10, 0.00, 0.90]
+        }  # right stochastic matrix
+
+    is-applicable:
+        has-attr: flu
+
+    apply:
+        tm_i = tm[group.attr.flu]
+        move-mass:
+            tm_i[0] -> A: flu = s
+            tm_i[1] -> A: flu = i
+            tm_i[2] -> A: flu = r
     '''
 
     def __init__(self, var, tm, name='markov-chain', t=TimeAlways(), memo=None):
@@ -187,7 +220,514 @@ class MCRule(Rule):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class SEIRRule(Rule, ABC):
+class TimeVaryingMarkovChain(MarkovChain):
+    '''
+    Time-homogenous Markov chain with finite state space with a time-varying transition matrix.
+
+    Possible alternative names:
+        Time-dependant MC
+        Non-homogenous MC
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class StochasticProcess(Rule, ABC):
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class MarkovProcess(StochasticProcess):
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class BernoulliScheme(MarkovProcess):
+    '''
+    Bernoulli scheme or Bernoulli shift is a generalization of the Bernoulli process to more than two possible
+    outcomes.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class BernoulliProcess(BernoulliScheme):
+    '''
+    A Bernoulli scheme is a special case of a Markov chain where the transition probability matrix has identical rows,
+    which means that the next state is even independent of the current state (in addition to being independent of the
+    past states). A Bernoulli scheme with only two possible states is known as a Bernoulli process.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class RandomWalk(MarkovProcess):
+    '''
+    Markov processes in discreet time.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class WienerProcess(MarkovProcess):
+    '''
+    Markov processes in continuous time.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class PoissonProcess(MarkovProcess):
+    '''
+    Markov processes in continuous time.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class JumpProcess(PoissonProcess):
+    '''
+    A jump process is a type of stochastic process that has discrete movements, called jumps, with random arrival
+    times, rather than continuous movement, typically modelled as a simple or compound Poisson process.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class CellularAutomaton(StochasticProcess):
+    '''
+    Cellular automata are a discrete-time dynamical system of interacting entities, whose state is discrete.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class StochasticCellularAutomaton(CellularAutomaton):
+    '''
+    Probabilistic cellular automata (PCA), random cellular automata, or locally interacting Markov chains.
+
+
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class InteractingParticleSystem(StochasticProcess):
+    '''
+    Continuous-time Markov jump processes describing the collective behavior of stochastically interacting components.
+    IPS are the continuous-time analogue of stochastic cellular automata.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class BirthDeathProcess(PoissonProcess):
+    '''
+    A jump process is a type of stochastic process that has discrete movements, called jumps, with random arrival
+    times, rather than continuous movement, typically modelled as a simple or compound Poisson process.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class BirthDeathProcess(MarkovProcess):
+    '''
+    A special case of continuous-time Markov process where the state transitions are of only two types: "births", which
+    increase the state variable by one and "deaths", which decrease the state by one.
+
+    A homogeneous Poisson process is a pure birth process.
+
+    The following infinitesimal generator of the process (\lambda are birth rates and \mu are death rates):
+
+        | -l_0           l_0             0             0    0  ... |
+        |  m_1  -(l_1 + m_1)           l_1             0    0  ... |
+        |    0           m_2  -(l_2 + m_2)           l_2    0  ... |
+        |    0             0           m_3  -(l_3 + m_3)  l_3  ... |
+        |    .             .             .             .    .  ... |
+        |    .             .             .             .    .  ... |
+
+    should be provided as:
+
+        [l_0, [l_1, m_1], [l_2, m_2], [l_3, m_3], ..., m_n]
+
+    Sojourn times have exponential p.d.f. $\lambda e^{-\lambda t}$.
+
+    --------------------------------------------------------------------------------------------------------------------
+
+    Birth process examples [1]:
+    - Radioactive transformations
+    - Conversion of fibroge molecules into fibrin molecules follows a birth process (blood clotting)
+
+    Application areas [1]:
+    - Epidemics
+    - Queues, inventories, and reliability
+    - Production management
+    - Computer communication systems
+    - Neutron propagation
+    - Optics
+    - Chemical reactions
+    - Construction and mining
+    - Compartmental models
+
+    References:
+    [1] Birth and Death Processes (Chapter 4)
+        http://neutrino.aquaphoenix.com/ReactionDiffusion/SERC5chap4.pdf
+    [2] https://cs.nyu.edu/mishra/COURSES/09.HPGP/scribe3
+    '''
+
+    def __init__(self, ig, name='birth-death-process', t=TimeAlways()):
+        super().__init__(name, t)
+
+        self.ig = ig  # inifinitesimal generator of the process
+
+    def apply(self, pop, group, iter, t):
+        return None
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class SISModel(MarkovChain):
+    '''
+    The SIS epidemiological model without vital dynamics.
+
+    Model parameters:
+        beta  - transmission rate
+        gamma - recovery rate
+
+    ----
+
+    code:
+        SISModel('flu', 0.05, 0.10)
+    '''
+
+    def __init__(self, var, beta, gamma, name='sis-model', t=TimeAlways(), memo=None):
+        super().__init__(var, { 's': [1 - beta, beta], 'i': [gamma, 1 - gamma] }, name, t, memo)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class SIRSModel(MarkovChain):
+    '''
+    The SIR(S) epidemiological model without vital dynamics.
+
+    Model parameters:
+        beta  - transmission rate
+        gamma - recovery rate
+        alpha - immunity loss rate (alpha = 0 implies life-long immunity)
+
+    ----
+
+    code:
+        SIRSModel('flu', 0.05, 0.20, 0.10)  # SIRS
+        SIRSModel('flu', 0.05, 0.20, 0.00)  # SIR
+    '''
+
+    def __init__(self, var, beta, gamma, alpha, name='sir-model', t=TimeAlways(), memo=None):
+        super().__init__(var, { 's': [1 - beta, beta, 0.00], 'i': [0.00, 1 - gamma, gamma], 'r': [alpha, 0.00, 1 - alpha] }, name, t, memo)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class PoissonIncidenceProcess(PoissonProcess):
+    '''
+    Homogenous and inhomogenous Poisson point process for disease incidence.
+
+    The non-homogeneity of the Poisson process is handled by allowing the user to specify how the rate (i.e., the
+    $\lambda$ parameter) of the process changes over time.  The change to that rate is given as the combination of a
+    delta on it and the number of iterations for that delta to take place.  The rate parameter is allowed to change
+    gradually (i.e., at every step of the simulation) or in strict increments (e.g., only every 10 iterations) and is
+    controlled by the 'inc_smooth' parameter.
+
+    The rate can change in the following ways (as determined by the 'rate_delta_mode' parameter which takes values of
+    the 'RateDeltaMode' enumeration):
+
+    - NC   No change (i.e., the Poisson process is stationary)
+    - ADD  Additive
+    - MUL  Multiplicative
+    - EXP  Exponential
+    - FN   User-provided lambda function called at every iteration
+
+    A Cox process, also known as a doubly stochastic Poisson process is a point process which is a generalization of a
+    Poisson process where the time-dependent intensity is itself a stochastic process.  The Cox process can be
+    implemented by passing as an argument a function which will be called at every iteration to determine the current
+    Poisson rate.  'rate_delta_mode=RateDeltaMode.FN' must be used in that case.
+
+    An example model given as "AD incidence doubles every five years after 65 yo" can be instantiated by using the
+    delta of two and the number of iterations of five.
+
+    --------------------------------------------------------------------------------------------------------------------
+
+    Epidemiology of Alzheimer's disease and other forms of dementia in China, 1990-2010: a systematic review and analysis.
+    https://www.thelancet.com/action/showPdf?pii=S0140-6736%2813%2960221-4
+
+    --------------------------------------------------------------------------------------------------------------------
+
+    SRC: https://en.wikipedia.org/wiki/Incidence_(epidemiology); retrieved on 2019.06.05
+
+    # Incidence (epidemiology)
+    --------------------------
+
+    Incidence in epidemiology is a measure of the probability of occurrence of a given medical condition in a
+    population within a specified period of time. Although sometimes loosely expressed simply as the number of new
+    cases during some time period, it is better expressed as a proportion or a rate[1] with a denominator.
+
+    Incidence proportion (also known as cumulative incidence) is the number of new cases within a specified time period
+    divided by the size of the population initially at risk. For example, if a population initially contains 1,000
+    non-diseased persons and 28 develop a condition over two years of observation, the incidence proportion is 28 cases
+    per 1,000 persons per two years, i.e. 2.8% per two years.
+
+    (...)
+
+
+    ## Incidence vs. prevalence
+    ---------------------------
+
+    Incidence should not be confused with prevalence, which is the proportion of cases in the population at a given
+    time rather than rate of occurrence of new cases. Thus, incidence conveys information about the risk of contracting
+    the disease, whereas prevalence indicates how widespread the disease is. Prevalence is the proportion of the total
+    number of cases to the total population and is more a measure of the burden of the disease on society with no
+    regard to time at risk or when subjects may have been exposed to a possible risk factor. Prevalence can also be
+    measured with respect to a specific subgroup of a population (see: denominator data). Incidence is usually more
+    useful than prevalence in understanding the disease etiology: for example, if the incidence rate of a disease in a
+    population increases, then there is a risk factor that promotes the incidence.
+
+    For example, consider a disease that takes a long time to cure and was widespread in 2002 but dissipated in 2003.
+    This disease will have both high incidence and high prevalence in 2002, but in 2003 it will have a low incidence
+    yet will continue to have a high prevalence (because it takes a long time to cure, so the fraction of individuals
+    that are affected remains high). In contrast, a disease that has a short duration may have a low prevalence and a
+    high incidence. When the incidence is approximately constant for the duration of the disease, prevalence is
+    approximately the product of disease incidence and average disease duration, so prevalence = incidence × duration.
+    The importance of this equation is in the relation between prevalence and incidence; for example, when the
+    incidence increases, then the prevalence must also increase. Note that this relation does not hold for age-specific
+    prevalence and incidence, where the relation becomes more complicated.[6]
+
+    (...)
+
+    ----
+
+    code:
+        PoissonIncidenceProcess('ad', 65, 0.01, 2, 5, rate_delta_mode=PoissonIncidenceProcess.RateDeltaMode.EXP))
+
+    init:
+        age_0=65, l_0=0.01, c=2, t_c=5
+
+    is-applicable:
+        has-attr: age, ad
+
+    apply:
+        if (group.attr.age >= age_0):
+            l = double_rate(l)  # l0 * c^{(group.attr.age - age_0) / t_c}
+            p_0 = PoissonPMF(l,0)
+            move-mass:
+                    p_0 -> A: age = group.attr.age + 1
+                1 - p_0 -> A: age = group.attr.age + 1, A: ad = True
+
+    ----
+
+    if (group.attr.age >= age_0):
+        l = double_rate(l)  # l0 * c^{(group.attr.age - age_0) / t_c}
+        p_0 = PoissonPMF(l,0)
+        p_0     -> A: age = group.attr.age + 1
+        1 - p_0 -> A: age = group.attr.age + 1, A: ad = True
+
+    ----
+
+    mu = e^(lambda * x)
+    log(mu) = lambda * x
+
+    log(mu/t) = lambda * x
+    log(mu/t) = lambda * x
+    log(mu) - log(t) = lambda * x
+    log(mu) = lambda * x + log(t)
+
+    log(incidence) = lambda * x + log(age - age_0)
+    '''
+
+    RateDeltaMode = IntEnum('RateDeltaMode', 'NC ADD MUL EXP FN')  # incidence (or rate) change mode
+
+    def __init__(self, attr, age_0, rate_0, delta, delta_t, rate_delta_mode=RateDeltaMode.NC, fn_calc_lambda=None, is_smooth=True, name='change-incidence', t=TimeAlways()):
+        super().__init__(name, t)
+
+        self.attr = attr            # the attribute name for the disease
+        self.age_0 = age_0          # lower bound cut-off age for getting AD
+        self.rate_0 = rate_0        # base rate of the Poisson process (i.e., at the cut-off age)
+        self.rate = rate_0          # current rate of the Poisson process
+        self.delta = delta          # increase the rate by this factor
+        self.delta_t = delta_t      # increase the rate every this many time units
+        self.is_smooth = is_smooth  # flag: smooth increment? (or happen in the defined increments)
+
+        self.rate_delta_mode = rate_delta_mode
+        self.fn_calc_lambda = {
+            self.RateDeltaMode.NC  : self.calc_lambda_nc,
+            self.RateDeltaMode.ADD : self.calc_lambda_add,
+            self.RateDeltaMode.MUL : self.calc_lambda_mul,
+            self.RateDeltaMode.EXP : self.calc_lambda_exp,
+            self.RateDeltaMode.FN  : rate_delta_mode
+        }.get(self.rate_delta_mode)
+
+    def apply(self, pop, group, iter, t):
+        return self.get_split_specs(group)
+
+    def calc_lambda_nc(self, age):
+        ''' No rate change (i.e., a stationary Poisson point process). '''
+
+        return self.rate_0
+
+    def calc_lambda_add(self, age):
+        ''' Additive rate change. '''
+
+        if self.is_smooth:
+            return self.rate_0 + self.delta *            ((age - self.age_0) / self.delta_t)
+        else:
+            return self.rate_0 + self.delta *  math.floor((age - self.age_0) / self.delta_t)
+
+    def calc_lambda_mul(self, age):
+        ''' Multiplicative rate change. '''
+
+        if self.is_smooth:
+            return self.rate_0 * self.delta *            ((age - self.age_0) / self.delta_t)
+        else:
+            return self.rate_0 * self.delta *  math.floor((age - self.age_0) / self.delta_t)
+
+    def calc_lambda_exp(self, age):
+        ''' Exponential rate change. '''
+
+        if self.is_smooth:
+            return self.rate_0 * self.delta **           ((age - self.age_0) / self.delta_t)
+        else:
+            return self.rate_0 * self.delta ** math.floor((age - self.age_0) / self.delta_t)
+
+    def calc_lambda_hmm(self, age):
+        '''
+        Poisson hidden Markov models (PHMM) are special cases of hidden Markov models where a Poisson process has a
+        rate which varies in association with changes between the different states of a Markov model.
+        '''
+
+        return self.rate_0
+
+    def get_split_specs(self, group, age_inc=1):
+        '''
+        age_inc - how much to increment the 'age' attribute
+        '''
+
+        age = group.ga('age')
+
+        if age < self.age_0:
+            return [GroupSplitSpec(p=1.00, attr_set={ 'age': age + age_inc, self.attr: False })]
+
+        self.rate = self.fn_calc_lambda(age)
+        p0 = poisson(self.rate).pmf(0)
+        # print(f'n: {round(group.n,2):>12}  age: {age:>3}  l: {l:>3}  p0: {round(p0,2):<4}  p1: {round(1-p0,2):<4}')
+
+        return [
+            GroupSplitSpec(p=    p0, attr_set={ 'age': age + age_inc, self.attr: False }),
+            GroupSplitSpec(p=1 - p0, attr_set={ 'age': age + age_inc, self.attr: True  })
+        ]
+
+    def is_applicable(self, group, iter, t):
+        return super().is_applicable(group, iter, t) and group.ha(['age', self.attr])
+
+    def setup(self, pop, group):
+        if group.ha('age'):
+            return self.get_split_specs(group, 0)
+        else:
+            return None
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class OneDecayProcess(Rule):
+    '''
+    Radioactive one-decay process.
+
+    N(t) = N_0 e^{-\lambda t}
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class SegregationModel(Rule):
+    '''
+    Segregation model.
+
+    ----
+
+    code:
+        SegregationModel('team', 2)
+
+    init:
+        p_migrate = 0.05
+
+    is-applicable:
+        has-attr: team
+        has-rel: @
+
+    apply:
+        p_team = n@_{attr.team = group.attr.team} / n@
+        if group.attr.flu = 'r':
+            move-mass:
+                p_migrate -> R: @ = get_random_site()
+
+    ----
+
+    p_team = n@_{attr.team = group.attr.team} / n@
+    if (p_team < 0.5) then p_migrate -> R: @ = get_random_site()
+    '''
+
+    def __init__(self, attr, attr_dom_card, p_migrate=0.05):
+        '''
+        attr_dom_card - cardinality of the attribute values set
+        p_migrate     - the proportion of the population to migrate if repelled
+        '''
+
+        super().__init__('segregation-model', TimeAlways())
+
+        self.attr = attr
+        self.p_migrate = p_migrate           # proportion of the population that will migrate if repelled
+        self.p_repel = 1.00 / attr_dom_card  # population will be repelled (i.e., will move) if the site that population is at has a proportion of same self.attr lower than this
+
+    def apply(self, pop, group, iter, t):
+        attr   = group.ga(self.attr)
+        site   = group.gr(Site.AT)
+        n      = site.get_pop_size()
+        n_team = site.get_pop_size(GroupQry(attr={ self.attr: attr }))
+
+        if n == 0:
+            return None
+
+        p_team = n_team / n  # proportion of same self.attr
+
+        if p_team < self.p_repel:
+            site_rnd = self.get_random_site(pop, site)
+            return [
+                GroupSplitSpec(p=    self.p_migrate, rel_set={ Site.AT: site_rnd }),
+                GroupSplitSpec(p=1 - self.p_migrate)
+            ]
+        else:
+            return None
+
+    def get_random_site(self, pop, site):
+        ''' Returns a random site different than the specified one. '''
+
+        s = random.choice(list(pop.sites.values()))
+        while s == site:
+            s = random.choice(list(pop.sites.values()))
+        return s
+
+    def is_applicable(self, group, iter, t):
+        return super().is_applicable(group, iter, t) and group.ha([self.attr]) and group.hr([Site.AT])
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class SEIRModel(Rule, ABC):
     '''
     The SEIR compartmental epidemiological model.
 
@@ -317,7 +857,7 @@ class SEIRRule(Rule, ABC):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class SEIRFluRule(SEIRRule):
+class SEIRFluModel(SEIRModel):
     '''
     The SEIR model for the influenza.
 
@@ -633,10 +1173,41 @@ class RuleAnalyzerTestRule(Rule):
 # ----------------------------------------------------------------------------------------------------------------------
 class SimpleFluProgressRule(Rule):
     '''
-    Describes how a population transitions between the flu states of susceptible, exposed, and recovered.
+    Describes how a population transitions between the flu states of susceptible, infected, and recovered.
+
+    ----
+
+    code:
+        SimpleFluProgressRule()
+
+    init:
+        .
+
+    is-applicable:
+        has-attr: flu
+
+    apply:
+        if group.attr.flu = 's':
+            p_inf = n@_{attr.flu = 'i'} / n@
+            move-mass:
+                p_inf -> A: flu = 'i'
+        if group.attr.flu = 'i':
+            move-mass:
+                0.2 -> A: flu = 'r'
+        if group.attr.flu = 'r':
+            move-mass:
+                0.1 -> A: flu = 's'
+
+    ----
+
+    if (flu = s)
+        p_inf = n@_{attr.flu = i} / n@
+        p_inf -> A: flu = 'i'
+    if (flu = i) then 0.2 > A: flu = r
+    if (flu = r) then 0.1 > A: flu = s
     '''
 
-    ATTRS = { 'flu': [ 's', 'e', 'r' ] }
+    ATTRS = { 'flu': [ 's', 'i', 'r' ] }
     NAME = 'Simple flu progression model'
 
     def __init__(self, t=TimeAlways(), name_human=None, memo=None):
@@ -646,28 +1217,28 @@ class SimpleFluProgressRule(Rule):
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
             at  = group.get_rel(Site.AT)
-            n   = at.get_pop_size()                               # total   population at current location
-            n_e = at.get_pop_size(GroupQry(attr={ 'flu': 'e' }))  # exposed population at current location
+            n   = at.get_pop_size()                               # total    population at current location
+            n_i = at.get_pop_size(GroupQry(attr={ 'flu': 'i' }))  # infected population at current location
 
-            p_infection = float(n_e) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
+            p_infection = float(n_i) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
 
             return [
-                GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'e' }),
+                GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'i' }),
                 GroupSplitSpec(p=1 - p_infection, attr_set={ 'flu': 's' })
             ]
 
-        # Exposed:
+        # Infected:
         if group.has_attr({ 'flu': 'i' }):
             return [
                 GroupSplitSpec(p=0.2, attr_set={ 'flu': 'r' }),
-                GroupSplitSpec(p=0.8, attr_set={ 'flu': 'e' }),
+                GroupSplitSpec(p=0.8, attr_set={ 'flu': 'i' }),
             ]
 
         # Recovered:
         if group.has_attr({ 'flu': 'r' }):
             return [
-                GroupSplitSpec(p=0.9, attr_set={ 'flu': 'r' }),
-                GroupSplitSpec(p=0.1, attr_set={ 'flu': 's' })
+                GroupSplitSpec(p=0.1, attr_set={ 'flu': 's' }),
+                GroupSplitSpec(p=0.9, attr_set={ 'flu': 'r' })
             ]
 
         raise ValueError('Unknown flu state')
@@ -675,17 +1246,15 @@ class SimpleFluProgressRule(Rule):
     def setup(self, pop, group):
         return [
             GroupSplitSpec(p=0.9, attr_set={ 'flu': 's' }),
-            GroupSplitSpec(p=0.1, attr_set={ 'flu': 'e' })
+            GroupSplitSpec(p=0.1, attr_set={ 'flu': 'i' })
         ]
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SimpleFluProgressMoodRule(Rule):
     '''
-    Describes how a population transitions between the states of susceptible, exposed, and recovered.  Includes the
-    inconsequential 'mood' attribute which improves exposition of how the PRAM framework works.
-
-    Introduced in Cohen (2019).
+    Describes how a population transitions between the states of susceptible, infected, and recovered.  Includes the
+    inconsequential 'mood' attribute which may improve exposition of how the PRAM framework works.
     '''
 
     NAME = 'Simple flu progression model with mood'
@@ -697,22 +1266,22 @@ class SimpleFluProgressMoodRule(Rule):
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
             at  = group.get_rel(Site.AT)
-            n   = at.get_pop_size()                               # total   population at the group's current location
-            n_e = at.get_pop_size(GroupQry(attr={ 'flu': 'e' }))  # exposed population at the group's current location
+            n   = at.get_pop_size()                               # total    population at the group's current location
+            n_i = at.get_pop_size(GroupQry(attr={ 'flu': 'i' }))  # infected population at the group's current location
 
-            p_infection = float(n_e) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
+            p_infection = float(n_i) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
 
             return [
-                GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'e', 'mood': 'annoyed' }),
+                GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'i', 'mood': 'annoyed' }),
                 GroupSplitSpec(p=1 - p_infection, attr_set={ 'flu': 's' })
             ]
 
-        # Exposed:
-        if group.has_attr({ 'flu': 'e' }):
+        # Infected:
+        if group.has_attr({ 'flu': 'i' }):
             return [
                 GroupSplitSpec(p=0.2, attr_set={ 'flu': 'r', 'mood': 'happy'   }),
-                GroupSplitSpec(p=0.5, attr_set={ 'flu': 'e', 'mood': 'bored'   }),
-                GroupSplitSpec(p=0.3, attr_set={ 'flu': 'e', 'mood': 'annoyed' })
+                GroupSplitSpec(p=0.5, attr_set={ 'flu': 'i', 'mood': 'bored'   }),
+                GroupSplitSpec(p=0.3, attr_set={ 'flu': 'i', 'mood': 'annoyed' })
             ]
 
         # Recovered:
@@ -729,24 +1298,55 @@ class SimpleFluProgressMoodRule(Rule):
 class SimpleFluLocationRule(Rule):
     '''
     Describes how student population changes location conditional upon being exposed to the flu.
+
+    ----
+
+    code:
+        SimpleFluLocationRule()
+
+    init:
+        .
+
+    is-applicable:
+        has-attr: flu
+        has-rel: home, school
+
+    apply:
+        if group.attr.flu = 'i':
+            if group.attr.income = 'l':
+                move-mass:
+                    0.1 -> R: @ = group.rel.home
+            if group.attr.income = 'm':
+                move-mass:
+                    0.6 -> R: @ = group.rel.home
+        if group.attr.flu = 'r':
+            move-mass:
+                0.8 -> R: @ = group.rel.school
+
+    ----
+
+    if (flu = i)
+        if (income = l) then 0.1 > R: @ = home
+        if (income = m) then 0.6 > R: @ = home
+    if (flu = r) then 0.8 > R: @ = school
     '''
 
-    ATTRS = { 'flu': [ 's', 'e', 'r' ], 'income': ['l', 'm'] }
+    ATTRS = { 'flu': [ 's', 'i', 'r' ], 'income': ['l', 'm'] }
     NAME = 'Simple flu location model'
 
     def __init__(self, t=TimeAlways(), name_human=None, memo=None):
         super().__init__('flu-location', t, name_human, memo)
 
     def apply(self, pop, group, iter, t):
-        # Exposed and low income:
-        if group.has_attr({ 'flu': 'e', 'income': 'l' }):
+        # Infected and low income:
+        if group.has_attr({ 'flu': 'i', 'income': 'l' }):
             return [
                 GroupSplitSpec(p=0.1, rel_set={ Site.AT: group.get_rel('home') }),
                 GroupSplitSpec(p=0.9)
             ]
 
-        # Exposed and medium income:
-        if group.has_attr({ 'flu': 'e', 'income': 'm' }):
+        # Infected and medium income:
+        if group.has_attr({ 'flu': 'i', 'income': 'm' }):
             return [
                 GroupSplitSpec(p=0.6, rel_set={ Site.AT: group.get_rel('home') }),
                 GroupSplitSpec(p=0.4)

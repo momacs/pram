@@ -1,14 +1,5 @@
 '''
-A simulation implementing an infectious disease progression model.  The model is given as a time-homogenous Markov
-chain with a finite state space with the initial state distribution:
-
-    flu: (1 0 0)
-
-and the transition model:
-          s     i     r
-    s  0.95  0     0.10
-    i  0.05  0.50  0
-    r  0     0.50  0.90
+A simulation implementing the SIRS model of infectious disease spread in a population.
 '''
 
 import os,sys
@@ -18,14 +9,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pram.data   import ProbePersistanceDB, ProbeMsgMode, GroupSizeProbe
 from pram.entity import Group, GroupQry, GroupSplitSpec
-from pram.rule   import MCRule, TimeAlways
+from pram.rule   import SIRSModel
 from pram.sim    import Simulation
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 (Simulation().
-    add_rule(MCRule('flu', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.50, 0.50], 'r': [0.10, 0.00, 0.90] })).
     add_probe(GroupSizeProbe.by_attr('flu', 'flu', ['s', 'i', 'r'], msg_mode=ProbeMsgMode.DISP)).
+    add_rule(SIRSModel('flu', beta=0.05, gamma=0.50, alpha=0.10)).
     add_group(Group(n=1000, attr={ 'flu': 's' })).
     run(48)
 )
@@ -51,7 +42,7 @@ from pram.sim    import Simulation
 # )
 #
 # (Simulation().
-#     add_rule(MCRule('flu', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.50, 0.50], 'r': [0.10, 0.00, 0.90] })).
+#     add_rule(SIRSModel('flu', beta=0.05, gamma=0.50, alpha=0.10)).
 #     add_probe(probe).
 #     add_group(Group(n=1000, attr={ 'flu': 's' })).
 #     run(48)

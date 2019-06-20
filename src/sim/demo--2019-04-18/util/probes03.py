@@ -23,10 +23,10 @@ def probe_flu_at(school, name=None):
         name=name or str(school.name),
         queries=[
             GroupQry(attr={ 'flu': 's' }, rel={ 'school': school }),
-            GroupQry(attr={ 'flu': 'e' }, rel={ 'school': school }),
+            GroupQry(attr={ 'flu': 'i' }, rel={ 'school': school }),
             GroupQry(attr={ 'flu': 'r' }, rel={ 'school': school })
         ],
         qry_tot=GroupQry(rel={ 'school': school }),
         persistance=pp,
-        var_names=['ps', 'pe', 'pr', 'ns', 'ne', 'nr']
+        var_names=['ps', 'pi', 'pr', 'ns', 'ni', 'nr']
     )

@@ -29,21 +29,21 @@ class FluProgressRule(Rule):
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
             at  = group.get_rel(Site.AT)
-            n   = at.get_pop_size()                               # total   population at current location
-            n_e = at.get_pop_size(GroupQry(attr={ 'flu': 'e' }))  # exposed population at current location
+            n   = at.get_pop_size()                               # total    population at current location
+            n_i = at.get_pop_size(GroupQry(attr={ 'flu': 'i' }))  # infected population at current location
 
-            p_infection = float(n_e) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
+            p_infection = float(n_i) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
 
             return [
-                GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'e' }),
+                GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'i' }),
                 GroupSplitSpec(p=1 - p_infection, attr_set={ 'flu': 's' })
             ]
 
-        # Exposed:
-        if group.has_attr({ 'flu': 'e' }):
+        # Infected:
+        if group.has_attr({ 'flu': 'i' }):
             return [
                 GroupSplitSpec(p=0.2, attr_set={ 'flu': 'r' }),  # group size after: 20% of before (recovered)
-                GroupSplitSpec(p=0.8, attr_set={ 'flu': 'e' })   # group size after: 80% of before (still exposed)
+                GroupSplitSpec(p=0.8, attr_set={ 'flu': 'i' })   # group size after: 80% of before (still infected)
             ]
 
         # Recovered:
@@ -60,15 +60,15 @@ class FluLocationRule(Rule):
         super().__init__('flu-location', TimeAlways())
 
     def apply(self, pop, group, iter, t):
-        # Exposed and low income:
-        if group.has_attr({ 'flu': 'e', 'income': 'l' }):
+        # Infected and poor:
+        if group.has_attr({ 'flu': 'i', 'income': 'l' }):
             return [
                 GroupSplitSpec(p=0.1, rel_set={ Site.AT: group.get_rel('home') }),
                 GroupSplitSpec(p=0.9)
             ]
 
-        # Exposed and medium income:
-        if group.has_attr({ 'flu': 'e', 'income': 'm' }):
+        # Infected and rich:
+        if group.has_attr({ 'flu': 'i', 'income': 'm' }):
             return [
                 GroupSplitSpec(p=0.6, rel_set={ Site.AT: group.get_rel('home') }),
                 GroupSplitSpec(p=0.4)
@@ -98,7 +98,7 @@ school_m  = Site(450067740)  #  7% low income students
 def grp_setup(pop, group):
     return [
         GroupSplitSpec(p=0.9, attr_set={ 'flu': 's' }),
-        GroupSplitSpec(p=0.1, attr_set={ 'flu': 'e' })
+        GroupSplitSpec(p=0.1, attr_set={ 'flu': 'i' })
     ]
 
 

@@ -175,7 +175,7 @@ class Site(Resource):
     during an epidemic outbreak.
     '''
 
-    AT = '__at__'  # relation name for the group's current location
+    AT = '@'  # relation name for the group's current location
 
     __slots__ = ('attr', 'rel_name', 'pop', 'groups')
 
@@ -515,6 +515,31 @@ class Group(Entity):
 
         TODO: Think if the dependencies between rules could (or perhaps even should) be read from some sort of a
               graph.  Perhaps then multiplying the probabilities would not be appropriate.
+
+
+        ----[ Possible future extension ]----
+
+        Superposition principle (or superposition property), states that, for all linear systems, the net response
+        caused by two or more stimuli is the sum of the responses that would have been caused by each stimulus
+        individually. So that if input A produces response X and input B produces response Y then input (A + B)
+        produces response (X + Y).
+
+        A function F(x) that satisfies the superposition principle is called a linear function. Superposition can be
+        defined by two simpler properties; additivity and homogeneity
+
+            F(x1 + x2) = F(x1) + F(x2)   additivity
+            F(ax) = aF(x)                homogeneity
+
+        for scalar a.
+
+        (...)
+
+        The superposition principle applies to any linear system, including algebraic equations, linear differential
+        equations, and systems of equations of those forms. The stimuli and responses could be numbers, functions,
+        vectors, vector fields, time-varying signals, or any other object that satisfies certain axioms. Note that when
+        vectors or vector fields are involved, a superposition is interpreted as a vector sum.
+
+        SRC: https://en.wikipedia.org/wiki/Superposition_principle
         '''
 
         # (1) Apply all the rules and get their respective split specs (ss):
