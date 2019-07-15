@@ -1,11 +1,19 @@
+'''
+Nomenclature disambiguation
+    Markov Process, Markov Chain
+        https://math.stackexchange.com/questions/2071285/markov-process-markov-chain
+'''
+
 import math
 import random
+import string
 
-from abc         import abstractmethod, ABC
-from attr        import attrs, attrib
-from dotmap      import DotMap
-from enum        import IntEnum
-from scipy.stats import lognorm, poisson, rv_discrete
+from abc             import abstractmethod, ABC
+from attr            import attrs, attrib
+from dotmap          import DotMap
+from enum            import IntEnum
+from scipy.stats     import lognorm, poisson, rv_discrete
+from scipy.integrate import ode
 
 from .entity import GroupQry, GroupSplitSpec, Site
 from .util   import Err, Time as TimeU
@@ -107,6 +115,10 @@ class Rule(ABC):
 
         pass
 
+    @staticmethod
+    def get_rand_name(name, prefix='__', rand_len=12):
+        return f'{prefix}{name}_' + ''.join(random.sample(string.ascii_letters + string.digits, rand_len))
+
     def is_applicable(self, group, iter, t):
         ''' Verifies if the rule is applicable given the context. '''
 
@@ -153,6 +165,342 @@ class Rule(ABC):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+class Noop(Rule):
+    '''
+    NO-OP, i.e., a rule that does not do anything.
+
+    Useful for testing simulations that require no rules because at least one rule need to be present in a simulation
+    in order for groups to be added.
+    '''
+
+    def __init__(self, name='noop', t=TimeAlways()):
+        super().__init__(name, t)
+
+    def apply(self, pop, group, iter, t):
+        return None
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class Sequence(Rule, ABC):
+    pass
+
+class Equation(Rule, ABC):
+    pass
+
+class DifferenceEquation(Equation, ABC):
+    pass
+
+class Event(Rule, ABC):
+    pass
+
+class Process(Rule, ABC):
+    pass
+
+class Model(Rule, ABC):
+    pass
+
+class ChaoticMap(Rule, ABC):
+    '''
+    The simplest dynamical system that has relevant features of chaotic Hamiltonian systems.
+
+    List of chaotic maps
+        https://en.wikipedia.org/wiki/List_of_chaotic_maps
+    '''
+
+    pass
+
+class System(Rule, ABC):
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class StochasticProcess(Rule, ABC):
+    '''
+    A stochastic process is a collection of random variables indexed by time or space.
+    '''
+
+    pass
+
+class MarkovProcess(StochasticProcess):
+    '''
+    A stochastic process that satisfies the Markov property.
+    '''
+
+    pass
+
+class StationaryProcess(StochasticProcess):
+    '''
+    A stochastic process whose unconditional joint probability distribution does not change when shifted in time.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class DiscreteSpacetimeStochasticProcess           (StochasticProcess, ABC): pass
+class DiscreteSpaceContinuousTimeStochasticProcess (StochasticProcess, ABC): pass
+class ContinuousSpaceDiscreteTimeStochasticProcess (StochasticProcess, ABC): pass
+class ContinuousSpacetimeStochasticProcess         (StochasticProcess, ABC): pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class TimeSeriesFn(Rule, ABC):
+    '''
+    Function-based time series.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class TimeSeriesObs(Rule, ABC):
+    '''
+    Observation-based time series.
+
+    A rule that generates a time series given by a stochastic vector or a stochastic matrix of explicit observations
+    (e.g., historical data).  The following matrix
+
+            t1 t2 t3
+        x1   1  2  3
+        x2   4  5  6
+
+    should be provided as
+
+        { 'x1': [1,2,3], 'x2': [4,5,6] }
+    '''
+
+    def __init__(self, x, name='time-series', t=TimeAlways(), memo=None):
+        super().__init__(name, t, memo)
+        self.x = x  # f(t)
+
+    def apply(self, pop, group, iter, t):
+        # self.x[iter]
+        pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class FibonacciSeq(Sequence, DifferenceEquation):
+    '''
+    The Fibonacci numbers sequence.
+
+    F0-F20: 0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597 2584 4181 6765
+    '''
+
+    def __init__(self, attr='fib', name='fibonacci-seq', t=TimeAlways()):
+        super().__init__(name, t)
+
+        self.attr   = attr                             # n
+        self.attr_1 = Rule.get_rand_name(f'{attr}_1')  # n-1
+        self.attr_2 = Rule.get_rand_name(f'{attr}_2')  # n-2
+
+    def apply(self, pop, group, iter, t):
+        n  = group.ga(self.attr)
+        n1 = group.ga(self.attr_1) or 0
+        n2 = group.ga(self.attr_2) or 0
+
+        if n1 == 0:
+            n_, n1, n2 = 1,1,0
+        elif n2 == 0:
+            n_, n1, n2 = 1,1,1
+        else:
+            n_ = n1 + n2
+            n2 = n1
+            n1 = n_
+
+        return [GroupSplitSpec(p=1.00, attr_set={ self.attr: n_, self.attr_1: n1, self.attr_2: n2 })]
+
+    def is_applicable(self, group, iter, t):
+        return super().is_applicable(group, iter, t) and group.ha(self.attr)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class CompoundInterstSeq(Sequence, DifferenceEquation):
+    '''
+    Applies the comound interest formula to the designated attribute.
+
+    In:
+        r - nominal annual interest rate
+        n - compund frequency [months]
+    '''
+
+    def __init__(self, attr, r, n, name='compund-interst-seq', t=TimeAlways()):
+        super().__init__(name, t)
+
+        self.attr = attr
+        self.r = r
+        self.n = n
+
+    def apply(self, pop, group, iter, t):
+        p0 = group.ga(self.attr)
+        t = 1  # we do this every single iteration
+        p = p0 * (1 + self.r / self.n) ** (self.n * t)
+
+        return [GroupSplitSpec(p=1.00, attr_set={ self.attr: p })]
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class ODESystemSelf(Rule):
+    '''
+    Wraps a numeric integrator to solve a system of ordinary differential equations (ODEs) that do not interact with
+    anything else in the simulation.
+
+    The non-interactivity stems from the derivatives being kept internally to the integrator only.  This is useful when
+    computations need to happen on a step-by-step basis, consistent with the rest of the simulation, but the results,
+    while accessible, do not pollute the group attribute space.
+
+    Currently uses scipy's numerical integrators, but could switch to assimulo in the future.
+
+    In
+        f  - derivative-computing function
+        y0 - initial condition (i.e., a list of values)
+
+    --------------------------------------------------------------------------------------------------------------------
+
+    Finite-dimensional linear systems can always be modeled using a set of differential (or difference) equations as
+    follows:
+
+        d/dt x(t) = A(t) x(t) + B(t) u(t)
+             y(t) = C(t) x(t) + D(t) u(t)
+
+    in continuous time, or the following equivalent equations in discreet time:
+
+        x[k+1] = A[k] x[k] + B[k] u[k]
+          y[k] = C[k] x[k] + D[k] u[k]
+
+    The above equations are called linearized equations or equations of first variation.
+    '''
+
+    def __init__(self, f, y0, name='ode-system', t=TimeAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
+        super().__init__(name, t, memo)
+
+        self.y0 = y0
+        self.dt = dt  # TODO: should change with the change in the timer
+
+        self.ni = ode(f).set_integrator(ni_name, method='bdf')  # numeric integrator
+        self.ni.set_initial_value(self.y0, 0)
+
+        if f_params is not None:
+            self.ni.set_f_params(f_params)
+        if jac_params is not None:
+            self.ni.set_jac_params(jac_params)
+
+        self.hist = DotMap(t=[], y=[])  # history
+
+    def apply(self, pop, group, iter, t):
+        self.ni.integrate(self.ni.t + self.dt)
+
+        self.hist.t.append(self.ni.t)
+        self.hist.y.append(self.ni.y)
+
+        # print(f'{round(self.ni.t,1)}: {self.ni.y}')
+        return None
+
+    def get_hist(self):
+        ''' Returns the history of times and derivatives computed at those times. '''
+
+        t = [0.00] + self.hist.t
+        y = [[self.y0[i]] + [y[i].tolist().real for y in self.hist.y] for i in range(len(self.y0))]
+
+        return [t,y]
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class ODESystem(Rule):
+    '''
+    Wraps a numeric integrator to solve a system of ordinary differential equations (ODEs).
+
+    The initial state and the derivates computed as the system evolves are stored in the group attribute space thereby
+    directly impacting the simulation.
+
+    Currently uses scipy's numerical integrators, but could switch to assimulo in the future.
+
+    In
+        f  - derivative-computing function
+        y0 - initial condition (i.e., a list of group attribute names)
+    '''
+
+    def __init__(self, f, y0, name='ode-system', t=TimeAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
+        super().__init__(name, t, memo)
+
+        self.y0 = y0
+        self.y0_val = None
+        self.dt = dt  # TODO: should change with the change in the timer
+
+        self.ni = ode(f).set_integrator(ni_name, method='bdf')  # numeric integrator
+        # self.ni.set_initial_value(self.y0, 0)
+
+        if f_params is not None:
+            self.ni.set_f_params(f_params)
+        if jac_params is not None:
+            self.ni.set_jac_params(jac_params)
+
+        self.hist = DotMap(t=[], y=[])  # history
+
+    def apply(self, pop, group, iter, t):
+        if self.y0_val is None:
+            self.y0_val = [group.attr[y] for y in self.y0]
+            self.ni.set_initial_value(self.y0_val, 0)
+
+        self.ni.integrate(self.ni.t + self.dt)
+
+        self.hist.t.append(self.ni.t)
+        self.hist.y.append(self.ni.y)
+
+        return [GroupSplitSpec(p=1.00, attr_set={ self.y0[i]: self.ni.y[i].real for i in range(len(self.y0))})]
+
+    def get_hist(self):
+        ''' Returns the history of times and derivatives computed at those times. '''
+
+        t = [0.00] + self.hist.t
+        y = [[self.y0_val[i]] + [y[i].tolist().real for y in self.hist.y] for i in range(len(self.y0))]
+
+        return [t,y]
+
+    def is_applicable(self, group, iter, t):
+        return super().is_applicable(group, iter, t) and group.ha(self.y0)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class LogisticMap(ChaoticMap):
+    '''
+    x_{n+1} = r x_n (1 - x_n),
+
+    where $r \n [2,4]$ and $x \in [0,1]$.
+
+    Time domain                : Discrete
+    Space domain               : Real
+    Number of space dimensions : 1
+    Number of parameters       : 1
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class LotkaVolterraSystem(ChaoticMap, ODESystem):
+    '''
+    Time domain                : Continuous
+    Space domain               : Real
+    Number of space dimensions : 3
+    Number of parameters       : 4
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class LorenzSystem(ChaoticMap, ODESystem):
+    '''
+    Time domain                : Continuous
+    Space domain               : Real
+    Number of space dimensions : 3
+    Number of parameters       : 3
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class ProbabilisticAutomaton(Rule, ABC):
     '''
     Probabilistic automaton.
@@ -162,14 +510,18 @@ class ProbabilisticAutomaton(Rule, ABC):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class MarkovChain(ProbabilisticAutomaton, ABC):
+class MarkovChain(MarkovProcess, ProbabilisticAutomaton, ABC):
+    '''
+    Markov process with a discrete state space.
+    '''
+
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class TimeInvMarkovChain(MarkovChain):
+class DiscreteInvMarkovChain(MarkovChain, DiscreteSpacetimeStochasticProcess, StationaryProcess):
     '''
-    Discrete-time homogenous Markov chain with finite state space.
+    Discrete-time time-homogenous Markov chain with finite state space.
 
     The following sample transition model for the variables named X:
 
@@ -181,6 +533,17 @@ class TimeInvMarkovChain(MarkovChain):
 
         { 'x1': [0.1, 0.9], 'x2': [0.3, 0.7] }
 
+    ----[ Definition ]--------------------------------------------------------------------------------------------------
+
+    A stochastic process $X = \{X_n:n \geq 0\}$ on a countable set $S$ is a Markov Chain if, for any $i,j \in S$ and
+    $n \geq 0$,
+
+    P(X_{n+1} = j | X_0, \ldots, X_n) = P(X_{n+1} = j | X_n)
+    P(X_{n+1} = j | X_n = i) = p_{ij}
+
+    The $p_{ij} is the probability that the Markov chain jumps from state $i$ to state $j$.  These transition
+    probabilities satisfy $\sum_{j \in S} p_{ij} = 1, i \in S$, and the matrix $P=(pij)$ is the transition matrix of
+    the chain.
 
     ----[ Notation A ]----
 
@@ -198,11 +561,12 @@ class TimeInvMarkovChain(MarkovChain):
         has-attr: flu
 
     apply:
-        tm_i = tm[group.attr.flu]
+        curr_state = group.attr.flu
+        new_state_sv = tm[]  # stochastic vector
         move-mass:
-            tm_i[0] -> A:flu = 's'
-            tm_i[1] -> A:flu = 'i'
-            tm_i[2] -> A:flu = 'r'
+            new_state_sv[0] -> A:flu = 's'
+            new_state_sv[1] -> A:flu = 'i'
+            new_state_sv[2] -> A:flu = 'r'
 
 
     ----[ Notation B ]----
@@ -234,9 +598,9 @@ class TimeInvMarkovChain(MarkovChain):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class TimeVarMarkovChain(MarkovChain):
+class DiscreteVarMarkovChain(MarkovChain, DiscreteSpacetimeStochasticProcess):
     '''
-    Discrete-time non-homogenous Markov chain with finite state space.
+    Discrete-time non-time-homogenous Markov chain with finite state space.
 
 
     ----[ Notation A ]----
@@ -301,58 +665,107 @@ class TimeVarMarkovChain(MarkovChain):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class StochasticProcess(Rule, ABC):
+class CotinuousMarkovChain(MarkovChain, DiscreteSpaceContinuousTimeStochasticProcess):
+    '''
+    Continuous-time Markov chain with finite state space.
+    '''
+
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class MarkovProcess(StochasticProcess):
-    pass
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-class BernoulliScheme(MarkovProcess):
+class BernoulliScheme(DiscreteInvMarkovChain):
     '''
     Bernoulli scheme or Bernoulli shift is a generalization of the Bernoulli process to more than two possible
     outcomes.
+
+    A Bernoulli scheme is a special case of a Markov chain where the transition probability matrix has identical rows,
+    which means that the next state is even independent of the current state (in addition to being independent of the
+    past states).
     '''
 
-    pass
+    def __init__(self, attr='state', vals=(0,1), name='bernoulli-process', t=TimeAlways(), memo=None):
+        super().__init__(var, { vals[0]: [1-p, p], vals[1]: [1-p, p] }, name, t, memo)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class BernoulliProcess(BernoulliScheme):
     '''
-    A Bernoulli scheme is a special case of a Markov chain where the transition probability matrix has identical rows,
-    which means that the next state is even independent of the current state (in addition to being independent of the
-    past states). A Bernoulli scheme with only two possible states is known as a Bernoulli process.
+    A Bernoulli process is a sequence of independent trials in which each trial results in a success or failure with
+    respective probabilities $p$ and $q=1−p$.
+
+    A Bernoulli scheme with only two possible states is known as a Bernoulli process.
+
+    Binomial Markov Chain.
     '''
 
-    pass
+    def __init__(self, p=0.5, attr='state', vals=(0,1), name='bernoulli-process', t=TimeAlways(), memo=None):
+        super().__init__(attr, { vals[0]: [1-p, p], vals[1]: [1-p, p] }, name, t, memo)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class RandomWalk(MarkovProcess):
+class RandomWalk(DiscreteInvMarkovChain):
     '''
     Markov processes in discreet time.
+
+    The results of discretizing both time and space of a diffusion equation.
     '''
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class WienerProcess(MarkovProcess):
+class LevyProcess(MarkovProcess):
     '''
-    Markov processes in continuous time.
+    The continuous-time analog of a random walk.
     '''
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class PoissonProcess(MarkovProcess):
+class DiffusionProcess(StochasticProcess):
+    '''
+    A continuous-time Markov process with almost surely continuous sample paths.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class WienerProcess(LevyProcess, DiffusionProcess):
     '''
     Markov processes in continuous time.
+
+    Brownian motion process or Brownian motion.
+
+    A limit of simple random walk.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class OrnsteinUhlenbeckProcess(LevyProcess, DiffusionProcess):
+    '''
+    A stationary Gauss–Markov mean-reverting process.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class PoissonProcess(LevyProcess):
+    '''
+    Poisson point process.
+
+    Markov processes in continuous time.
+
+    On the real line, the Poisson process is a type of continuous-time Markov process known as a birth-death process
+    (with just births and zero deaths) and is called a pure [67] or simple birth process.[68] More complicated
+    processes with the Markov property, such as Markov arrival processes, have been defined where the Poisson process
+    is a special case.[54]
+    [https://en.wikipedia.org/wiki/Poisson_point_process]
     '''
 
     pass
@@ -363,6 +776,18 @@ class JumpProcess(PoissonProcess):
     '''
     A jump process is a type of stochastic process that has discrete movements, called jumps, with random arrival
     times, rather than continuous movement, typically modelled as a simple or compound Poisson process.
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class CoxProcess(PoissonProcess):
+    '''
+    A point process which is a generalization of a Poisson process where the time-dependent intensity is itself a
+    stochastic process.
+
+    Also known as a doubly stochastic Poisson process.
     '''
 
     pass
@@ -464,7 +889,7 @@ class BirthDeathProcess(MarkovProcess):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class SISModel(TimeInvMarkovChain):
+class SISModel(DiscreteInvMarkovChain):
     '''
     The SIS epidemiological model without vital dynamics.
 
@@ -484,7 +909,7 @@ class SISModel(TimeInvMarkovChain):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class SIRSModel(TimeInvMarkovChain):
+class SIRSModel(DiscreteInvMarkovChain):
     '''
     The SIR(S) epidemiological model without vital dynamics.
 
@@ -503,6 +928,17 @@ class SIRSModel(TimeInvMarkovChain):
 
     def __init__(self, var, beta, gamma, alpha, name='sir-model', t=TimeAlways(), memo=None):
         super().__init__(var, { 's': [1 - beta, beta, 0.00], 'i': [0.00, 1 - gamma, gamma], 'r': [alpha, 0.00, 1 - alpha] }, name, t, memo)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class SIRModelGillespie(Rule):
+    '''
+    Gillespie algorithm
+
+    SRC: https://en.wikipedia.org/wiki/Gillespie_algorithm
+    '''
+
+    pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -596,7 +1032,7 @@ class PoissonIncidenceProcess(PoissonProcess):
     apply:
         if (group.attr.age >= age_0):
             l = double_rate(l)        # l0 * c^{(group.attr.age - age_0) / t_c}
-            p_0 = PoissonPMF(l,0)
+            p_0 = PoissonPMF(l,0)  # ...
             move-mass:
                     p_0 -> A:age = group.attr.age + 1
                 1 - p_0 -> A:age = group.attr.age + 1, A:ad = True
@@ -745,10 +1181,10 @@ class SegregationModel(Rule):
         has-rel: @
 
     apply:
-        p_team = n@_{attr.team = group.attr.team} / n@
-        if group.attr.flu = 'r':
-            move-mass:
-                p_migrate -> R:@ = get_random_site()
+        p_team = n@_{attr.team = group.attr.team} / n@  # ...
+        if (p_team < 0.5):
+            rd p_migrate -> R:@ = get_random_site()
+            nc 1 - p_migrate
 
 
     ----[ Notation B ]----
@@ -1421,22 +1857,28 @@ class SimpleFluLocationRule(Rule):
     apply:
         if group.attr.flu = 'i':
             if group.attr.income = 'l':
-                move-mass:
-                    0.1 -> R:@ = group.rel.home
+                rd 0.1 -> R:@ = group.rel.home  # rd - redistribute mass
+                nc 0.9                          # nc - no change
             if group.attr.income = 'm':
-                move-mass:
-                    0.6 -> R:@ = group.rel.home
+                rd 0.6 -> R:@ = group.rel.home
+                nc 0.4
         if group.attr.flu = 'r':
-            move-mass:
-                0.8 -> R:@ = group.rel.school
+            rd 0.8 -> R:@ = group.rel.school
+            nc 0.2
 
 
     ----[ Notation B ]----
 
     if (flu = i)
-        if (income = l) 0.1 > R:@ = home
-        if (income = m) 0.6 > R:@ = home
-    if (flu = r) 0.8 > R:@ = school
+        if (income = l)
+            rd 0.1 -> R:@ = home
+            nc 0.9
+        if (income = m)
+            rd 0.6 > R:@ = home
+            nc 0.4
+    if (flu = r)
+        rd 0.8 > R:@ = school
+        nc 0.2
     '''
 
     ATTRS = { 'flu': [ 's', 'i', 'r' ], 'income': ['l', 'm'] }

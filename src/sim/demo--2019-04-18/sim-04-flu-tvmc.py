@@ -51,7 +51,6 @@ school_m = Site('school-m')
         done().
     add([
         SimpleFluLocationRule(),
-        # SimpleFluProgressRule(),
         TimeVarMarkovChain('flu', { 's': get_flu_s_sv, 'i': [0.00, 0.80, 0.20], 'r': [0.10, 0.00, 0.90] }),
         get_probe_flu_at(school_l),
         Group('g1', 450, attr={ 'flu': 's', 'sex': 'f', 'income': 'm', 'pregnant': 'no', 'mood': 'happy'   }, rel={ Site.AT: school_m, 'school': school_m, 'home': home}),

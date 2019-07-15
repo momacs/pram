@@ -365,6 +365,7 @@ class GroupQry(object):
 
     attr : dict = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
     rel  : dict = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
+    cond : list = attrib(factory=list, converter=converters.default_if_none(factory=list))
 
 
 @attrs(kw_only=True, slots=True)

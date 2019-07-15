@@ -204,7 +204,8 @@ class GroupPopulation(object):
         if qry is None:
             return self.groups.values()
 
-        return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items())]
+        # return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items())]
+        return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
 
     def get_next_group_name(self):
         return f'g.{len(self.groups)}'

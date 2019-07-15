@@ -853,6 +853,26 @@ class SimulationDBI(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+class SimulationEnsemble(object):
+    '''
+    An ensamble of dynamical systems with different initial conditions.
+
+    This object gives raise to an ensamble distribution.
+
+    --------------------------------------------------------------------------------------------------------------------
+
+    In mathematical physics, especially as introduced into statistical mechanics and thermodynamics by J. Willard Gibbs
+    in 1902, an ensemble (also statistical ensemble) is an idealization consisting of a large number of virtual copies
+    (sometimes infinitely many) of a system, considered all at once, each of which represents a possible state that the
+    real system might be in. In other words, a statistical ensemble is a probability distribution for the state of the
+    system.
+    '''
+
+    def __init__(self, init_cond=[]):
+        self.init_cond = init_cond  # a list of initial conditions
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class SimulationPlotter(object):
     def __init__(self, sim):
         self.sim = sim
@@ -942,6 +962,21 @@ class SimulationSetter(object):
 class Simulation(object):
     '''
     A PRAM simulation.
+
+    At this point, this simulation is a discrete-event simulation (DES).  DES models the operation of a system as a
+    (discrete) sequence of events in time. Each event occurs at a particular instant in time and marks a change of
+    state in the system. Between consecutive events, no change in the system is assumed to occur; thus the simulation
+    time can directly jump to the occurrence time of the next event, which is called next-event time progression.
+
+    In addition to next-event time progression, there is also an alternative approach, called fixed-increment time
+    progression, where time is broken up into small time slices and the system state is updated according to the set of
+    events/activities happening in the time slice. Because not every time slice has to be simulated, a next-event time
+    simulation can typically run much faster than a corresponding fixed-increment time simulation.
+
+    Both forms of DES contrast with continuous simulation in which the system state is changed continuously over time
+    on the basis of a set of differential equations defining the rates of change of state variables.
+
+    [https://en.wikipedia.org/wiki/Discrete-event_simulation]
     '''
 
     def __init__(self, rand_seed=None):
