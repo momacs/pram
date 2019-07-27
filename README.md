@@ -165,7 +165,7 @@ PRAM supports modeling on three levels of abstraction: Domain, class, and rule. 
 
 ### The SIRS Model
 
-The well-known SIR epidemiological model (Kermack & McKendrick, 1927) will help us illustrate the differnet modeling levels.  In that model, population is compartmentalized into susceptible (S), infectious (I), and recovered (R).  As shown on the image below, an infectious disease is transmitted between susceptible hosts with the rate $\beta$ who eventually recover with rate $\gamma$.  If the disease does not leave the individuals with life-long immunity, the recovered can become susceptible again with rate $\alpha$ (i.e., if $\alpha = 0$, the SIRS model collapses into the SIR model).
+The SIR epidemiological model (Kermack & McKendrick, 1927) will help us illustrate the differnet modeling levels.  In that model, population is compartmentalized into susceptible (S), infectious (I), and recovered (R).  As shown on the image below, an infectious disease is transmitted between susceptible hosts with the rate β . &beta; who eventually recover with rate $\gamma$.  Because getting a disease does not need to result in life-long immunity to it, the model can be augmented by allowing recovered hosts become susceptible again with rate &alpha;; this is the SIRS model.
 
 ![The SIRS model](media/modeling-levels/sirs-model.png)
 
@@ -292,9 +292,9 @@ The first figure below shows the results of syntactic rule analysis which discov
 
 Cohen, P.R. & Loboda, T.D. (2019) Probabilistic Relational Agent-Based Models.  _International Conference on Social Computing, Behavioral-Cultural Modeling & Prediction and Behavior Representation in Modeling and Simulation (BRiMS)_, Washington, DC, USA.  [PDF](https://github.com/momacs/pram/blob/master/docs/cohen-2019-brims.pdf)
 
-Kermack, W.O. & McKendrick, A.G. (1927) A Contribution to the Mathematical Theory of Epidemics. _Proceedings of the Royal Society A. 115(772)_, 700--721.
+Kermack, W.O. & McKendrick, A.G. (1927) A Contribution to the Mathematical Theory of Epidemics. _Proceedings of the Royal Society A. 115(772)_, 700-721.
 
-Loboda, T.D. (2019) [Milestone 3 Report](https://github.com/momacs/pram/blob/master/docs/milestone-3-report.pdf).
+Loboda, T.D. (2019) [Milestone 3 Report](https://github.com/momacs/pram/blob/master/docs/Milestone-3-Report.pdf).
 
 Loboda, T.D. & Cohen, P.R. (2019) Probabilistic Relational Agent-Based Models.  Poster presented at the _International Conference on Social Computing, Behavioral-Cultural Modeling & Prediction and Behavior Representation in Modeling and Simulation (BRiMS)_, Washington, DC, USA.  [PDF](https://github.com/momacs/pram/blob/master/docs/loboda-2019-brims.pdf)
 
