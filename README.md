@@ -256,11 +256,13 @@ Finally, the numeric integrator for a system of ODEs can be kept internal to the
 
 One of the goals of the `pram` package is to elucidate the interactions between complex systems.  It hopes to do that via composite simulations, i.e., simulations composed of different models which are allowed to work independently and interact by simultaniosuly changing the shared simulation state space.
 
-### The SIR Model with a Flu-Spike Event or Process
+### The SIR Model with a Flu-Spike Event
 
 The time series below is a result of a simulation combining the SIR model with an event (i.e., a time-point perturbation).  That event converts a large proportion (specifically, 80%) of the recovered agents back into susceptible.
 
 ![The SIR model with an event](media/sim-model-composition/sir-evt.png)
+
+### The SIR Model with a Flu-Spike Process
 
 A more interesting and realistic scenario might involve not an event but a process (i.e, a time-span perturbation).  For example, the time series below shows the intensity of a process described by the scaled gamma distribution.
 
