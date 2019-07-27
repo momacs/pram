@@ -179,12 +179,14 @@ SIRSModel('flu', β=0.05, γ=0.50, α=0.10)
 
 ### The Class Level
 
-Moreover, a modeler can express models on the level of a model class.  For example, an epidemiologist may understand that the SIRS model can be implemented as a time-invariant Markov chain.  Here is an example of how that can be coded in the `pram` package using the flexible `TimeInvMarkovChain` rule:
+A modeler can also work on the class-of-models level.  For example, an epidemiologist may know that the SIRS model can be implemented as a time-invariant Markov chain.  Here is an example of how that can be coded in the `pram` package using the `TimeInvMarkovChain` rule:
 
 ```python
 β, γ, α = 0.05, 0.50, 0.10
 transition_matrix = {
-'s': [1 - β, β, 0.00], 'i': [ 0.00, 1 - γ, γ], 'r':[ α, 0.00,1–α]
+    's': [1 - β,     β,  0.00],
+	'i': [ 0.00, 1 - γ,     γ],
+	'r': [    α,  0.00, 1 – α]
 }
 TimeInvMarkovChain('flu', transition_matrix)
 ```
