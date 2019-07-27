@@ -165,7 +165,7 @@ PRAM supports modeling on three levels of abstraction: Domain, class, and rule. 
 
 ### The SIRS Model
 
-The SIR epidemiological model (Kermack & McKendrick, 1927) will help us illustrate the differnet modeling levels.  In that model, population is compartmentalized into susceptible (S), infectious (I), and recovered (R).  As shown on the image below, an infectious disease is transmitted between susceptible hosts with the rate &beta; who eventually recover with rate &gamma;.  Because getting a disease does not need to result in life-long immunity to it, the model can be augmented by allowing recovered hosts to become susceptible again with rate &alpha; (which results in the SIRS model).
+The SIR epidemiological model (Kermack & McKendrick, 1927) will help us illustrate the differnet modeling levels.  In that model, population is compartmentalized into susceptible (S), infectious (I), and recovered (R).  As shown on the image below, an infectious disease is transmitted between susceptible hosts with the rate _&beta;_ who eventually recover with rate _&gamma;_.  Because getting a disease does not need to result in life-long immunity to it, the model can be augmented by allowing recovered hosts to become susceptible again with rate _&alpha;_ (which results in the SIRS model).
 
 ![The SIRS model](media/modeling-levels/sirs-model.png)
 
@@ -229,7 +229,7 @@ This pseudo-code is based on a Python-like notation we have been working on to h
 
 ### Mass Space
 
-`pram` supports simulating systems of odrinary differential equations (ODEs) operating on three types of spaces.  First, systems of ODEs can be used as mass conversion operators.  For example, the image below shows the conversion of mass for two substances, A and B, described by the exponential decay equation (i.e., _dN/dt = -&lambda;N_).  The decay constants for the two substances are &lambda;<sub>A</sub> = 1_ and _&lambda;<sub>B</sub> = 0.05_.
+`pram` supports simulating systems of odrinary differential equations (ODEs) operating on three types of spaces.  First, systems of ODEs can be used as mass conversion operators.  For example, the image below shows the conversion of mass for two substances, A and B, described by the exponential decay equation (i.e., _dN/dt = -&lambda;N_).  The decay constants for the two substances are _&lambda;<sub>A</sub> = 1_ and _&lambda;<sub>B</sub> = 0.05_.
 
 ![Exponential decay of two substances](media/sim-odes/decay.png)
 
