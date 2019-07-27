@@ -256,7 +256,7 @@ Finally, the numeric integrator for a system of ODEs can be kept internal to the
 
 One of the goals of the `pram` package is to elucidate the interactions between complex systems.  It hopes to do that via composite simulations, i.e., simulations composed of different models which are allowed to work independently and interact by simultaniosuly changing the shared simulation state space.
 
-### The SIR Model
+### The SIR Model with a Flu-Spike Event or Process
 
 The time series below is a result of a simulation combining the SIR model with an event (i.e., a time-point perturbation).  That event converts a large proportion (specifically, 80%) of the recovered agents back into susceptible.
 
@@ -270,7 +270,7 @@ When this gamma process is combined with the SIR model, the PRAM simulation prod
 
 ![The SIR model with a gamma process](media/sim-model-composition/sir-gamma-proc.png)
 
-### The Lotka-Volterra Model
+### The Lotka-Volterra Model with a Climate Calamity Process
 
 The Lotka-Volterra model of population dynamics contains four paratemers.  When one of them, the prey reproduction rate parameter, is affected by a linear process that decreases it slowly but surely, the following picture emerges.
 
