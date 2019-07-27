@@ -193,7 +193,7 @@ TimeInvMarkovChain('flu', transition_matrix)
 
 ### The Rule Level
 
-Finally, a modeler may choose to descend to the lowest level and implement the dynamics of their model directly.  This is beneficial if what they are trying to express diverges from the set of modeling classes `pram` provides (or to encode a particular sort of interaction between different models).  Extending an existing class (e.g., the `TimeInvMarkovChain`) is an example of modeling on the rule level as well even if minimal portions of the model dynamics are overwridden.  Here is a pseudo-code for the SIRS model:
+Finally, a modeler may choose to descend to the lowest level and implement the dynamics of their model directly.  This is beneficial if what they are trying to express diverges from the set of modeling classes `pram` provides (or to encode a particular sort of interaction between different models).  Extending an existing class (e.g., the `TimeInvMarkovChain`) is an example of modeling on the rule level as well even if minimal portions of the model dynamics are overwridden.  Here is a pseudo-code for the (slightly extended) SIRS model:
 
 ```
 rule_flu_progression():
@@ -233,7 +233,7 @@ This pseudo-code is based on a Python-like notation we have been working on to h
 
 ![Exponential decay of two substances](media/sim-odes/decay.png)
 
-As another example, the time-series below shows the result of simulating a system of ODEs describing the SIR model.  The equations convert the susceptible mass into the recovered mass via the infected mass.
+As another example, the time series below shows the result of simulating a system of ODEs describing the SIR model.
 
 ![The SIR model](media/sim-odes/sir.png)
 
@@ -241,13 +241,13 @@ As another example, the time-series below shows the result of simulating a syste
 
 The second space which can be affected by a system of ODEs is given by groups.  Because groups are defined by the values of their attributes and relations, this results in mass conversion (or flow) between groups, but the machanism by which this occurs is different than when the ODEs operate on the mass space.
 
-The time-series below shows the result of simulating the Lotka-Volterra population dynamics model.  That model expresses the cyclic relationship between the size of prey population that grows via reproduction and the size of predator population which grows by consuming the prey.
+The time series below shows the result of simulating the Lotka-Volterra population dynamics model.  That model expresses the cyclic relationship between the size of prey population that grows via reproduction and the size of predator population which grows by consuming the prey.
 
 ![The Lotka-Volterra model](media/sim-odes/lv.png)
 
 ### Rule Space
 
-Finally, the numeric integrator for a system of ODEs can be kept internal to the PRAM rule.  In that case, it does not interact with the simulation context directly.  Nevertheless, the results of the integration are available to all other rules.  For example, the image below shows the phase plot of atmospheric convection modeled with three ODEs of the Lorenz system.  In this particular instance, the solution to this particular initial value problem is the Lorenz attractor.
+Finally, the numeric integrator for a system of ODEs can be kept internal to the PRAM rule.  In that case, it does not interact with the simulation context directly.  Nevertheless, the results of the integration are available to all other rules.  For example, the image below shows the phase plot of atmospheric convection modeled with three ODEs that form the Lorenz system.  The solution to this particular initial value problem is the Lorenz attractor.
 
 ![The Lorenz system](media/sim-odes/lorenz.png)
 
@@ -258,15 +258,15 @@ One of the goals of the `pram` package is to elucidate the interactions between 
 
 ### The SIR Model
 
-The time-series below is a result of a simulation combining the SIR model with an event (i.e, a time-point perturbation).  That event converts a large proportion (specifically, 80%) of the recovered agents back into susceptible essentially knocking the SIR model back in time.
+The time series below is a result of a simulation combining the SIR model with an event (i.e., a time-point perturbation).  That event converts a large proportion (specifically, 80%) of the recovered agents back into susceptible.
 
 ![The SIR model with an event](media/sim-model-composition/sir-evt.png)
 
-A more interesting and realistic scenario might involve not an event but a process (i.e, a time-span perturbation).  For example, the time-series below shows the intensity of a process described by the scaled gamma distribution.
+A more interesting and realistic scenario might involve not an event but a process (i.e, a time-span perturbation).  For example, the time series below shows the intensity of a process described by the scaled gamma distribution.
 
 ![The gamma process](media/sim-model-composition/gamma.png)
 
-When this gamma process is combined with the SIR model, the PRAM simulation produces a time-series shown on the image below.  Iterations 1-999 are dominated by the SIR model which converts mass from S to R via I (i.e., susceptible to recovered via infectious).  However, from that point on (i.e., for iterations of 1000-3000), additionally to that model, the gamma process shown above converts a portion of the recovered agents back into susceptible.  As shown on the plot below, the interplay of the two `pram` rules (with the SIR model dynamics being encoded by a system of ODEs) produces interesting effect of the infection in the population being stretched in time possibly resulting in a long term epidemic.
+When this gamma process is combined with the SIR model, the PRAM simulation produces a time series shown on the image below.  Iterations 1-999 are dominated by the SIR model which converts mass from S to R via I (i.e., susceptible to recovered via infectious).  However, from that point on (i.e., for iterations of 1000-3000), additionally to that model, the gamma process shown above converts a portion of the recovered agents back into susceptible.  As shown on the plot below, the interplay of the two `pram` rules (with the SIR model dynamics being encoded by a system of ODEs) produces an interesting effect of the infection level in the population being stretched in time plausibly resulting in a model of a long-term epidemic.
 
 ![The SIR model with a gamma process](media/sim-model-composition/sir-gamma-proc.png)
 
