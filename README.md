@@ -1,6 +1,6 @@
-# Probabilistic Relational Agent-based Modeling (PRAM) Framework
+# Probabilistic Relational Agent-Based Modeling (PRAM) Framework
 
-A simulation framework that fuses relational probabilistic models and agent-based models.  This software is in the pre-release stage, so feel free to play with it, but keep in mind that not all pieces may be working.  Until there is a release, please don't open issues and flex your own Python muscle to fix problems you encounter.
+A simulation framework that fuses relational probabilistic models and agent-based models.  This software is in the pre-release stage.
 
 
 ## Dependencies - The Library
@@ -252,7 +252,7 @@ Finally, the numeric integrator for a system of ODEs can be kept internal to the
 ![The Lorenz system](media/sim-odes/lorenz.png)
 
 
-## Model Composition
+## Composite Simulations
 
 One of the goals of the `pram` package is to elucidate the interactions between complex systems.  It hopes to do that via composite simulations, i.e., simulations composed of different models which are allowed to work independently and interact by simultaniosuly changing the shared simulation state space.
 
@@ -276,9 +276,9 @@ The Lotka-Volterra model of population dynamics contains four paratemers.  When 
 
 ![The Lotka-Volterra model with a linear process](media/sim-model-composition/lv-lin-proc.png)
 
-By decreasing the reproductive rate of prey, that linear process models increasingly hostile natural environment.  The process does not directly disturb the sizes of the two populations and affects the population dynamics indirectly (plausibly by restricting the prey food source).  While using such a simple process is perfect for expositionary purposes, a more realistic model would involve breaking the linear process down into sub-processes, each corresponding to the dynamics of the eventually (or assymptotically) dead ecosystem.
+By decreasing the reproductive rate of prey, that linear process models increasingly hostile natural environment.  The process does not directly disturb the sizes of the two populations and affects the population dynamics indirectly (plausibly by restricting the prey food sources).  While using such a simple process is perfect for expositionary purposes, a more realistic model would involve breaking the linear process down into sub-processes, each corresponding to the dynamics of an asymptotically dead ecosystem.
 
-Even though the process changes the prey reproductive parameter in very small decrements, it nevertheless leads to the eventual extinction of the predator population (due to insufficiently large prey population) and then the prey population itself.  If we assumed that the simulation parameters are biologically and ecologically valid, this simulation would predict the predator species to go extinct in 80 years and the prey population to follow in another 50 years.
+Even though the process changes the prey reproductive parameter in very small decrements, it nevertheless leads to the eventual extinction of the predator population (due to insufficient size of the prey population) and then the prey population itself.  If we assume that the simulation parameters are biologically and ecologically valid, this simulation predicts the predator species to go extinct in 80 years and the prey population to follow in another 50 years.
 
 ## Web App
 
