@@ -185,8 +185,8 @@ A modeler can also work on the class-of-models level.  For example, an epidemiol
 β, γ, α = 0.05, 0.50, 0.10
 transition_matrix = {
     's': [1 - β,     β,  0.00],
-	'i': [ 0.00, 1 - γ,     γ],
-	'r': [    α,  0.00, 1 – α]
+    'i': [ 0.00, 1 - γ,     γ],
+    'r': [    α,  0.00, 1 – α]
 }
 TimeInvMarkovChain('flu', transition_matrix)
 ```
