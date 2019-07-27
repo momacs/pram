@@ -20,7 +20,8 @@ class ProbePersistanceMode(IntEnum):
 @attrs(slots=True)
 class ProbePersistanceDBItem(object):
     name    : str  = attrib()
-    ins_qry : str  = attrib()
+    ins_qry : str  = attrib()  # insert query (used for persisting data in the DB)
+    sel_qry : str  = attrib()  # select query (used for retrieving data from the DB, e.g., to generate plots)
     ins_val : list = attrib(factory=list, converter=converters.default_if_none(factory=list))
 
 
@@ -74,8 +75,8 @@ class ProbePersistanceDB(ProbePersistance):
 
     FLUSH_EVERY = 16
 
-    def __init__(self, fpath, mode=ProbePersistanceMode.APPEND, flush_every=FLUSH_EVERY):
-        self.probes = {}
+    def __init__(self, fpath=':memory:', mode=ProbePersistanceMode.APPEND, flush_every=FLUSH_EVERY):
+        self.probes = {}  # objects of the ProbePersistanceDBItem class hashed by the name of the probe
         self.conn = None
         self.fpath = fpath
         self.mode = mode
@@ -102,6 +103,7 @@ class ProbePersistanceDB(ProbePersistance):
             return
 
         self.conn = sqlite3.connect(self.fpath, check_same_thread=False)
+        self.conn.row_factory = sqlite3.Row
 
     def flush(self):
         ''' Flush all remaining buffered items. '''
@@ -125,6 +127,35 @@ class ProbePersistanceDB(ProbePersistance):
                     c.executemany(probe_item.ins_qry, probe_item.ins_val)
                 probe_item.ins_val = []
 
+    def plot(self, probe, series, fpath_fig=None, figsize=(8,8), legend_loc='upper right', dpi=300):
+        probe_item = self.probes[DB.str_to_name(probe.name)]
+
+        data = { s['var']:[] for s in series }
+        data['i'] = []
+        with self.conn as c:
+            for r in c.execute(probe_item.sel_qry).fetchall():
+                data['i'].append(r['i'])
+                for s in series:
+                    data[s['var']].append(r[s['var']])
+
+        # Plot:
+        fig = plt.figure(figsize=figsize, dpi=dpi)
+        # plt.title('SIR Model')
+        for s in series:
+            plt.plot(data['i'], data[s['var']], lw=s['lw'], linestyle=s['linestyle'], marker=s['marker'], color=s['color'], markersize=s['markersize'], mfc='none', antialiased=True)
+        plt.legend([s['lbl'] for s in series], loc=legend_loc)
+        plt.xlabel('Iteration')
+        plt.ylabel('Probability')
+        plt.grid(alpha=0.25, antialiased=True)
+        # plt.subplots_adjust(left=0.04, right=0.99, top=0.98, bottom=0.06)
+
+        if fpath_fig is None:
+            plt.show()
+        else:
+            fig.savefig(fpath_fig, dpi=dpi)
+
+        return fig
+
     def reg_probe(self, probe, do_overwrite=False):
         name_db = DB.str_to_name(probe.name)
 
@@ -138,8 +169,8 @@ class ProbePersistanceDB(ProbePersistance):
             'i INTEGER NOT NULL',
             't REAL NOT NULL'
         ] + \
-        [ f'{c.name} {DB.str_to_type(c.type)}' for c in probe.consts ] + \
-        [ f'{v.name} {DB.str_to_type(v.type)}' for v in probe.vars ]
+        [ f'{c.name} {c.type}' for c in probe.consts ] + \
+        [ f'{v.name} {v.type}' for v in probe.vars ]
 
         with self.conn as c:
             c.execute(f'CREATE TABLE IF NOT EXISTS {name_db} (' + ','.join(cols) + ');')
@@ -150,11 +181,24 @@ class ProbePersistanceDB(ProbePersistance):
             f"({','.join(['i','t'] + [c.name for c in probe.consts] + [v.name for v in probe.vars])}) " + \
             f"VALUES ({','.join(['?'] * (len(cols) - 2))})"
 
-        self.probes[name_db] = ProbePersistanceDBItem(name_db, ins_qry)
+        sel_qry = f"SELECT {','.join(['i','t'] + [c.name for c in probe.consts] + [v.name for v in probe.vars])} FROM {name_db}"
+
+        self.probes[name_db] = ProbePersistanceDBItem(name_db, ins_qry, sel_qry)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class ProbePersistanceMem(ProbePersistanceDB):
+    '''
+    Persists probe results to an in-memory database.
+    '''
+
+    def __init__(self, mode=ProbePersistanceMode.APPEND, flush_every=ProbePersistanceDB.FLUSH_EVERY):
+        super().__init__(':memory:', mode, flush_every)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbeMsgMode(Flag):
+    NONE  = auto()  # ignore the value (i.e., do not display and do not store, unless persistance layer is defined)
     DISP  = auto()  # display messages
     CUMUL = auto()  # hold messages in the buffer
 
@@ -182,6 +226,10 @@ class Probe(ABC):
 
     def get_msg(self, do_join=True):
         return '\n'.join(self.msg)
+
+    @abstractmethod
+    def plot(self, series, fpath_fig=None, figsize=(8,8), legend_loc='upper right', dpi=300):
+        pass
 
     @abstractmethod
     def run(self, i,t):
@@ -223,7 +271,8 @@ class GroupSizeProbe(Probe):
                 if vn in ProbePersistance.VAR_NAME_KEYWORD:
                     raise ValueError(f"The following variable names are restricted: {ProbePersistance.VAR_NAME_KEYWORD}")
 
-                vn_db = DB.str_to_name(vn)
+                # vn_db = DB.str_to_name(vn)  # commented out because plotting method was expecting quoted values
+                vn_db = vn
                 if vn_db in vn_db_used:
                     raise ValueError(f"Variable name error: Name '{vn}' translates into a database name '{vn_db}' which already exists.")
 
@@ -250,6 +299,12 @@ class GroupSizeProbe(Probe):
 
     def __str__(self):
         return 'Probe  name: {:16}  query-cnt: {:>3}'.format(self.name, len(self.queries))
+
+    def plot(self, series, fpath_fig=None, figsize=(8,8), legend_loc='upper right', dpi=300):
+        if not self.persistance:
+            return print('Plotting error: The prove is not associated with a persistance backend')
+
+        return self.persistance.plot(self, series, fpath_fig, figsize, legend_loc, dpi)
 
     def run(self, iter, t):
         '''

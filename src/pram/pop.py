@@ -89,7 +89,7 @@ class GroupPopulation(object):
             self.add_site(s)
         return self
 
-    def apply_rules(self, rules, iter, t, is_rule_setup=False, is_rule_cleanup=False, is_sim_setup=False):
+    def apply_rules(self, rules, iter, t, traj=None, is_rule_setup=False, is_rule_cleanup=False, is_sim_setup=False):
         '''
         Iterates through groups and for each applies all rules (which is handled intelligently by the Group class).
         The result of (possible) rules applications is a list of new groups the original group should be split into.

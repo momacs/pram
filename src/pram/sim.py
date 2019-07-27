@@ -138,7 +138,7 @@
 #
 # Milestones: Code
 #     Simulation
-#         c Simulation class                                                                   [2018.12.16 - ...]
+#         c Simulation class                                                                   [2018.12.16 - 2019.07.19]
 #         Timer
 #             Timer (base class)                                                               [2019.03.31]
 #             Timer (simple subclasses, e.g., HourTimer)                                       [2019.03.31 - 2019.04.03]
@@ -147,8 +147,11 @@
 #         SimulationAdder class                                                                [2019.04.06]
 #         SimulationSetter class                                                               [2019.04.06]
 #         SimulationDBI class                                                                  [2019.04.22]
+#         SimulationPlotter class                                                              [2019.04.10]
 #         StaticRuleAnalyzer class                                                             [2019.03.02 - 2019.04.14]
 #         DynamicRuleAnalyzer class                                                            [2019.03.02 - 2019.05.04]
+#         Trajectory class                                                                     [2019.07.12 - 2019.07.24]
+#         TrajectoryEnsemble class                                                             [2019.07.12 - 2019.07.24]
 #         Entities
 #             c Agent                                                                          [2018.12.16 - 2019.01.05]
 #             c Entity                                                                         [2018.12.16 - 2019.03.22]
@@ -184,7 +187,7 @@
 #         Population
 #             c Population                                                                     [2019.01.07]
 #             c AgentPopulation                                                                [2019.01.07]
-#             c GroupPopulation                                                                [2019.01.07 - ...]
+#             c GroupPopulation                                                                [2019.01.07 - 2019.07.15]
 #                 f Selecting groups                                                           [2019.01.07 - 2019.01.21]
 #                 f Rule application                                                           [2019.01.04 - 2019.01.17]
 #                 f Mass redistribution                                                        [2019.01.04 - 2019.02.24]
@@ -193,7 +196,7 @@
 #         c Probe                                                                              [2019.01.18 - 2019.03.31]
 #         c ProbePersistanceDB                                                                 [2019.03.02 - 2019.03.18]
 #         c ProbePersistanceFS                                                                 [2019.03.02]
-#         c GroupSizeProbe                                                                     [2019.01.18 - 2019.04.03]
+#         c GroupSizeProbe                                                                     [2019.01.18 - 2019.07.15]
 #
 #     Logging
 #         c Log                                                                                [2019.01.06]
@@ -391,9 +394,10 @@ import inspect
 import math
 import matplotlib.pyplot as plt
 import numpy as np
-import random
 import os
 import pickle
+import random
+import sqlite3
 
 from collections import namedtuple, Counter
 from dotmap      import DotMap
@@ -429,6 +433,8 @@ class Timer(object):
 
     # TODO: Loop detection currently relies on modulus which does not handle 'step_size' > 1 properly.
 
+    POSIX_DT = datetime.datetime(1970, 1, 1)  # POSIX datetime
+
     def __init__(self, ms=Time.MS.ms, iter=float('inf'), t0=0, tmin=0, tmax=10, do_disp_zero=True):
         self.ms = ms
         self.i_max = iter
@@ -439,6 +445,10 @@ class Timer(object):
         self.tmax = tmax     # ^
         self.t = t0          # ^
         self.t_loop_cnt = 0  # ^
+
+        self.last_iter_t0 = None
+        self.last_iter_t1 = None
+        self.last_iter_t  = None
 
         if self.tmin > self.tmax:
             raise TypeError(f'The min time has to be smaller than the max time.')
@@ -494,6 +504,10 @@ class Timer(object):
     def get_t_left(self):
         return self.i_max - self.i
 
+    @staticmethod
+    def get_ts():
+        return (datetime.datetime.now() - Timer.POSIX_DT).total_seconds() * 1000  # [ms]
+
     def reset(self):
         self.i = 0
         self.t = self.t0
@@ -504,6 +518,9 @@ class Timer(object):
 
     def set_iter(self, iter):
         self.i_max = iter
+
+    def start(self):
+        self.last_iter_t0 = Timer.get_ts()
 
     def step(self):
         self.i += 1
@@ -520,6 +537,15 @@ class Timer(object):
         if self.i > 0 and self.t == self.tmin:
             self.t_loop_cnt += 1
             self.did_loop_on_last_iter = True
+
+        self.last_iter_t1 = Timer.get_ts()
+        self.last_iter_t  = self.last_iter_t1 - self.last_iter_t0
+        self.last_iter_t0 = Timer.get_ts()
+        self.last_iter_t1 = None
+
+    def stop(self):
+        self.last_iter_t1 = Timer.get_ts()
+        self.last_iter_t  = self.last_iter_t1 - self.last_iter_t0
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -563,7 +589,8 @@ class YearTimer(Timer):
         super().__init__(Time.MS.y, iter, 0, 2000, 10000, do_disp_zero)
 
 
-# ---------------------------------------------------------------------------------------------------------------------- # class CalMonthTimer(Timer):
+# ----------------------------------------------------------------------------------------------------------------------
+# class CalMonthTimer(Timer):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -853,26 +880,6 @@ class SimulationDBI(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class SimulationEnsemble(object):
-    '''
-    An ensamble of dynamical systems with different initial conditions.
-
-    This object gives raise to an ensamble distribution.
-
-    --------------------------------------------------------------------------------------------------------------------
-
-    In mathematical physics, especially as introduced into statistical mechanics and thermodynamics by J. Willard Gibbs
-    in 1902, an ensemble (also statistical ensemble) is an idealization consisting of a large number of virtual copies
-    (sometimes infinitely many) of a system, considered all at once, each of which represents a possible state that the
-    real system might be in. In other words, a statistical ensemble is a probability distribution for the state of the
-    system.
-    '''
-
-    def __init__(self, init_cond=[]):
-        self.init_cond = init_cond  # a list of initial conditions
-
-
-# ----------------------------------------------------------------------------------------------------------------------
 class SimulationPlotter(object):
     def __init__(self, sim):
         self.sim = sim
@@ -964,24 +971,15 @@ class Simulation(object):
     A PRAM simulation.
 
     At this point, this simulation is a discrete-event simulation (DES).  DES models the operation of a system as a
-    (discrete) sequence of events in time. Each event occurs at a particular instant in time and marks a change of
-    state in the system. Between consecutive events, no change in the system is assumed to occur; thus the simulation
-    time can directly jump to the occurrence time of the next event, which is called next-event time progression.
-
-    In addition to next-event time progression, there is also an alternative approach, called fixed-increment time
-    progression, where time is broken up into small time slices and the system state is updated according to the set of
-    events/activities happening in the time slice. Because not every time slice has to be simulated, a next-event time
-    simulation can typically run much faster than a corresponding fixed-increment time simulation.
-
-    Both forms of DES contrast with continuous simulation in which the system state is changed continuously over time
-    on the basis of a set of differential equations defining the rates of change of state variables.
-
-    [https://en.wikipedia.org/wiki/Discrete-event_simulation]
+    (discrete) sequence of events in time.  DES contrast with continuous simulation in which the system state is
+    changed continuously over time on the basis of a set of differential equations defining the rates of change of
+    state variables.
     '''
 
-    def __init__(self, rand_seed=None):
+    def __init__(self, traj=None, rand_seed=None):
         self.set_rand_seed(rand_seed)
 
+        self.traj = traj  # trajectory
         self.run_cnt = 0
 
         self.pop = GroupPopulation()
@@ -1523,15 +1521,19 @@ class Simulation(object):
         if not self.is_setup_done:
             if self.fn.group_setup:
                 self._inf('Running group setup')
-                self.pop.apply_rules(self.fn.group_setup, 0, self.timer, is_sim_setup=True)
+                self.pop.apply_rules(self.fn.group_setup, 0, self.timer, self.traj, is_sim_setup=True)
 
             self._inf('Running rule setup')
-            self.pop.apply_rules(self.rules, 0, self.timer, is_rule_setup=True)
+            self.pop.apply_rules(self.rules, 0, self.timer, self.traj, is_rule_setup=True)
             self.is_setup_done = True
 
         if self.pragma.autocompact:
             self._inf('Compacting the model')
             self.compact()
+
+        # Save the initial trajectory state:
+        if self.traj is not None:
+            self.traj.save_state(True)
 
         # Force probes to capture the initial state:
         if self.pragma.probe_capture_init and self.run_cnt == 0:
@@ -1550,6 +1552,7 @@ class Simulation(object):
         self.run_cnt += 1
         self.autostop_i = 0  # number of consecutive iterations the 'autostop' condition has been met for
 
+        self.timer.start()
         for i in range(self.timer.get_i_left()):
             if self.pragma.live_info:
                 self._inf(f'Iteration {self.timer.i + 1} of {self.timer.i_max}')
@@ -1558,7 +1561,7 @@ class Simulation(object):
                 print(f't:{self.timer.get_t()}')
 
             # Apply rules:
-            self.pop.apply_rules(self.rules, self.timer.get_i(), self.timer.get_t())
+            self.pop.apply_rules(self.rules, self.timer.get_i(), self.timer.get_t(), self.traj)
             n_moved = self.pop.n_distrib_last
             pop_size = float(self.pop.get_size())
             if pop_size > 0:
@@ -1569,6 +1572,14 @@ class Simulation(object):
             # Run probes:
             for p in self.probes:
                 p.run(self.timer.get_i(), self.timer.get_t())
+
+            # Advance timer:
+            self.timer.step()
+            self.running.progress += self.running.step
+
+            # Save the trajectory state:
+            if self.traj is not None:
+                self.traj.save_state()
 
             # Autostop:
             if self.pragma.autostop and p_moved is not None:
@@ -1581,21 +1592,21 @@ class Simulation(object):
                     if self.pragma.live_info:
                         self._inf('Autostop condition has been met; population mass redistributed during the most recent iteration')
                         self._inf(f'    {n_moved} of {self.pop.get_size()} = {p_moved * 100}%')
+                        self.timer.stop()
                         break
                     else:
                         print('')
                         print('Autostop condition has been met; population mass redistributed during the most recent iteration:')
                         print(f'    {n_moved} of {self.pop.get_size()} = {p_moved * 100}%')
+                        self.timer.stop()
                         break
-
-            # Advance timer:
-            self.timer.step()
-            self.running.progress += self.running.step
 
             # Autocompact:
             if self.pragma.autocompact:
                 self._inf(f'    Compacting the model')
                 self.compact()
+
+        self.timer.stop()
 
         self._inf(f'Final population info')
         self._inf(f'    Groups: {"{:,}".format(self.pop.get_group_cnt())}')
@@ -1614,7 +1625,7 @@ class Simulation(object):
         # Rule cleanup and simulation compacting:
         self._inf('Running rule cleanup')
 
-        self.pop.apply_rules(self.rules, 0, self.timer, is_rule_cleanup=True)
+        self.pop.apply_rules(self.rules, 0, self.timer, self.traj, is_rule_cleanup=True)
         if self.pragma.autocompact:
             self._inf('Compacting the model')
             self.compact()
@@ -1832,3 +1843,225 @@ class Simulation(object):
     @staticmethod
     def unpickle_gz(fpath):
         return Simulation._unpickle(fpath, gzip.GzipFile)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class Trajectory(object):
+    '''
+    A time-ordered sequence of system configurations that occur as the system state evolves.
+
+    Also called orbit.  Can also be thought of as a sequence of vectors in the state space (or a point in a phase
+    space).
+    '''
+
+    def __init__(self, name, memo=None, sim=None):
+        self.id   = None  # set by TrajectoryEnsemble object when the DB ID is known
+        self.name = name
+        self.memo = memo
+        self.ens  = None  # the containing TrajectoryEnsemble object
+
+        self.sim  = sim or Simulation()
+        self.sim.traj = self
+
+        self.states = []
+        self.flows  = []  # inter-state mass flow
+
+    def _pickle(self, fpath, fn):
+        with fn(fpath, 'wb') as f:
+            pickle.dump(self, f)
+
+    def pickle(self, fpath):
+        self._pickle(fpath, open)
+        return self
+
+    def pickle_bz2(self, fpath):
+        self._pickle(fpath, bz2.BZ2File)
+        return self
+
+    def pickle_gz(self, fpath):
+        self._pickle(fpath, gzip.GzipFile)
+        return self
+
+    def run(self, iter_or_dur=1):
+        self.sim.run(iter_or_dur)
+
+    def save_state(self, is_initial=False):
+        if self.ens is not None:
+            self.ens.save_state(self, is_initial)
+
+    @staticmethod
+    def _unpickle(fpath, fn):
+        with fn(fpath, 'rb') as f:
+            gc.disable()
+            sim = pickle.load(f)
+            gc.enable()
+            return sim
+
+    @staticmethod
+    def unpickle_bz2(fpath):
+        return Simulation._unpickle(fpath, bz2.BZ2File)
+
+    @staticmethod
+    def unpickle_gz(fpath):
+        return Simulation._unpickle(fpath, gzip.GzipFile)
+
+# ----------------------------------------------------------------------------------------------------------------------
+class TrajectoryEnsemble(object):
+    '''
+    A collection of trajectories.
+
+    --------------------------------------------------------------------------------------------------------------------
+
+    In mathematical physics, especially as introduced into statistical mechanics and thermodynamics by J. Willard Gibbs
+    in 1902, an ensemble (also statistical ensemble) is an idealization consisting of a large number of virtual copies
+    (sometimes infinitely many) of a system, considered all at once, each of which represents a possible state that the
+    real system might be in. In other words, a statistical ensemble is a probability distribution for the state of the
+    system.
+    '''
+
+    DDL = '''
+        CREATE TABLE traj (
+        id   INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        name TEXT NOT NULL UNIQUE,
+        memo TEXT
+        );
+
+        CREATE TABLE rule (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        traj_id INTEGER,
+        name    TEXT NOT NULL,
+        src     TEXT NOT NULL,
+        CONSTRAINT fk__rule__traj FOREIGN KEY (traj_id) REFERENCES traj (id) ON UPDATE CASCADE ON DELETE CASCADE
+        );
+
+        CREATE TABLE iter (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        traj_id INTEGER,
+        i       INTEGER NOT NULL,
+        t       REAL NOT NULL,
+        host    TEXT NOT NULL,
+        UNIQUE(traj_id,i),
+        CONSTRAINT fk__iter__traj FOREIGN KEY (traj_id) REFERENCES traj (id) ON UPDATE CASCADE ON DELETE CASCADE
+        );
+
+        CREATE TABLE state (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        iter_id INTEGER,
+        sim     BLOB,
+        CONSTRAINT fk__state__iter FOREIGN KEY (iter_id) REFERENCES iter (id) ON UPDATE CASCADE ON DELETE CASCADE
+        );
+
+        CREATE TABLE flow (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        iter_id INTEGER,
+        CONSTRAINT fk__flow__iter FOREIGN KEY (iter_id) REFERENCES iter (id) ON UPDATE CASCADE ON DELETE CASCADE
+        );
+        '''
+
+    def __init__(self, fpath_db):
+        self.traj = {}  # index by DB ID
+        self.conn = None
+        self.hosts = []  # hostnames of machines that will run trajectories
+
+        self._db_conn_open(fpath_db)
+
+    def __del__(self):
+        self._db_conn_close()
+
+    def _db_conn_close(self):
+        if self.conn is None: return
+
+        self.conn.close()
+        self.conn = None
+
+    def _db_conn_open(self, fpath_db):
+        self.fpath_db = fpath_db
+
+        # Database exists:
+        if os.path.isfile(fpath_db):
+            self.conn = sqlite3.connect(self.fpath_db, check_same_thread=False)
+            self.conn.execute('PRAGMA foreign_keys = ON')
+            self.conn.execute('PRAGMA journal_mode=WAL')
+
+            n = self._db_get_int('SELECT COUNT(*) FROM traj', [])
+            print(f'Using extant database (trajectories present: {n})')
+
+        # Database does not exist:
+        else:
+            self.conn = sqlite3.connect(self.fpath_db, check_same_thread=False)
+            self.conn.execute('PRAGMA foreign_keys = ON')
+            self.conn.execute('PRAGMA journal_mode=WAL')
+
+            with self.conn as c:
+                c.executescript(self.DDL)
+                c.commit()
+
+            print('New database initialized')
+
+    def _db_ins(self, q, args):
+        with self.conn as c:
+            return c.execute(q, args).lastrowid
+
+    def _db_get_int(self, q, args):
+        with self.conn as c:
+            return c.execute(q, args).fetchone()[0]
+
+    def _db_upd(self, q, args):
+        with self.conn as c:
+            c.execute(q, args)
+
+    def add_trajectories(self, traj):
+        for t in traj:
+            self.add_trajectory(t)
+
+        return self
+
+    def add_trajectory(self, t):
+        if self._db_get_int('SELECT COUNT(*) FROM traj WHERE name = ?', [t.name]) > 0:
+            return print(f'A trajectory with the name specified already exists: {t.name}')
+
+        with self.conn as c:
+            t.id = c.execute('INSERT INTO traj (name, memo) VALUES (?,?)', [t.name, t.memo]).lastrowid
+            for r in t.sim.rules:
+                c.execute('INSERT INTO rule (traj_id, name, src) VALUES (?,?,?)', [t.id, r.__class__.__name__, inspect.getsource(r.__class__)])
+
+        t.ens = self
+        self.traj[t.id] = t
+
+        return self
+
+    def load(self, fpath):
+        pass
+
+    def save(self, fpath):
+        pass
+
+    def save_state(self, traj, is_initial=False):
+        if self._db_get_int('SELECT COUNT(*) FROM traj WHERE id = ?', [traj.id]) == 0:
+            return print(f'Trajectory with this ID not found: {traj.id}')
+
+        sim = traj.sim
+
+        # Save state:
+        with self.conn as c:
+            c.execute('INSERT INTO iter (traj_id, i, t, host) VALUES (?,?,?,?)', [traj.id, sim.timer.i, (0 if is_initial else sim.timer.last_iter_t), 'localhost'])
+            c.commit()
+
+        # Save mass flow:
+        if not is_initial:
+            pass
+
+        return self
+
+    def run(self, iter_or_dur=1):
+        for i,t in enumerate(self.traj.values()):
+            print(f'Running trajectory {i+1} of {len(self.traj)}: {t.name}')
+            t.run(iter_or_dur)
+
+        return self
+
+    def set_hosts(self, hosts):
+        self.hosts = hosts
+        return self

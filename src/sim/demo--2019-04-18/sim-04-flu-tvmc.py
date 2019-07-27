@@ -3,7 +3,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pram.data   import GroupSizeProbe, ProbeMsgMode
 from pram.entity import Group, GroupQry, Site
-from pram.rule   import SimpleFluLocationRule, SimpleFluProgressRule, TimeVarMarkovChain
+from pram.rule   import SimpleFluLocationRule, DiscreteVarMarkovChain
 from pram.sim    import Simulation
 
 
@@ -51,7 +51,7 @@ school_m = Site('school-m')
         done().
     add([
         SimpleFluLocationRule(),
-        TimeVarMarkovChain('flu', { 's': get_flu_s_sv, 'i': [0.00, 0.80, 0.20], 'r': [0.10, 0.00, 0.90] }),
+        DiscreteVarMarkovChain('flu', { 's': get_flu_s_sv, 'i': [0.00, 0.80, 0.20], 'r': [0.10, 0.00, 0.90] }),
         get_probe_flu_at(school_l),
         Group('g1', 450, attr={ 'flu': 's', 'sex': 'f', 'income': 'm', 'pregnant': 'no', 'mood': 'happy'   }, rel={ Site.AT: school_m, 'school': school_m, 'home': home}),
         Group('g2',  50, attr={ 'flu': 'i', 'sex': 'f', 'income': 'm', 'pregnant': 'no', 'mood': 'annoyed' }, rel={ Site.AT: school_m, 'school': school_m, 'home': home}),

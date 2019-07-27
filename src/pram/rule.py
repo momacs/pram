@@ -13,7 +13,7 @@ from attr            import attrs, attrib
 from dotmap          import DotMap
 from enum            import IntEnum
 from scipy.stats     import lognorm, poisson, rv_discrete
-from scipy.integrate import ode
+from scipy.integrate import ode, solve_ivp
 
 from .entity import GroupQry, GroupSplitSpec, Site
 from .util   import Err, Time as TimeU
@@ -193,6 +193,39 @@ class DifferenceEquation(Equation, ABC):
 class Event(Rule, ABC):
     pass
 
+class Control(Rule, ABC):
+    pass
+
+class Input(Rule, ABC):
+    pass
+
+class Stimulus(Rule, ABC):
+    pass
+
+class Forcing(Rule, ABC):
+    pass
+
+class Disturbance(Rule, ABC):
+    pass
+
+class Perturbation(Rule, ABC):
+    pass
+
+class Intervention(Rule, ABC):
+    pass
+
+class Action(Rule, ABC):
+    '''
+    In physics, action is an attribute of the dynamics of a physical system from which the equations of motion of the
+    system can be derived. It is a mathematical functional which takes the trajectory, also called path or history, of
+    the system as its argument and has a real number as its result. Generally, the action takes different values for
+    different paths.[1]
+
+    Source: https://en.wikipedia.org/wiki/Action_(physics)
+    '''
+
+    pass
+
 class Process(Rule, ABC):
     pass
 
@@ -221,14 +254,14 @@ class StochasticProcess(Rule, ABC):
 
     pass
 
-class MarkovProcess(StochasticProcess):
+class MarkovProcess(StochasticProcess, ABC):
     '''
     A stochastic process that satisfies the Markov property.
     '''
 
     pass
 
-class StationaryProcess(StochasticProcess):
+class StationaryProcess(StochasticProcess, ABC):
     '''
     A stochastic process whose unconditional joint probability distribution does not change when shifted in time.
     '''
@@ -339,14 +372,33 @@ class CompoundInterstSeq(Sequence, DifferenceEquation):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class ODESystemSelf(Rule):
+class ProbabilisticEquation(Equation):
+    '''
+    A algebraic equation p(t), where p(t) \in [0,1] (i.e., it yields a probability).
+    '''
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class ODeltaESystem(Rule):
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class ODESystem(Rule):
     '''
     Wraps a numeric integrator to solve a system of ordinary differential equations (ODEs) that do not interact with
     anything else in the simulation.
 
     The non-interactivity stems from the derivatives being kept internally to the integrator only.  This is useful when
-    computations need to happen on a step-by-step basis, consistent with the rest of the simulation, but the results,
-    while accessible, do not pollute the group attribute space.
+    computations need to happen on a step-by-step basis, consistent with the rest of the simulation, but the results do
+    not pollute the group attribute space.
+
+    One consequnce of this operationalization is that the rule need to fire only once per iteration.  Because PRAM
+    fires each rule for every compatible group, the implementation of the present rule ensures that the computation
+    will only happen exactly once; anything more than that would be computing the same thing again (i.e., an utter
+    waste of perfectly good CPU time).
 
     Currently uses scipy's numerical integrators, but could switch to assimulo in the future.
 
@@ -373,7 +425,7 @@ class ODESystemSelf(Rule):
     def __init__(self, f, y0, name='ode-system', t=TimeAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
         super().__init__(name, t, memo)
 
-        self.y0 = y0
+        self.y0 = y0  # initial condition
         self.dt = dt  # TODO: should change with the change in the timer
 
         self.ni = ode(f).set_integrator(ni_name, method='bdf')  # numeric integrator
@@ -386,13 +438,19 @@ class ODESystemSelf(Rule):
 
         self.hist = DotMap(t=[], y=[])  # history
 
+        self.iter_last = -1  # keep the last-computed iterations to avoid multiple computations (due to multiple groups)
+
     def apply(self, pop, group, iter, t):
-        self.ni.integrate(self.ni.t + self.dt)
+        if iter != self.iter_last:  # only integrate if not done for this iteration
+            self.ni.integrate(self.ni.t + self.dt)
 
-        self.hist.t.append(self.ni.t)
-        self.hist.y.append(self.ni.y)
+            self.hist.t.append(self.ni.t)
+            self.hist.y.append(self.ni.y)
 
-        # print(f'{round(self.ni.t,1)}: {self.ni.y}')
+            # print(f'{round(self.ni.t,1)}: {self.ni.y}')
+
+            self.iter_last = iter
+
         return None
 
     def get_hist(self):
@@ -405,25 +463,23 @@ class ODESystemSelf(Rule):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class ODESystem(Rule):
+class ODESystemAttr(Rule):
     '''
-    Wraps a numeric integrator to solve a system of ordinary differential equations (ODEs).
-
-    The initial state and the derivates computed as the system evolves are stored in the group attribute space thereby
-    directly impacting the simulation.
+    Wraps a numeric integrator to solve a system of ordinary differential equations (ODEs) and store its state in the
+    group attribute space.
 
     Currently uses scipy's numerical integrators, but could switch to assimulo in the future.
 
     In
         f  - derivative-computing function
-        y0 - initial condition (i.e., a list of group attribute names)
+        y0 - initial condition attributes (i.e., a list of group attribute names)
     '''
 
     def __init__(self, f, y0, name='ode-system', t=TimeAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
         super().__init__(name, t, memo)
 
         self.y0 = y0
-        self.y0_val = None
+        self.y0_val = None  # initial condition
         self.dt = dt  # TODO: should change with the change in the timer
 
         self.ni = ode(f).set_integrator(ni_name, method='bdf')  # numeric integrator
@@ -435,15 +491,24 @@ class ODESystem(Rule):
             self.ni.set_jac_params(jac_params)
 
         self.hist = DotMap(t=[], y=[])  # history
+        self.f = f
 
     def apply(self, pop, group, iter, t):
-        if self.y0_val is None:
-            self.y0_val = [group.attr[y] for y in self.y0]
-            self.ni.set_initial_value(self.y0_val, 0)
+        # Previous version (no initial condition update after the first one):
+        # if self.y0_val is None:
+        #     self.y0_val = [group.attr[y] for y in self.y0]
+        #     self.ni.set_initial_value(self.y0_val, 0)
+        #
+        # self.ni.integrate(self.ni.t + self.dt)
+        #
+        # self.hist.t.append(self.ni.t)
+        # self.hist.y.append(self.ni.y)
 
-        self.ni.integrate(self.ni.t + self.dt)
+        self.y0_val = [group.attr[y] for y in self.y0]
+        self.ni.set_initial_value(self.y0_val, 0)
+        self.ni.integrate(self.dt)
 
-        self.hist.t.append(self.ni.t)
+        self.hist.t.append((iter + 1) * self.dt)
         self.hist.y.append(self.ni.y)
 
         return [GroupSplitSpec(p=1.00, attr_set={ self.y0[i]: self.ni.y[i].real for i in range(len(self.y0))})]
@@ -461,11 +526,102 @@ class ODESystem(Rule):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class LogisticMap(ChaoticMap):
+class ODESystemMass(Rule):
+    '''
+    Wraps a numeric integrator to solve a system of ordinary differential equations (ODEs) that drive mass shifts.
+
+    The initial state is deterimed by the group landscape.
+
+    The rule splits the congruent group (i.e., the one meeting the search criteria) into the number of parts that
+    corresponds to the number of ODEs.  Even though it might seem like different groups should be split differently,
+    this solution is correct and stems from the fact that the new group sizes are calculated for the iteration step
+    (i.e., for all groups) and not for individual group.
+
+    Currently uses scipy's numerical integrators, but could switch to assimulo in the future.
+
+    In
+        f  - derivative-computing function
+        y0 - initial condition (i.e., a list of group attribute names)
+    '''
+
+    def __init__(self, f, queries, name='ode-system-mass', t=TimeAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
+        super().__init__(name, t, memo)
+
+        self.queries = queries
+        self.y0_mass = None  # initial condition
+        self.dt = dt  # TODO: should change with the change in the timer
+
+        self.ni = ode(f).set_integrator(ni_name, method='bdf')  # numeric integrator
+        # self.ni.set_initial_value(self.y0, 0)
+
+        if f_params is not None:
+            self.ni.set_f_params(f_params)
+        if jac_params is not None:
+            self.ni.set_jac_params(jac_params)
+
+        self.hist = DotMap(t=[], y=[])  # history
+
+        self.iter_last = -1  # keep the last-computed iterations to avoid multiple computations (due to multiple groups)
+
+        self.tmp = DotMap()  # scratchpad to remember computation throughout an iteration (remember, one computation per iteration)
+
+    def apply(self, pop, group, iter, t):
+        if iter != self.iter_last:  # only integrate once per iteration
+            # Previous version (no initial condition update after the first one):
+            # if self.y0_mass is None:
+            #     self.y0_mass = [sum([0] + [g.n for g in pop.get_groups(q)]) for q in self.queries]
+            #     # print(f'y0 : {self.y0_mass}')
+            #     self.ni.set_initial_value(self.y0_mass, 0)
+            #
+            # self.ni.integrate(self.ni.t + self.dt)
+            #
+            # self.hist.t.append(self.ni.t)
+            # self.hist.y.append(self.ni.y)
+
+            # self.y0_mass = [sum([0] + [g.n for g in pop.get_groups(q)]) for q in self.queries]
+            self.y0_mass = [sum([0] + [g.n for g in pop.get_groups(GroupQry(attr=q.attr))]) for q in self.queries]
+            self.ni.set_initial_value(self.y0_mass, 0)
+            self.ni.integrate(self.dt)
+
+            self.hist.t.append((iter + 1) * self.dt)
+            self.hist.y.append(self.ni.y)
+
+            # n  = self.ni.y[0].tolist().real + self.ni.y[1].tolist().real + self.ni.y[2].tolist().real
+            self.tmp.n  = sum(self.y0_mass)
+            # self.tmp.ps = min(1.00, max(0.00, self.ni.y[0].tolist().real / self.tmp.n))
+            # self.tmp.pi = min(1.00, max(0.00, self.ni.y[1].tolist().real / self.tmp.n))
+            # self.tmp.pr = 1.00 - self.tmp.ps - self.tmp.pi
+            self.tmp.p = [min(1.00, max(0.00, self.ni.y[i].tolist().real / self.tmp.n)) for i in range(len(self.queries) - 1)]
+            self.tmp.p.append(1.00 - sum(self.tmp.p))
+
+        # return [
+        #     GroupSplitSpec(p=self.tmp.ps, attr_set={ 'flu': 's' }),
+        #     GroupSplitSpec(p=self.tmp.pi, attr_set={ 'flu': 'i' }),
+        #     GroupSplitSpec(p=self.tmp.pr, attr_set={ 'flu': 'r' })
+        # ]
+
+        return [GroupSplitSpec(p=self.tmp.p[i], attr_set=self.queries[i].attr) for i in range(len(self.queries))]
+
+    def get_hist(self):
+        ''' Returns the history of times and derivatives computed at those times. '''
+
+        t = [0.00] + self.hist.t
+        y = [[self.y0_mass[i]] + [y[i].tolist().real for y in self.hist.y] for i in range(len(self.queries))]
+
+        return [t,y]
+
+    # def is_applicable(self, group, iter, t):
+    #     return super().is_applicable(group, iter, t) and group.ha(self.y0)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class LogisticMap(Sequence, ChaoticMap):
     '''
     x_{n+1} = r x_n (1 - x_n),
 
     where $r \n [2,4]$ and $x \in [0,1]$.
+
+    --------------------------------------------------------------------------------------------------------------------
 
     Time domain                : Discrete
     Space domain               : Real
@@ -479,6 +635,15 @@ class LogisticMap(ChaoticMap):
 # ----------------------------------------------------------------------------------------------------------------------
 class LotkaVolterraSystem(ChaoticMap, ODESystem):
     '''
+    Population dynamics model.
+
+    a is the natural growth rate of rabbits in the absence of predation,
+    c is the natural death rate of foxes in the absence of food (rabbits),
+    b is the death rate per encounter of rabbits due to predation,
+    e is the efficiency of turning predated rabbits into foxes.
+
+    --------------------------------------------------------------------------------------------------------------------
+
     Time domain                : Continuous
     Space domain               : Real
     Number of space dimensions : 3
@@ -491,6 +656,26 @@ class LotkaVolterraSystem(ChaoticMap, ODESystem):
 # ----------------------------------------------------------------------------------------------------------------------
 class LorenzSystem(ChaoticMap, ODESystem):
     '''
+    Atmospheric convection model.
+
+    A simplified mathematical model for atmospheric convection specified by the Lorenz equations:
+
+        dx/dt = sigma * (y - x)
+        dy/dt = x * (rho - z) - y
+        dz/dt = xy - beta * z
+
+    The equations relate the properties of a two-dimensional fluid layer uniformly warmed from below and cooled from above.
+    In particular, the equations describe the rate of change of three quantities with respect to time: x is proportional to
+    the rate of convection, y to the horizontal temperature variation, and z to the vertical temperature variation. The
+    constants sigma, rho, and beta are system parameters proportional to the Prandtl number, Rayleigh number, and certain
+    physical dimensions of the layer itself.
+
+    From a technical standpoint, the Lorenz system is nonlinear, non-periodic, three-dimensional and deterministic.
+
+    SRC: https://en.wikipedia.org/wiki/Lorenz_system
+
+    --------------------------------------------------------------------------------------------------------------------
+
     Time domain                : Continuous
     Space domain               : Real
     Number of space dimensions : 3
@@ -724,9 +909,15 @@ class LevyProcess(MarkovProcess):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class DiffusionProcess(StochasticProcess):
+class DiffusionProcess(MarkovProcess):
     '''
     A continuous-time Markov process with almost surely continuous sample paths.
+
+    A solution to a stochastic differential equation (in short form),
+
+        d X_t = \mu(X_t, t)dt + \sigma X_t(X_t, t)dB_t,
+
+    where $B$ is a standard Brownian motion.
     '''
 
     pass
