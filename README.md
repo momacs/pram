@@ -165,7 +165,7 @@ PRAM supports modeling on three levels of abstraction: Domain, class, and rule. 
 
 ### The SIRS Model
 
-The SIR epidemiological model (Kermack & McKendrick, 1927) will help us illustrate the differnet modeling levels.  In that model, population is compartmentalized into susceptible (S), infectious (I), and recovered (R).  As shown on the image below, an infectious disease is transmitted between susceptible hosts with the rate &beta; who eventually recover with rate &gamma;.  Because getting a disease does not need to result in life-long immunity to it, the model can be augmented by allowing recovered hosts become susceptible again with rate &alpha;; this is the SIRS model.
+The SIR epidemiological model (Kermack & McKendrick, 1927) will help us illustrate the differnet modeling levels.  In that model, population is compartmentalized into susceptible (S), infectious (I), and recovered (R).  As shown on the image below, an infectious disease is transmitted between susceptible hosts with the rate &beta; who eventually recover with rate &gamma;.  Because getting a disease does not need to result in life-long immunity to it, the model can be augmented by allowing recovered hosts to become susceptible again with rate &alpha; (which results in the SIRS model).
 
 ![The SIRS model](media/modeling-levels/sirs-model.png)
 
@@ -174,7 +174,7 @@ The SIR epidemiological model (Kermack & McKendrick, 1927) will help us illustra
 The domain level allows the modeler to express their models on the level of their research area.  For example, being familiar with the different models of infectious diseases, it would be natural for an epidemiologist to invoke a model like the SIRS directly.  Here is a Python example of just that:
 
 ```python
-SIRSModel('flu', &beta;=0.05, γ=0.50, α=0.10)
+SIRSModel('flu', β=0.05, γ=0.50, α=0.10)
 ```
 
 ### The Class Level
