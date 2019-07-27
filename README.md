@@ -222,14 +222,14 @@ rule_flu_location():
       nc 0.2
 ```
 
-This pseudo-code is based on a notation we have been working on to help to expose the internal workings of a model without resorting to often unnecessarily verbose Python source code.
+This pseudo-code is based on a Python-like notation we have been working on to help to expose the internal workings of a model without resorting to often unnecessarily verbose Python source code.
 
 
 ## Ordinary Differential Equations
 
 ### Mass Space
 
-`pram` supports simulating systems of odrinary differential equations (ODEs) operating on one of three spaces.  The first one uses systems of ODEs as mass conversion operators.  For example, the image below shows the conversion of mass for two substances, A and B, described by the exponential decay equation (i.e., $dN/dt = -\lambda N$).  The decay constants for the two substances are $\lambda_A = 1$ and $\lambda_B = 0.05$.
+`pram` supports simulating systems of odrinary differential equations (ODEs) operating on three types of spaces.  First, systems of ODEs can be used as mass conversion operators.  For example, the image below shows the conversion of mass for two substances, A and B, described by the exponential decay equation (i.e., _dN/dt = -&lambda;N_).  The decay constants for the two substances are &lambda;<sub>A</sub> = 1_ and _&lambda;<sub>B</sub> = 0.05_.
 
 ![Exponential decay of two substances](media/sim-odes/decay.png)
 
