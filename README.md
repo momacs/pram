@@ -272,13 +272,13 @@ When this gamma process is combined with the SIR model, the PRAM simulation prod
 
 ![The SIR model with a gamma process](media/sim-model-composition/sir-gamma-proc.png)
 
-### The Lotka-Volterra Model with a Climate Calamity Process
+### The Lotka-Volterra Model with a Food Restriction Process
 
 The Lotka-Volterra model of population dynamics contains four paratemers.  When one of them, the prey reproduction rate parameter, is affected by a linear process that decreases it slowly but surely, the following picture emerges.
 
 ![The Lotka-Volterra model with a linear process](media/sim-model-composition/lv-lin-proc.png)
 
-By decreasing the reproductive rate of prey, that linear process models increasingly hostile natural environment.  The process does not directly disturb the sizes of the two populations and affects the population dynamics indirectly (plausibly by restricting the prey food sources).  While using such a simple process is perfect for expositionary purposes, a more realistic model would involve breaking the linear process down into sub-processes, each corresponding to the dynamics of an asymptotically dead ecosystem.
+By decreasing the reproductive rate of prey, that linear process models increasingly hostile natural environment.  The process does not directly disturb the sizes of the two populations and affects the population dynamics indirectly (plausibly by restricting the prey food sources).  While using such a simple process is perfect for expositionary purposes, a more realistic model would involve breaking the linear process down into sub-processes, each corresponding to the dynamics of an asymptotically barren ecosystem.
 
 Even though the process changes the prey reproductive parameter in very small decrements, it nevertheless leads to the eventual extinction of the predator population (due to insufficient size of the prey population) and then the prey population itself.  If we assume that the simulation parameters are biologically and ecologically valid, this simulation predicts the predator species to go extinct in 80 years and the prey population to follow in another 50 years.
 
