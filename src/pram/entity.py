@@ -685,7 +685,7 @@ class Group(Entity):
             inf(f'        Relations  from table : {[r.col for r in rel_db]}')
 
         # (2) Contruct the query:
-        qry = 'SELECT COUNT(*) AS n{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
+        qry = 'SELECT COUNT(*) AS m{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
             tbl=tbl,
             cols=', '.join(attr_db_keep + [r.col for r in rel_db]),
             cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr_db_keep + [r.col for r in rel_db]]),
@@ -731,8 +731,8 @@ class Group(Entity):
                 if rel_at is not None:
                     g_rel.update({ Site.AT: g_rel.get(rel_at) })
 
-                groups.append(cls(n=row['n'], attr=g_attr, rel=g_rel))
-                grp_pop += int(row['n'])
+                groups.append(cls(m=row['m'], attr=g_attr, rel=g_rel))
+                grp_pop += int(row['m'])
         gc.enable()
 
         if inf:
@@ -769,7 +769,7 @@ class Group(Entity):
             attr_db_keep = [a for a in attr_db if a in columns]
 
         # (2) Contruct the query:
-        qry = 'SELECT COUNT(*) AS n{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
+        qry = 'SELECT COUNT(*) AS m{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
             tbl=tbl,
             cols=', '.join(attr_db_keep + [r.col_from for r in rel_db]),
             cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr_db_keep + [r.col_from for r in rel_db]]),
@@ -805,7 +805,7 @@ class Group(Entity):
                     g_rel.update({ Site.AT: g_rel.get(rel_at) })
 
                 print(f'A:{g_attr}  R:{g_rel}')
-                groups.append(cls(n=row['n'], attr=g_attr, rel=g_rel))
+                groups.append(cls(m=row['m'], attr=g_attr, rel=g_rel))
 
         return groups
 
@@ -890,8 +890,8 @@ class Group(Entity):
                 if rel_at is not None:
                     g_rel.update({ Site.AT: g_rel.get(rel_at) })
 
-                groups.append(cls(n=row['n'], attr=g_attr, rel=g_rel))
-                grp_n_tot += int(row['n'])
+                groups.append(cls(m=row['m'], attr=g_attr, rel=g_rel))
+                grp_n_tot += int(row['m'])
 
         if inf:
             inf( '    Summary')
@@ -939,6 +939,18 @@ class Group(Entity):
         '''
 
         return self.__hash__()
+
+    def get_mass_at(self, qry, site=Site.AT):
+        '''
+        Returns the proportion of mass at the given site that is compatible with the query given.  For example, a
+        proportion of infected agents at a particular school.  By default, the site is the groups current location.
+        '''
+
+        at    = self.get_rel(Site.AT)
+        n     = at.get_pop_size()     #     population at current location
+        n_qry = at.get_pop_size(qry)  # sub-population at current location
+
+        return float(n_qry) / float(n)
 
     def get_rel(self, name=None):
         if name and self.rel_used is not None:
