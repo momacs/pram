@@ -263,12 +263,12 @@ class Site(Resource):
         groups = self.pop.get_groups(qry)
 
         if non_empty_only:
-            return [g for g in groups if g.n > 0]
+            return [g for g in groups if g.m > 0]
         else:
             return groups
 
     def get_pop_size(self, qry=None):
-        return sum(g.n for g in self.get_groups_here(qry))
+        return sum(g.m for g in self.get_groups_here(qry))
 
     def invalidate_pop(self):
         self.groups = None
@@ -382,11 +382,11 @@ class GroupSplitSpec(object):
           values.
     '''
 
-    p        : float = attrib(default=0.0, converter=float)  # validator=attr.validators.instance_of(float))
+    p        : float = attrib(default=0.0,  converter=float)  # validator=attr.validators.instance_of(float))
     attr_set : dict  = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
-    attr_del : set   = attrib(factory=set, converter=converters.default_if_none(factory=set))
+    attr_del : set   = attrib(factory=set,  converter=converters.default_if_none(factory=set))
     rel_set  : dict  = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
-    rel_del  : set   = attrib(factory=set, converter=converters.default_if_none(factory=set))
+    rel_del  : set   = attrib(factory=set,  converter=converters.default_if_none(factory=set))
 
     @p.validator
     def is_prob(self, attribute, value):
@@ -405,18 +405,18 @@ class GroupDBRelSpec(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Group(Entity):
-    __slots__ = ('name', 'n', 'attr', 'rel', 'is_frozen', 'hash', 'callee')
+    __slots__ = ('name', 'm', 'attr', 'rel', 'is_frozen', 'hash', 'callee')
 
     attr_used = None  # a set of attribute that has been conditioned on by at least one rule
     rel_used  = None  # ^ for relations
         # both of the above should be kept None unless a simulation is running and the dynamic rule analysis
         # should be on-going
 
-    def __init__(self, name=None, n=0.0, attr={}, rel={}, callee=None):
+    def __init__(self, name=None, m=0.0, attr={}, rel={}, callee=None):
         super().__init__(EntityType.GROUP, '')
 
         self.name = name
-        self.n    = float(n)
+        self.m    = float(m)
         self.attr = attr or {}
         self.rel  = rel  or {}
 
@@ -448,7 +448,7 @@ class Group(Entity):
         return '{}(name={}, n={}, attr={}, rel={})'.format(__class__.__name__, self.name or '.', self.n, self.attr, self.rel)
 
     def __str__(self):
-        return '{}  name: {:16}  n: {:8}  attr: {}  rel: {}'.format(self.__class__.__name__, self.name or '.', round(self.n, 2), self.attr, self.rel)
+        return '{}  name: {:16}  n: {:8}  attr: {}  rel: {}'.format(self.__class__.__name__, self.name or '.', round(self.m, 2), self.attr, self.rel)
 
     def _isinstance(self, qry, type):
         '''
@@ -933,6 +933,11 @@ class Group(Entity):
         return self.attr.get(name) if name is not None else self.attr
 
     def get_hash(self):
+        '''
+        Calling this method should be the only way to get the group's hash.  You wanna do it otherwise?  Get ready for
+        a world of hurt.
+        '''
+
         return self.__hash__()
 
     def get_rel(self, name=None):
@@ -1024,11 +1029,11 @@ class Group(Entity):
         for (i,s) in enumerate(specs):
             if i == len(specs) - 1:  # last group spec
                 p = 1 - p_sum        # complement the probability
-                n = self.n - n_sum   # make sure we're not missing anybody due to floating-point arithmetic
+                n = self.m - n_sum   # make sure we're not missing anybody due to floating-point arithmetic
             else:
                 p = s.p
-                n = self.n * p
-                # n = math.floor(self.n * p)  # conservative floor() use to make sure we don't go over due to rounding
+                n = self.m * p
+                # n = math.floor(self.m * p)  # conservative floor() use to make sure we don't go over due to rounding
 
             p_sum += p
             n_sum += n

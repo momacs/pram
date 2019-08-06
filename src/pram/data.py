@@ -314,8 +314,8 @@ class GroupSizeProbe(Probe):
         '''
 
         if self.msg_mode != 0 or self.persistance:
-            n_tot = sum([g.n for g in self.pop.get_groups(self.qry_tot)])  # TODO: If the total mass never changed, we could memoize this (either here or in GroupPopulation).
-            n_qry = [sum([g.n for g in self.pop.get_groups(q)]) for q in self.queries]
+            n_tot = sum([g.m for g in self.pop.get_groups(self.qry_tot)])  # TODO: If the total mass never changed, we could memoize this (either here or in GroupPopulation).
+            n_qry = [sum([g.m for g in self.pop.get_groups(q)]) for q in self.queries]
 
         # Message:
         if self.msg_mode != 0:

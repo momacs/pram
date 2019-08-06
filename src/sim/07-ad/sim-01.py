@@ -89,7 +89,7 @@ r = GetADProbRule()
         done().
     add().
         rule(r).
-        group(Group(n=100, attr={ 'age': 60 })).
+        group(Group(m=100, attr={ 'age': 60 })).
         done().
     run(7).
     summary(False, 1024,0,0,0, (1,0))

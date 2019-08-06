@@ -59,8 +59,8 @@ s = (Simulation().
     set_pragma_autocompact(True).
     add([
         ODESystemMass(f_sir_model, [DotMap(attr={ 'flu': 's' }), DotMap(attr={ 'flu': 'i' }), DotMap(attr={ 'flu': 'r' })], dt=0.1),
-        Group(n=950, attr={ 'flu': 's' }),
-        Group(n= 50, attr={ 'flu': 'i' }),
+        Group(m=950, attr={ 'flu': 's' }),
+        Group(m= 50, attr={ 'flu': 'i' }),
         probe
     ]).
     run(1000)

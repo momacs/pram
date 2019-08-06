@@ -21,7 +21,7 @@ from pram.sim    import Simulation
         done().
     add().
         rule(PIP('ad', 65, 0.01, 2, 5, rate_delta_mode=PIP.RateDeltaMode.EXP)).
-        group(Group(n=100, attr={ 'age': 60 })).
+        group(Group(m=100, attr={ 'age': 60 })).
         done().
     run(20).
     summary(False, 1024,0,0,0, (1,0))

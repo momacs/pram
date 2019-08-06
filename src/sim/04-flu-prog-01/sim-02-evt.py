@@ -33,7 +33,7 @@ class FluSpikeEvent(Event):
     add_probe(GroupSizeProbe.by_attr('flu', 'flu', ['s', 'i', 'r'], msg_mode=ProbeMsgMode.DISP)).
     add_rule(SIRSModel('flu', beta=0.05, gamma=0.50, alpha=0.10)).
     add_rule(FluSpikeEvent()).
-    add_group(Group(n=1000, attr={ 'flu': 's' })).
+    add_group(Group(m=1000, attr={ 'flu': 's' })).
     run(48)
 )
 
@@ -61,6 +61,6 @@ class FluSpikeEvent(Event):
 #     add_rule(SIRSModel('flu', beta=0.05, gamma=0.50, alpha=0.10)).
 #     add_rule(FluSpikeEvent()).
 #     add_probe(probe).
-#     add_group(Group(n=1000, attr={ 'flu': 's' })).
+#     add_group(Group(m=1000, attr={ 'flu': 's' })).
 #     run(48)
 # )

@@ -17,7 +17,7 @@ from pram.sim    import Simulation
 (Simulation().
     add_probe(GroupSizeProbe.by_attr('flu', 'flu', ['s', 'i', 'r'], msg_mode=ProbeMsgMode.DISP)).
     add_rule(SIRSModel('flu', beta=0.05, gamma=0.50, alpha=0.10)).
-    add_group(Group(n=1000, attr={ 'flu': 's' })).
+    add_group(Group(m=1000, attr={ 'flu': 's' })).
     run(48)
 )
 
@@ -44,6 +44,6 @@ from pram.sim    import Simulation
 # (Simulation().
 #     add_rule(SIRSModel('flu', beta=0.05, gamma=0.50, alpha=0.10)).
 #     add_probe(probe).
-#     add_group(Group(n=1000, attr={ 'flu': 's' })).
+#     add_group(Group(m=1000, attr={ 'flu': 's' })).
 #     run(48)
 # )

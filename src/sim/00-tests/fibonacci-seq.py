@@ -11,7 +11,7 @@ from pram.sim    import Simulation
     Simulation().
     add([
         FibonacciSeq('fib'),
-        Group(n=1, attr={ 'fib': 0 })
+        Group(m=1, attr={ 'fib': 0 })
     ]).
     run(20).
     summary(False, 128,0,0,0)

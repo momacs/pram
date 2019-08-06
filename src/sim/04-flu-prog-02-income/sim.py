@@ -143,7 +143,7 @@ def sim01(iter_cnt):
         add([
             ProgressFluRule(),
             GroupSizeProbe.by_attr('flu', 'flu', ['s', 'e', 'r'], msg_mode=ProbeMsgMode.CUMUL),
-            Group(n=1000)
+            Group(m=1000)
         ]).
         run(iter_cnt)
     )
@@ -158,8 +158,8 @@ def sim02(iter_cnt):
         add([
             ProgressFluIncomeRule(),
             GroupSizeProbe.by_attr('flu', 'flu', ['s', 'e', 'r'], msg_mode=ProbeMsgMode.CUMUL),
-            Group(n=500, attr={ 'income': 'l' }),
-            Group(n=500, attr={ 'income': 'm' })
+            Group(m=500, attr={ 'income': 'l' }),
+            Group(m=500, attr={ 'income': 'm' })
         ]).
         run(iter_cnt)
     )
@@ -185,8 +185,8 @@ def sim03(iter_cnt):
                 ],
                 msg_mode=ProbeMsgMode.CUMUL,
             ),
-            Group(n=500, attr={ 'income': 'l' }),
-            Group(n=500, attr={ 'income': 'm' })
+            Group(m=500, attr={ 'income': 'l' }),
+            Group(m=500, attr={ 'income': 'm' })
         ]).
         run(iter_cnt)
     )

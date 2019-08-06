@@ -52,7 +52,7 @@ class DoubleIncidenceADRule(Rule):
 
         l = self.get_lambda(age)
         p0 = poisson(l).pmf(0)
-        print(f'n: {round(group.n,2):>12}  age: {age:>3}  l: {round(l,2):>3}  p0: {round(p0,2):<4}  p1: {round(1-p0,2):<4}')
+        print(f'n: {round(group.m,2):>12}  age: {age:>3}  l: {round(l,2):>3}  p0: {round(p0,2):<4}  p1: {round(1-p0,2):<4}')
 
         return [GroupSplitSpec(p=1.00, attr_set={ 'age': age + age_inc, 'ad': False })]  # testing so don't move mass
 
@@ -74,7 +74,7 @@ class DoubleIncidenceADRule(Rule):
         done().
     add().
         rule(DoubleIncidenceADRule()).
-        group(Group(n=100, attr={ 'age': 60 })).
+        group(Group(m=100, attr={ 'age': 60 })).
         done().
     run(40)
 )

@@ -19,9 +19,9 @@ s = (
     Simulation().
     add([
         Noop(),
-        Group(n=1, attr={ 'x': 100, 'y':  200 }),
-        Group(n=2, attr={ 'x': 150, 'y':  200 }),
-        Group(n=3, attr={ 'x': 100, 'y': -200 })
+        Group(m=1, attr={ 'x': 100, 'y':  200 }),
+        Group(m=2, attr={ 'x': 150, 'y':  200 }),
+        Group(m=3, attr={ 'x': 100, 'y': -200 })
     ])
 )
 

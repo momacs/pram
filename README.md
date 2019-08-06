@@ -3,15 +3,27 @@
 A simulation framework that fuses relational probabilistic models and agent-based models.  This software is in the pre-release stage.
 
 
-## Dependencies - The Library
+## Dependencies - Core Library ([`src/pram`](src/pram)
 - [Python 3.6](https://python.org)
-- [attrs](https://github.com/python-attrs/attrs)
-- [scipy](https://www.scipy.org)
-- [numpy](https://www.numpy.org)
 - [dotmap](https://pypi.org/project/dotmap)
+- [sortedcontainers](http://www.grantjenks.com/docs/sortedcontainers/index.html)
+- [attrs](https://github.com/python-attrs/attrs)
+- [numpy](https://www.numpy.org)
+- [scipy](https://www.scipy.org)
+- [matplotlib](https://matplotlib.org/)
+- [graph-tool](https://graph-tool.skewed.de/)
+- [pycairo](https://www.cairographics.org/pycairo/) (for `graph-tool`)
+- [PyGObject](https://pygobject.readthedocs.io) (for `graph-tool`)
+- [altair](https://altair-viz.github.io)
+- [selenium](https://selenium-python.readthedocs.io/) (for saving `altair` graphs)
+- [Gecko Driver](https://github.com/mozilla/geckodriver/releases) or [Chrome Driver](https://sites.google.com/a/chromium.org/chromedriver/) and a recent version of either of the respective Web browser (i.e., Firefox or Chrome; for saving `altair` graphs)
 
 
-## Dependencies - The Web App
+## Dependencies - Simulation Library ([`src/sim`](src/sim)
+None
+
+
+## Dependencies - The Web App ([`src/web`](src/web)
 Backend:
 - [Flask](http://flask.pocoo.org)
 - [Celery](http://www.celeryproject.org)
@@ -55,6 +67,8 @@ Once a PRAM `venv` has been activated, running the following will display result
 ```
 python src/sim/01-simple/sim.py
 ```
+
+Note that installing the `graph-tool` library is the only hard part.  Because it is a C++ software and the installation is system-dependent, there is no easy way for us to provide much assistance.  Please refer to the [documentation](https://graph-tool.skewed.de/).
 
 
 ## Flu at Allegheny County Schools: An Example of a PRAM Simulation

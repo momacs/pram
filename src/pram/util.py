@@ -46,6 +46,20 @@ class DB(object):
     PATT_VALID_NAME = re.compile('^[a-zA-Z][a-zA-Z0-9_]*$')
 
     @staticmethod
+    def blob2obj(b, do_decompress=True):
+        if do_decompress:
+            return pickle.loads(gzip.decompress(b))
+        else:
+            return pickle.loads(str(b))
+
+    @staticmethod
+    def obj2blob(o, do_compress=True):
+        if do_compress:
+            return gzip.compress(pickle.dumps(o, pickle.HIGHEST_PROTOCOL))
+        else:
+            return pickle.dumps(o, pickle.HIGHEST_PROTOCOL)
+
+    @staticmethod
     def get_num(conn, tbl, col, where=None):
         where = '' if where is None else f' WHERE {where}'
         row = conn.execute(f'SELECT {col} FROM {tbl}{where}').fetchone()

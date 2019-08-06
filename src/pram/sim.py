@@ -93,7 +93,7 @@
 #         Optimization (when the time comes, but not later)
 #             Move to PyPy
 #             Memoize GroupQry queries
-#                 They should be reset (or handled inteligently) after mass redistribution
+#                 They should be reset (or handled inteligently) after mass transfer
 #             Persist probe results on a batch basis (e.g., via 'executemany()')
 #             Remove groups unused in certain number of simulation steps to account for high group-dynamic scenarios
 #     Simulation construction
@@ -132,7 +132,7 @@
 #     Ported to Ubuntu (Python 3._._; 18.04 LTS)                                               []
 #     Moved to PyPy                                                                            []
 #     Published to PyPI                                                                        []
-#     Containerized (Docker)                                                                   []
+#     Containerized                                                                            []
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -140,18 +140,18 @@
 #     Simulation
 #         c Simulation class                                                                   [2018.12.16 - 2019.07.19]
 #         Timer
-#             Timer (base class)                                                               [2019.03.31]
-#             Timer (simple subclasses, e.g., HourTimer)                                       [2019.03.31 - 2019.04.03]
-#             CalDayTimer                                                                      [2019.03.31 - ...]
-#             CalMonthTimer                                                                    [2019.03.31 - ...]
-#         SimulationAdder class                                                                [2019.04.06]
-#         SimulationSetter class                                                               [2019.04.06]
-#         SimulationDBI class                                                                  [2019.04.22]
-#         SimulationPlotter class                                                              [2019.04.10]
-#         StaticRuleAnalyzer class                                                             [2019.03.02 - 2019.04.14]
-#         DynamicRuleAnalyzer class                                                            [2019.03.02 - 2019.05.04]
-#         Trajectory class                                                                     [2019.07.12 - 2019.07.24]
-#         TrajectoryEnsemble class                                                             [2019.07.12 - 2019.07.24]
+#             c Timer                                                                          [2019.03.31]
+#             c Timer (simple subclasses, e.g., HourTimer)                                     [2019.03.31 - 2019.04.03]
+#             c CalDayTimer                                                                    [2019.03.31 - ...]
+#             c CalMonthTimer                                                                  [2019.03.31 - ...]
+#         c SimulationAdder                                                                    [2019.04.06]
+#         c SimulationSetter                                                                   [2019.04.06]
+#         c SimulationDBI                                                                      [2019.04.22]
+#         c SimulationPlotter                                                                  [2019.04.10]
+#         c StaticRuleAnalyzer                                                                 [2019.03.02 - 2019.04.14]
+#         c DynamicRuleAnalyzer                                                                [2019.03.02 - 2019.05.04]
+#         c Trajectory                                                                         [2019.07.12 - 2019.07.29]
+#         c TrajectoryEnsemble                                                                 [2019.07.12 - 2019.07.29]
 #         Entities
 #             c Agent                                                                          [2018.12.16 - 2019.01.05]
 #             c Entity                                                                         [2018.12.16 - 2019.03.22]
@@ -190,7 +190,8 @@
 #             c GroupPopulation                                                                [2019.01.07 - 2019.07.15]
 #                 f Selecting groups                                                           [2019.01.07 - 2019.01.21]
 #                 f Rule application                                                           [2019.01.04 - 2019.01.17]
-#                 f Mass redistribution                                                        [2019.01.04 - 2019.02.24]
+#                 f Mass transfer                                                              [2019.01.04 - 2019.02.24]
+#             c MassFlowGraph                                                                  [2019.07.26 - ...]
 #
 #     Data collection
 #         c Probe                                                                              [2019.01.18 - 2019.03.31]
@@ -215,7 +216,7 @@
 #         c RuleAnalyzerTestCase                                                               [2019.03.18]
 #
 #     Visualization and UI
-#         l WebUI                                                                              []
+#         l WebUI                                                                              [2019.04.02 - 2019.06.10]
 #
 #     Utilities
 #         c Data                                                                               [2019.01.06]
@@ -290,11 +291,6 @@
 #         Rule will make a portion of groups smoke
 #         Smoking (both active and passive smoking) will (diffrentially) negatively impact lifespan
 #         Being in the proximity of other smokers will increase likelihood of smoking
-#
-# ----------------------------------------------------------------------------------------------------------------------
-#
-# Solved or being solved
-#     ...
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -450,6 +446,8 @@ class Timer(object):
         self.last_iter_t1 = None
         self.last_iter_t  = None
 
+        self.is_running = False
+
         if self.tmin > self.tmax:
             raise TypeError(f'The min time has to be smaller than the max time.')
 
@@ -520,6 +518,7 @@ class Timer(object):
         self.i_max = iter
 
     def start(self):
+        self.is_running = True
         self.last_iter_t0 = Timer.get_ts()
 
     def step(self):
@@ -546,6 +545,7 @@ class Timer(object):
     def stop(self):
         self.last_iter_t1 = Timer.get_ts()
         self.last_iter_t  = self.last_iter_t1 - self.last_iter_t0
+        self.is_running = False
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -976,13 +976,13 @@ class Simulation(object):
     state variables.
     '''
 
-    def __init__(self, traj=None, rand_seed=None):
+    def __init__(self, traj=None, rand_seed=None, do_keep_mass_flow_specs=False):
         self.set_rand_seed(rand_seed)
 
         self.traj = traj  # trajectory
         self.run_cnt = 0
 
-        self.pop = GroupPopulation()
+        self.pop = GroupPopulation(self, do_keep_mass_flow_specs)
         self.rules = []
         self.probes = []
 
@@ -1332,9 +1332,9 @@ class Simulation(object):
                 }
             },
             'pop': {
-                'agentCnt' : self.pop.get_size(),
-                'groupCnt' : self.pop.get_group_cnt(),
-                'siteCnt'  : self.pop.get_site_cnt()
+                'agentMass' : self.pop.get_mass(),
+                'groupCnt'  : self.pop.get_group_cnt(),
+                'siteCnt'   : self.pop.get_site_cnt()
             },
             'probes': {
                 'ls': [{ 'name': p.name } for p in self.probes]
@@ -1362,25 +1362,29 @@ class Simulation(object):
             }
         }
 
-    def new_group(self, n=0.0, name=None):
+    @staticmethod
+    def _load(fpath, fn):
+        with fn(fpath, 'rb') as f:
+            gc.disable()
+            sim = pickle.load(f)
+            gc.enable()
+            return sim
+
+    @staticmethod
+    def load(fpath):
+        return Simulation._unpickle(fpath, open)
+
+    @staticmethod
+    def load_bz2(fpath):
+        return Simulation._unpickle(fpath, bz2.BZ2File)
+
+    @staticmethod
+    def load_gz(fpath):
+        return Simulation._unpickle(fpath, gzip.GzipFile)
+
+    def new_group(self, m=0.0, name=None):
         # return Group(name or self.pop.get_next_group_name(), n, callee=self)
-        return Group(name, n, callee=self)
-
-    def _pickle(self, fpath, fn):
-        with fn(fpath, 'wb') as f:
-            pickle.dump(self, f)
-
-    def pickle(self, fpath):
-        self._pickle(fpath, open)
-        return self
-
-    def pickle_bz2(self, fpath):
-        self._pickle(fpath, bz2.BZ2File)
-        return self
-
-    def pickle_gz(self, fpath):
-        self._pickle(fpath, gzip.GzipFile)
-        return self
+        return Group(name, m, callee=self)
 
     def plot(self):
         return SimulationPlotter(self)
@@ -1521,19 +1525,15 @@ class Simulation(object):
         if not self.is_setup_done:
             if self.fn.group_setup:
                 self._inf('Running group setup')
-                self.pop.apply_rules(self.fn.group_setup, 0, self.timer, self.traj, is_sim_setup=True)
+                self.pop.apply_rules(self.fn.group_setup, 0, self.timer, is_sim_setup=True)
 
             self._inf('Running rule setup')
-            self.pop.apply_rules(self.rules, 0, self.timer, self.traj, is_rule_setup=True)
+            self.pop.apply_rules(self.rules, 0, self.timer, is_rule_setup=True)
             self.is_setup_done = True
 
         if self.pragma.autocompact:
             self._inf('Compacting the model')
             self.compact()
-
-        # Save the initial trajectory state:
-        if self.traj is not None:
-            self.traj.save_state(True)
 
         # Force probes to capture the initial state:
         if self.pragma.probe_capture_init and self.run_cnt == 0:
@@ -1544,7 +1544,7 @@ class Simulation(object):
 
         # Run the simulation:
         self._inf('Initial population')
-        self._inf(f'    Agents : {"{:,}".format(int(self.pop.get_size()))}')
+        self._inf(f'    Mass   : {"{:,}".format(int(self.pop.get_mass()))}')
         self._inf(f'    Groups : {"{:,}".format(self.pop.get_group_cnt())}')
         self._inf(f'    Sites  : {"{:,}".format(self.pop.get_site_cnt())}')
         self._inf('Running the PRAM')
@@ -1561,13 +1561,13 @@ class Simulation(object):
                 print(f't:{self.timer.get_t()}')
 
             # Apply rules:
-            self.pop.apply_rules(self.rules, self.timer.get_i(), self.timer.get_t(), self.traj)
-            n_moved = self.pop.n_distrib_last
-            pop_size = float(self.pop.get_size())
-            if pop_size > 0:
-                p_moved = float(n_moved) / pop_size
+            self.pop.apply_rules(self.rules, self.timer.get_i(), self.timer.get_t())
+            m_flow = self.pop.last_iter.mass_flow_tot
+            m_pop = float(self.pop.get_mass())
+            if m_pop > 0:
+                p_flow = float(m_flow) / m_pop
             else:
-                p_moved = None
+                p_flow = None
 
             # Run probes:
             for p in self.probes:
@@ -1577,27 +1577,23 @@ class Simulation(object):
             self.timer.step()
             self.running.progress += self.running.step
 
-            # Save the trajectory state:
-            if self.traj is not None:
-                self.traj.save_state()
-
             # Autostop:
-            if self.pragma.autostop and p_moved is not None:
-                if n_moved < self.pragma.autostop_n or p_moved < self.pragma.autostop_p:
+            if self.pragma.autostop and p_flow is not None:
+                if m_flow < self.pragma.autostop_n or p_flow < self.pragma.autostop_p:
                     self.autostop_i += 1
                 else:
                     self.autostop_i = 0
 
                 if self.autostop_i >= self.pragma.autostop_t:
                     if self.pragma.live_info:
-                        self._inf('Autostop condition has been met; population mass redistributed during the most recent iteration')
-                        self._inf(f'    {n_moved} of {self.pop.get_size()} = {p_moved * 100}%')
+                        self._inf('Autostop condition has been met; population mass transfered during the most recent iteration')
+                        self._inf(f'    {m_flow} of {self.pop.get_mass()} = {p_flow * 100}%')
                         self.timer.stop()
                         break
                     else:
                         print('')
-                        print('Autostop condition has been met; population mass redistributed during the most recent iteration:')
-                        print(f'    {n_moved} of {self.pop.get_size()} = {p_moved * 100}%')
+                        print('Autostop condition has been met; population mass transfered during the most recent iteration:')
+                        print(f'    {m_flow} of {self.pop.get_mass()} = {p_flow * 100}%')
                         self.timer.stop()
                         break
 
@@ -1625,7 +1621,7 @@ class Simulation(object):
         # Rule cleanup and simulation compacting:
         self._inf('Running rule cleanup')
 
-        self.pop.apply_rules(self.rules, 0, self.timer, self.traj, is_rule_cleanup=True)
+        self.pop.apply_rules(self.rules, 0, self.timer, is_rule_cleanup=True)
         if self.pragma.autocompact:
             self._inf('Compacting the model')
             self.compact()
@@ -1635,6 +1631,22 @@ class Simulation(object):
         self.running.progress = 1.0
         self.running.step = 1.0
 
+        return self
+
+    def _save(self, fpath, fn):
+        with fn(fpath, 'wb') as f:
+            pickle.dump(self, f)
+
+    def save(self, fpath):
+        self._pickle(fpath, open)
+        return self
+
+    def save_bz2(self, fpath):
+        self._pickle(fpath, bz2.BZ2File)
+        return self
+
+    def save_gz(self, fpath):
+        self._pickle(fpath, gzip.GzipFile)
         return self
 
     def set(self):
@@ -1778,7 +1790,7 @@ class Simulation(object):
             print( '    Timing')
             print(f'        Timer: {self.timer}')
             print( '    Population')
-            print(f'        Size        : {"{:,.2f}".format(round(self.pop.get_size(), 1))}')
+            print(f'        Mass        : {"{:,.2f}".format(round(self.pop.get_mass(), 1))}')
             print(f'        Groups      : {"{:,}".format(self.pop.get_group_cnt())}')
             print(f'        Groups (ne) : {"{:,}".format(self.pop.get_group_cnt(True))}')
             print(f'        Sites       : {"{:,}".format(self.pop.get_site_cnt())}')
@@ -1822,246 +1834,4 @@ class Simulation(object):
 
         print('\n' * end_line_cnt[1], end='')
 
-        return self
-
-    @staticmethod
-    def _unpickle(fpath, fn):
-        with fn(fpath, 'rb') as f:
-            gc.disable()
-            sim = pickle.load(f)
-            gc.enable()
-            return sim
-
-    @staticmethod
-    def unpickle(fpath):
-        return Simulation._unpickle(fpath, open)
-
-    @staticmethod
-    def unpickle_bz2(fpath):
-        return Simulation._unpickle(fpath, bz2.BZ2File)
-
-    @staticmethod
-    def unpickle_gz(fpath):
-        return Simulation._unpickle(fpath, gzip.GzipFile)
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-class Trajectory(object):
-    '''
-    A time-ordered sequence of system configurations that occur as the system state evolves.
-
-    Also called orbit.  Can also be thought of as a sequence of vectors in the state space (or a point in a phase
-    space).
-    '''
-
-    def __init__(self, name, memo=None, sim=None):
-        self.id   = None  # set by TrajectoryEnsemble object when the DB ID is known
-        self.name = name
-        self.memo = memo
-        self.ens  = None  # the containing TrajectoryEnsemble object
-
-        self.sim  = sim or Simulation()
-        self.sim.traj = self
-
-        self.states = []
-        self.flows  = []  # inter-state mass flow
-
-    def _pickle(self, fpath, fn):
-        with fn(fpath, 'wb') as f:
-            pickle.dump(self, f)
-
-    def pickle(self, fpath):
-        self._pickle(fpath, open)
-        return self
-
-    def pickle_bz2(self, fpath):
-        self._pickle(fpath, bz2.BZ2File)
-        return self
-
-    def pickle_gz(self, fpath):
-        self._pickle(fpath, gzip.GzipFile)
-        return self
-
-    def run(self, iter_or_dur=1):
-        self.sim.run(iter_or_dur)
-
-    def save_state(self, is_initial=False):
-        if self.ens is not None:
-            self.ens.save_state(self, is_initial)
-
-    @staticmethod
-    def _unpickle(fpath, fn):
-        with fn(fpath, 'rb') as f:
-            gc.disable()
-            sim = pickle.load(f)
-            gc.enable()
-            return sim
-
-    @staticmethod
-    def unpickle_bz2(fpath):
-        return Simulation._unpickle(fpath, bz2.BZ2File)
-
-    @staticmethod
-    def unpickle_gz(fpath):
-        return Simulation._unpickle(fpath, gzip.GzipFile)
-
-# ----------------------------------------------------------------------------------------------------------------------
-class TrajectoryEnsemble(object):
-    '''
-    A collection of trajectories.
-
-    --------------------------------------------------------------------------------------------------------------------
-
-    In mathematical physics, especially as introduced into statistical mechanics and thermodynamics by J. Willard Gibbs
-    in 1902, an ensemble (also statistical ensemble) is an idealization consisting of a large number of virtual copies
-    (sometimes infinitely many) of a system, considered all at once, each of which represents a possible state that the
-    real system might be in. In other words, a statistical ensemble is a probability distribution for the state of the
-    system.
-    '''
-
-    DDL = '''
-        CREATE TABLE traj (
-        id   INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        name TEXT NOT NULL UNIQUE,
-        memo TEXT
-        );
-
-        CREATE TABLE rule (
-        id      INTEGER PRIMARY KEY AUTOINCREMENT,
-        traj_id INTEGER,
-        name    TEXT NOT NULL,
-        src     TEXT NOT NULL,
-        CONSTRAINT fk__rule__traj FOREIGN KEY (traj_id) REFERENCES traj (id) ON UPDATE CASCADE ON DELETE CASCADE
-        );
-
-        CREATE TABLE iter (
-        id      INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        traj_id INTEGER,
-        i       INTEGER NOT NULL,
-        t       REAL NOT NULL,
-        host    TEXT NOT NULL,
-        UNIQUE(traj_id,i),
-        CONSTRAINT fk__iter__traj FOREIGN KEY (traj_id) REFERENCES traj (id) ON UPDATE CASCADE ON DELETE CASCADE
-        );
-
-        CREATE TABLE state (
-        id      INTEGER PRIMARY KEY AUTOINCREMENT,
-        iter_id INTEGER,
-        sim     BLOB,
-        CONSTRAINT fk__state__iter FOREIGN KEY (iter_id) REFERENCES iter (id) ON UPDATE CASCADE ON DELETE CASCADE
-        );
-
-        CREATE TABLE flow (
-        id      INTEGER PRIMARY KEY AUTOINCREMENT,
-        iter_id INTEGER,
-        CONSTRAINT fk__flow__iter FOREIGN KEY (iter_id) REFERENCES iter (id) ON UPDATE CASCADE ON DELETE CASCADE
-        );
-        '''
-
-    def __init__(self, fpath_db):
-        self.traj = {}  # index by DB ID
-        self.conn = None
-        self.hosts = []  # hostnames of machines that will run trajectories
-
-        self._db_conn_open(fpath_db)
-
-    def __del__(self):
-        self._db_conn_close()
-
-    def _db_conn_close(self):
-        if self.conn is None: return
-
-        self.conn.close()
-        self.conn = None
-
-    def _db_conn_open(self, fpath_db):
-        self.fpath_db = fpath_db
-
-        # Database exists:
-        if os.path.isfile(fpath_db):
-            self.conn = sqlite3.connect(self.fpath_db, check_same_thread=False)
-            self.conn.execute('PRAGMA foreign_keys = ON')
-            self.conn.execute('PRAGMA journal_mode=WAL')
-
-            n = self._db_get_int('SELECT COUNT(*) FROM traj', [])
-            print(f'Using extant database (trajectories present: {n})')
-
-        # Database does not exist:
-        else:
-            self.conn = sqlite3.connect(self.fpath_db, check_same_thread=False)
-            self.conn.execute('PRAGMA foreign_keys = ON')
-            self.conn.execute('PRAGMA journal_mode=WAL')
-
-            with self.conn as c:
-                c.executescript(self.DDL)
-                c.commit()
-
-            print('New database initialized')
-
-    def _db_ins(self, q, args):
-        with self.conn as c:
-            return c.execute(q, args).lastrowid
-
-    def _db_get_int(self, q, args):
-        with self.conn as c:
-            return c.execute(q, args).fetchone()[0]
-
-    def _db_upd(self, q, args):
-        with self.conn as c:
-            c.execute(q, args)
-
-    def add_trajectories(self, traj):
-        for t in traj:
-            self.add_trajectory(t)
-
-        return self
-
-    def add_trajectory(self, t):
-        if self._db_get_int('SELECT COUNT(*) FROM traj WHERE name = ?', [t.name]) > 0:
-            return print(f'A trajectory with the name specified already exists: {t.name}')
-
-        with self.conn as c:
-            t.id = c.execute('INSERT INTO traj (name, memo) VALUES (?,?)', [t.name, t.memo]).lastrowid
-            for r in t.sim.rules:
-                c.execute('INSERT INTO rule (traj_id, name, src) VALUES (?,?,?)', [t.id, r.__class__.__name__, inspect.getsource(r.__class__)])
-
-        t.ens = self
-        self.traj[t.id] = t
-
-        return self
-
-    def load(self, fpath):
-        pass
-
-    def save(self, fpath):
-        pass
-
-    def save_state(self, traj, is_initial=False):
-        if self._db_get_int('SELECT COUNT(*) FROM traj WHERE id = ?', [traj.id]) == 0:
-            return print(f'Trajectory with this ID not found: {traj.id}')
-
-        sim = traj.sim
-
-        # Save state:
-        with self.conn as c:
-            c.execute('INSERT INTO iter (traj_id, i, t, host) VALUES (?,?,?,?)', [traj.id, sim.timer.i, (0 if is_initial else sim.timer.last_iter_t), 'localhost'])
-            c.commit()
-
-        # Save mass flow:
-        if not is_initial:
-            pass
-
-        return self
-
-    def run(self, iter_or_dur=1):
-        for i,t in enumerate(self.traj.values()):
-            print(f'Running trajectory {i+1} of {len(self.traj)}: {t.name}')
-            t.run(iter_or_dur)
-
-        return self
-
-    def set_hosts(self, hosts):
-        self.hosts = hosts
         return self

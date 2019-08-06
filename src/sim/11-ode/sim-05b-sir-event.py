@@ -168,8 +168,8 @@ s = (Simulation().
         # FluExpProcess(),
         FluGammaProcess(),
         # ODESystemMass(f_decay, [DotMap(attr={ 'flu': 'r' }), DotMap(attr={ 'flu': 's' })], dt=0.1),
-        Group(n=950, attr={ 'flu': 's' }),
-        Group(n= 50, attr={ 'flu': 'i' }),
+        Group(m=950, attr={ 'flu': 's' }),
+        Group(m= 50, attr={ 'flu': 'i' }),
         probe
     ]).
     run(3000)

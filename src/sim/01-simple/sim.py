@@ -9,14 +9,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pram.data   import GroupSizeProbe, ProbeMsgMode
 from pram.entity import Group, GroupQry, GroupSplitSpec, Site
-from pram.rule   import GoToRule, MarkovChain, TimeInt
+from pram.rule   import GoToRule, DiscreteInvMarkovChain, TimeInt
 from pram.sim    import Simulation
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # (0) Init:
 
-progress_flu_rule = MarkovChain('flu-status', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.50, 0.50], 'r': [0.10, 0.00, 0.90] })
+progress_flu_rule = DiscreteInvMarkovChain('flu-status', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.50, 0.50], 'r': [0.10, 0.00, 0.90] })
     # s - susceptible
     # i - infectious
     # r - recoverd

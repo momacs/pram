@@ -92,7 +92,7 @@ s = (
         ODESystemAttr(f_lotka_volterra, ['x', 'y'], dt=0.1),
         PredatorDiseaseEvent(),
         PreyDiseaseEvent(),
-        Group(n=1, attr={ 'x': 10, 'y': 10 })
+        Group(m=1, attr={ 'x': 10, 'y': 10 })
     ]).
     run(1500)
 )

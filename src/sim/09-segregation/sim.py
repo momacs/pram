@@ -40,10 +40,10 @@ probe_a = GroupSizeProbe(
         done().
     add([
         SegregationModel('team', len(loc)),
-        Group(n=200, attr={ 'team': 'blue' }, rel={ Site.AT: loc[0] }),
-        Group(n=300, attr={ 'team': 'blue' }, rel={ Site.AT: loc[1] }),
-        Group(n=100, attr={ 'team': 'red'  }, rel={ Site.AT: loc[0] }),
-        Group(n=400, attr={ 'team': 'red'  }, rel={ Site.AT: loc[1] }),
+        Group(m=200, attr={ 'team': 'blue' }, rel={ Site.AT: loc[0] }),
+        Group(m=300, attr={ 'team': 'blue' }, rel={ Site.AT: loc[1] }),
+        Group(m=100, attr={ 'team': 'red'  }, rel={ Site.AT: loc[0] }),
+        Group(m=400, attr={ 'team': 'red'  }, rel={ Site.AT: loc[1] }),
         # probe_loc
         probe_a
     ]).

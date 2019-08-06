@@ -569,7 +569,7 @@ class ODESystemMass(Rule):
         if iter != self.iter_last:  # only integrate once per iteration
             # Previous version (no initial condition update after the first one):
             # if self.y0_mass is None:
-            #     self.y0_mass = [sum([0] + [g.n for g in pop.get_groups(q)]) for q in self.queries]
+            #     self.y0_mass = [sum([0] + [g.m for g in pop.get_groups(q)]) for q in self.queries]
             #     # print(f'y0 : {self.y0_mass}')
             #     self.ni.set_initial_value(self.y0_mass, 0)
             #
@@ -579,7 +579,7 @@ class ODESystemMass(Rule):
             # self.hist.y.append(self.ni.y)
 
             # self.y0_mass = [sum([0] + [g.n for g in pop.get_groups(q)]) for q in self.queries]
-            self.y0_mass = [sum([0] + [g.n for g in pop.get_groups(GroupQry(attr=q.attr))]) for q in self.queries]
+            self.y0_mass = [sum([0] + [g.m for g in pop.get_groups(GroupQry(attr=q.attr))]) for q in self.queries]
             self.ni.set_initial_value(self.y0_mass, 0)
             self.ni.integrate(self.dt)
 
@@ -587,11 +587,11 @@ class ODESystemMass(Rule):
             self.hist.y.append(self.ni.y)
 
             # n  = self.ni.y[0].tolist().real + self.ni.y[1].tolist().real + self.ni.y[2].tolist().real
-            self.tmp.n  = sum(self.y0_mass)
+            self.tmp.m  = sum(self.y0_mass)
             # self.tmp.ps = min(1.00, max(0.00, self.ni.y[0].tolist().real / self.tmp.n))
             # self.tmp.pi = min(1.00, max(0.00, self.ni.y[1].tolist().real / self.tmp.n))
             # self.tmp.pr = 1.00 - self.tmp.ps - self.tmp.pi
-            self.tmp.p = [min(1.00, max(0.00, self.ni.y[i].tolist().real / self.tmp.n)) for i in range(len(self.queries) - 1)]
+            self.tmp.p = [min(1.00, max(0.00, self.ni.y[i].tolist().real / self.tmp.m)) for i in range(len(self.queries) - 1)]
             self.tmp.p.append(1.00 - sum(self.tmp.p))
 
         # return [
@@ -733,7 +733,7 @@ class DiscreteInvMarkovChain(MarkovChain, DiscreteSpacetimeStochasticProcess, St
     ----[ Notation A ]----
 
     code:
-        TimeInvMarkovChain('flu', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.80, 0.10], 'r': [0.10, 0.00, 0.90] })
+        DiscreteInvMarkovChain('flu', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.80, 0.10], 'r': [0.10, 0.00, 0.90] })
 
     init:
         tm = {
@@ -1325,7 +1325,7 @@ class PoissonIncidenceProcess(PoissonProcess):
 
         self.rate = self.fn_calc_lambda(age)
         p0 = poisson(self.rate).pmf(0)
-        # print(f'n: {round(group.n,2):>12}  age: {age:>3}  l: {l:>3}  p0: {round(p0,2):<4}  p1: {round(1-p0,2):<4}')
+        # print(f'n: {round(group.m,2):>12}  age: {age:>3}  l: {l:>3}  p0: {round(p0,2):<4}  p1: {round(1-p0,2):<4}')
 
         return [
             GroupSplitSpec(p=    p0, attr_set={ 'age': age + age_inc, self.attr: False }),

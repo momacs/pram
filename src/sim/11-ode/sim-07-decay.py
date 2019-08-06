@@ -69,8 +69,8 @@ s = (Simulation().
     add([
         ODESystemMass(f_decay_a, [DotMap(attr={ 'sub-a': 'u' }), DotMap(attr={ 'sub-a': 'd' })], dt=0.1),
         ODESystemMass(f_decay_b, [DotMap(attr={ 'sub-b': 'u' }), DotMap(attr={ 'sub-b': 'd' })], dt=0.1),
-        Group(n=1000, attr={ 'sub-a': 'u' }),
-        Group(n=1000, attr={ 'sub-b': 'u' }),
+        Group(m=1000, attr={ 'sub-a': 'u' }),
+        Group(m=1000, attr={ 'sub-b': 'u' }),
         probe_u,
         probe_d
     ]).
