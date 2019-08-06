@@ -3,7 +3,7 @@
 A simulation framework that fuses relational probabilistic models and agent-based models.  This software is in the pre-release stage.
 
 
-## Dependencies - Core Library ([`src/pram`](src/pram)
+## Dependencies - Core Library ([`src/pram`](src/pram))
 - [Python 3.6](https://python.org)
 - [dotmap](https://pypi.org/project/dotmap)
 - [sortedcontainers](http://www.grantjenks.com/docs/sortedcontainers/index.html)
@@ -19,11 +19,11 @@ A simulation framework that fuses relational probabilistic models and agent-base
 - [Gecko Driver](https://github.com/mozilla/geckodriver/releases) or [Chrome Driver](https://sites.google.com/a/chromium.org/chromedriver/) and a recent version of either of the respective Web browser (i.e., Firefox or Chrome; for saving `altair` graphs)
 
 
-## Dependencies - Simulation Library ([`src/sim`](src/sim)
+## Dependencies - Simulation Library ([`src/sim`](src/sim))
 None
 
 
-## Dependencies - The Web App ([`src/web`](src/web)
+## Dependencies - The Web App ([`src/web`](src/web))
 Backend:
 - [Flask](http://flask.pocoo.org)
 - [Celery](http://www.celeryproject.org)
