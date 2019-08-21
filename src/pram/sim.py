@@ -1631,6 +1631,11 @@ class Simulation(object):
         self.running.progress = 1.0
         self.running.step = 1.0
 
+        # Flush any buffered probe data:
+        for p in self.probes:
+            if p.persistance is not None:
+                p.persistance.flush()
+
         return self
 
     def _save(self, fpath, fn):
