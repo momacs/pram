@@ -8,6 +8,7 @@ A simulation framework that fuses relational probabilistic models and agent-base
 - [dotmap](https://pypi.org/project/dotmap)
 - [sortedcontainers](http://www.grantjenks.com/docs/sortedcontainers/index.html)
 - [attrs](https://github.com/python-attrs/attrs)
+- [dill](https://pypi.org/project/dill/)
 - [numpy](https://www.numpy.org)
 - [scipy](https://www.scipy.org)
 - [matplotlib](https://matplotlib.org/)
@@ -175,11 +176,11 @@ Below is the output of the simulation when it is run synchronously from the term
 
 ## Modeling Levels
 
-PRAM supports modeling on three levels of abstraction: Domain, class, and rule.  Apart from being flexibile, this design choice delivers expressive brevity in that it allows the modeler to invoke models in a space- and time-efficient manner.  In what follows, we briefly describe a example model and then demonstrate how that model can be implemented on each of the three level.
+PRAM supports modeling on three levels of abstraction: Domain, class, and rule.  Apart from being flexible, this design choice delivers expressive brevity in that it allows the modeler to invoke models in a space- and time-efficient manner.  In what follows, we briefly describe an example model and then demonstrate how that model can be implemented on each of the three level.
 
 ### The SIRS Model
 
-The SIR epidemiological model (Kermack & McKendrick, 1927) will help us illustrate the differnet modeling levels.  In that model, population is compartmentalized into susceptible (S), infectious (I), and recovered (R).  As shown on the image below, an infectious disease is transmitted between susceptible hosts with the rate _&beta;_ who eventually recover with rate _&gamma;_.  Because getting a disease does not need to result in life-long immunity to it, the model can be augmented by allowing recovered hosts to become susceptible again with rate _&alpha;_ (which results in the SIRS model).
+The SIR epidemiological model (Kermack & McKendrick, 1927) will help us illustrate the differnt modeling levels.  In that model, population is compartmentalized into susceptible (S), infectious (I), and recovered (R).  As shown on the image below, an infectious disease is transmitted between susceptible hosts with the rate _&beta;_ who eventually recover with rate _&gamma;_.  Because getting a disease does not need to result in life-long immunity to it, the model can be augmented by allowing recovered hosts to become susceptible again with rate _&alpha;_ (which results in the SIRS model).
 
 ![The SIRS model](media/modeling-levels/sirs-model.png)
 
@@ -207,7 +208,7 @@ TimeInvMarkovChain('flu', transition_matrix)
 
 ### The Rule Level
 
-Finally, a modeler may choose to descend to the lowest level and implement the dynamics of their model directly.  This is beneficial if what they are trying to express diverges from the set of modeling classes `pram` provides (or to encode a particular sort of interaction between different models).  Extending an existing class (e.g., the `TimeInvMarkovChain`) is an example of modeling on the rule level as well even if minimal portions of the model dynamics are overwridden.  Here is a pseudo-code for the (slightly extended) SIRS model:
+Finally, a modeler may choose to descend to the lowest level and implement the dynamics of their model directly.  This is beneficial if what they are trying to express diverges from the set of modeling classes `pram` provides (or to encode a particular sort of interaction between different models).  Extending an existing class (e.g., the `TimeInvMarkovChain`) is an example of modeling on the rule level as well even if minimal portions of the model dynamics are overridden.  Here is a pseudo-code for the (slightly extended) SIRS model:
 
 ```
 rule_flu_progression():
