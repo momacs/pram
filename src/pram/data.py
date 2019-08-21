@@ -273,7 +273,7 @@ class GroupSizeProbe(Probe):
         if var_names is None:
             self.vars = \
                 [Var(f'p{i}', 'float') for i in range(len(self.queries))] + \
-                [Var(f'n{i}', 'float') for i in range(len(self.queries))]
+                [Var(f'm{i}', 'float') for i in range(len(self.queries))]
                 # proportions and numbers
             # self.vars = [Probe.Var(f'v{i}', 'float') for i in range(len(self.queries))]
         else:
