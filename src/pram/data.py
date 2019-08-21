@@ -34,6 +34,14 @@ class ProbePersistance(ABC):
         pass
 
     @abstractmethod
+    def plot(self, probe, series, fpath_fig=None, figsize=(12,4), legend_loc='upper right', dpi=150):
+        pass
+
+    @abstractmethod
+    def get_data(self, probe):
+        pass
+
+    @abstractmethod
     def persist(self):
         pass
 
@@ -114,6 +122,10 @@ class ProbePersistanceDB(ProbePersistance):
                     c.executemany(p.ins_qry, p.ins_val)
                     p.ins_val = []
 
+    def get_data(self, probe):
+        probe_item = self.probes[DB.str_to_name(probe.name)]
+        return [dict(r) for r in self.conn.execute(probe_item.sel_qry).fetchall()]
+
     def persist(self, probe, vals, iter, t):
         probe_item = self.probes[DB.str_to_name(probe.name)]
 
@@ -127,7 +139,7 @@ class ProbePersistanceDB(ProbePersistance):
                     c.executemany(probe_item.ins_qry, probe_item.ins_val)
                 probe_item.ins_val = []
 
-    def plot(self, probe, series, fpath_fig=None, figsize=(8,8), legend_loc='upper right', dpi=300):
+    def plot(self, probe, series, fpath_fig=None, figsize=(12,4), legend_loc='upper right', dpi=150):
         probe_item = self.probes[DB.str_to_name(probe.name)]
 
         data = { s['var']:[] for s in series }
@@ -224,6 +236,10 @@ class Probe(ABC):
     def clear(self):
         self.msg.clear()
 
+    @abstractmethod
+    def get_data(self):
+        pass
+
     def get_msg(self, do_join=True):
         return '\n'.join(self.msg)
 
@@ -300,9 +316,15 @@ class GroupSizeProbe(Probe):
     def __str__(self):
         return 'Probe  name: {:16}  query-cnt: {:>3}'.format(self.name, len(self.queries))
 
+    def get_data(self):
+        if not self.persistance:
+            return print('Plotting error: The probe is not associated with a persistance backend')
+
+        return self.persistance.get_data(self)
+
     def plot(self, series, fpath_fig=None, figsize=(8,8), legend_loc='upper right', dpi=300):
         if not self.persistance:
-            return print('Plotting error: The prove is not associated with a persistance backend')
+            return print('Plotting error: The probe is not associated with a persistance backend')
 
         return self.persistance.plot(self, series, fpath_fig, figsize, legend_loc, dpi)
 
