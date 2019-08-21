@@ -30,3 +30,5 @@ series = [
     { 'var': 'p2', 'lw': 0.75, 'linestyle': ':',  'marker': 'x', 'color': 'green', 'markersize': 0, 'lbl': 'R' }
 ]
 p.plot(series, figsize=(16,3))
+
+# print(p.get_data())
