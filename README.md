@@ -4,6 +4,7 @@ A simulation framework that fuses relational probabilistic models and agent-base
 
 
 ## Dependencies - Core Library ([`src/pram`](src/pram))
+
 - [Python 3.6](https://python.org)
 - [dotmap](https://pypi.org/project/dotmap)
 - [sortedcontainers](http://www.grantjenks.com/docs/sortedcontainers/index.html)
@@ -21,10 +22,12 @@ A simulation framework that fuses relational probabilistic models and agent-base
 
 
 ## Dependencies - Simulation Library ([`src/sim`](src/sim))
+
 None
 
 
 ## Dependencies - The Web App ([`src/web`](src/web))
+
 Backend:
 - [Flask](http://flask.pocoo.org)
 - [Celery](http://www.celeryproject.org)
@@ -38,6 +41,7 @@ Front-end:
 
 
 ## Setup
+
 The following shell script creates a Python virtual environment (`venv`), activates it, downloads the source code of PRAM into it, and installs all dependencies.
 
 ```
@@ -344,21 +348,21 @@ Let us illustrate this idea with a simulation of two interacting models.  The fi
 
 While the result of these two models interacting is fairly easy to anticipate, this may not be the case for larger systems of models.  Below is a line plot of 10 randomly selected trajectories of this ensemble.  Note that the actual data is not smooth; the plot represents splines fitted to each of the three series within each of the 10 trajectories.
 
-![traj-ensemble-sir-beta-10-traj](media/traj/ensamble-01-sirs-beta-line-01-10t.png)
+![traj-ensemble-sir-beta-10-traj](media/traj/ensemble-01-sirs-beta-line-01-10t.png)
 
 This is how a 100 samples would look like.
 
-![traj-ensemble-sir-beta-100-traj](media/traj/ensamble-02-sirs-beta-line-02-100t.png)
+![traj-ensemble-sir-beta-100-traj](media/traj/ensemble-02-sirs-beta-line-02-100t.png)
 
 ### Example: The SIRS Model + Beta Perturbation + Gamma Process
 
 In this example, we will investigate a simulation consisting of the same SIRS model and a beta perturbation but this time there will also be a gamma process which, like before, converts an increasingly large number of recovered agents into the susceptible ones only to ease off and eventually cease to affect the simulation altogether.  Below is mass dynamics for an ensemble of 10 trajectories.
 
-![traj-ensemble-sir-gamma-beta-10-traj](media/traj/ensamble-06-sir-gamma-beta-line-02-10t-2ki.png)
+![traj-ensemble-sir-gamma-beta-10-traj](media/traj/ensemble-06-sir-gamma-beta-line-02-10t-2ki.png)
 
 Because directly plotting large number of individual trajectories may not produce a clear image, trajectories can be aggregated over.  One example of such aggregation is shown below.  Here, the mean and the interquartile range (IQR) for each of the three groups (i.e., S, I, and R) is shown instead of the individual series.
 
-![traj-ensemble-sir-gamma-beta-aggr-10-traj](media/traj/ensamble-07-sir-gamma-beta-line-aggr-10t-2ki.png)
+![traj-ensemble-sir-gamma-beta-aggr-10-traj](media/traj/ensemble-07-sir-gamma-beta-line-aggr-10t-2ki.png)
 
 
 ## Web App
