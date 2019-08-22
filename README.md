@@ -297,6 +297,70 @@ By decreasing the reproductive rate of prey, that linear process models increasi
 
 Even though the process changes the prey reproductive parameter in very small decrements, it nevertheless leads to the eventual extinction of the predator population (due to insufficient size of the prey population) and then the prey population itself.  If we assume that the simulation parameters are biologically and ecologically valid, this simulation predicts the predator species to go extinct in 80 years and the prey population to follow in another 50 years.
 
+
+## Mass Dynamics
+
+In the context of a PRAM simulation, mass dynamics can be defined in at least three related but distinct ways.  First, we could understand it as mass locus (_m_); such conceptualization would allows us to answer the question "Where is mass?"  Second, we could define it as mass flow (i.e., the first derivative of mass locus, _dm/dt_) which would permit answers to the question "How did it get there?"  Finally, we could talk of the mass flux (or rate of mass flow, i.e., first derivative of mass transfer and the second derivative of mass locus, _d<sup>2</sup>m/dt_).  The rate answers the question "How quickly did it move?"
+
+### Mass Spaces
+
+Mass dynamics in PRAMs can be considered in the _group space_ or the _probe space_.  The group mass space is a partition defined by group attributes and relations and thus contains all the groups in a simulation (for that reason, the name _simulation mass space_ would be adequate as well).  The probe mass space on the other hand is typically smaller (i.e., it has fewer dimensions) because the mass distributed among the groups is typically aggregated by probes.  For example, while the SIR model can be invoked in a simulation containing many agents attending many schools, a probe defined by the user will reveal their interest to be on a high level of, e.g., "size of populations of infected students at low vs medium income schools over time."
+
+### Mass Locus
+
+Below are a few examples of how mass locus can be visualized using steamgraphs.  First, we have the SIR model which was described earlier.
+
+![streamgraph-sir](media/mass-dynamics/streamgraph-01-sir.png)
+
+Next, we have a simulation of the SIR model composed with a gamma process which at iteration 1000 starts to convert recovered agents back into susceptible.  That gamma process quickly overpowers the SIR model's attempts to convert agents into recovered (via infectious) but then eases off and eventually play no role.
+
+![streamgraph-sir-gamma](media/mass-dynamics/streamgraph-03-sir-gamma.png)
+
+Next, we have the segregation model (Schelling, 1969) in which mass dynamics is the result of the agents' motivation to be close to other similar agents (e.g., blue agents want to be in proximity of other blue agents) and far away from dissimilar agents (e.g., blue agents do not want to congregate near red agents).
+
+![streamgraph-segregation](media/mass-dynamics/streamgraph-04-segregation.png)
+
+Finally, we have a simulation of the SIR model at eight different schools.  The SIR models at each of those schools are slightly different in that the transmission probability depends on the size of the school, i.e., the probability of a student to become infected is proportional to the number of infectious students around him.  In that way, larger schools are more likely to be afflicted by an epidemic.
+
+![streamgraph-schools](media/mass-dynamics/streamgraph-05-schools.png)
+
+
+### Mass Flow
+
+Below is an example of visualization of mass flow in the SIR model that has been run for seven iterations.
+
+![states-sir-7-iter](media/mass-dynamics/states-01-sir-7i.png)
+
+
+## Trajectories and Trajectory Ensembles
+
+A PRAM simulation need not to be deterministic.  In fact, simulations imbued with stochasticity are likely the more interesting kind.  In order to properly account for a stochastic nature of those simulations, the software enables execution of multiple independent simulations.  The trace of those simulation runs yields an ensemble distribution which can then be inspected statistically for patterns (e.g., the expected number of years until underground water wells dry up in a region given water utilization strategies S1 versus S2 or the worst-case scenario under a set of utilization strategies).  Because the states of individual simulations can be conceived as sequential interacting samples of the system state, this method belongs to the mean field particle class.  While beginning with a set of user-defined or random initial states (or a combination thereof) is the simplest solution, a more elaborate initial state selection could be employed as well.
+
+### Example: The SIRS Model + Beta Perturbation
+
+Let us illustrate this idea with a simulation of two interacting models.  The first model is the SIRS model.  The second model is a stochastic process that at every simulation step converts a small portion of the recovered agents back into susceptible.  That random conversion probability is a random draw from the Beta(2,25) distribution.  Below is the histogram of 100,000 such draws.
+
+![beta-distribution](media/traj/beta.png)
+
+While the result of these two models interacting is fairly easy to anticipate, this may not be the case for larger systems of models.  Below is a line plot of 10 randomly selected trajectories of this ensemble.  Note that the actual data is not smooth; the plot represents splines fitted to each of the three series within each of the 10 trajectories.
+
+![traj-ensemble-sir-beta-10-traj](media/traj/ensamble-01-sirs-beta-line-01-10t.png)
+
+This is how a 100 samples would look like.
+
+![traj-ensemble-sir-beta-100-traj](media/traj/ensamble-02-sirs-beta-line-02-100t.png)
+
+### Example: The SIRS Model + Beta Perturbation + Gamma Process
+
+In this example, we will investigate a simulation consisting of the same SIRS model and a beta perturbation but this time there will also be a gamma process which, like before, converts an increasingly large number of recovered agents into the susceptible ones only to ease off and eventually cease to affect the simulation altogether.  Below is mass dynamics for an ensemble of 10 trajectories.
+
+![traj-ensemble-sir-gamma-beta-10-traj](media/traj/ensamble-06-sir-gamma-beta-line-02-10t-2ki.png)
+
+Because directly plotting large number of individual trajectories may not produce a clear image, trajectories can be aggregated over.  One example of such aggregation is shown below.  Here, the mean and the interquartile range (IQR) for each of the three groups (i.e., S, I, and R) is shown instead of the individual series.
+
+![traj-ensemble-sir-gamma-beta-aggr-10-traj](media/traj/ensamble-07-sir-gamma-beta-line-aggr-10t-2ki.png)
+
+
 ## Web App
 
 The Web app located in the [`src/web`](src/web/) directory demonstrates how the `Simulation` object can be used asynchronously via a Web user interface.  A production-grade server-side logic handles client requests.  As shown of the screenshots below, the UI itself is organized into a logical sequence of five sections: Rules, Population, Probes, Simulation, and Output.
@@ -316,6 +380,8 @@ Kermack, W.O. & McKendrick, A.G. (1927) A Contribution to the Mathematical Theor
 Loboda, T.D. (2019) [Milestone 3 Report](https://github.com/momacs/pram/blob/master/docs/Milestone-3-Report.pdf).
 
 Loboda, T.D. & Cohen, P.R. (2019) Probabilistic Relational Agent-Based Models.  Poster presented at the _International Conference on Social Computing, Behavioral-Cultural Modeling & Prediction and Behavior Representation in Modeling and Simulation (BRiMS)_, Washington, DC, USA.  [PDF](https://github.com/momacs/pram/blob/master/docs/loboda-2019-brims.pdf)
+
+Schelling, T.C. (1969) Models of Segregation. _The American Economic Review, 59(2)_, 488-493.
 
 
 ## License
