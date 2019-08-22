@@ -269,7 +269,7 @@ Finally, the numeric integrator for a system of ODEs can be kept internal to the
 
 ## Composite Simulations
 
-One of the goals of the `pram` package is to elucidate the interactions between complex systems.  It hopes to do that via composite simulations, i.e., simulations composed of different models which are allowed to work independently and interact by simultaniosuly changing the shared simulation state space.
+One of the goals of the `pram` package is to elucidate the interactions between complex systems.  It hopes to do that via composite simulations, i.e., simulations composed of different models which are allowed to work independently and interact by simultaneously changing the shared simulation state space.
 
 ### The SIR Model with a Flu-Spike Event
 
@@ -289,7 +289,7 @@ When this gamma process is combined with the SIR model, the PRAM simulation prod
 
 ### The Lotka-Volterra Model with a Food Restriction Process
 
-The Lotka-Volterra model of population dynamics contains four paratemers.  When one of them, the prey reproduction rate parameter, is affected by a linear process that decreases it slowly but surely, the following picture emerges.
+The Lotka-Volterra model of population dynamics contains four parameters.  When one of them, the prey reproduction rate parameter, is affected by a linear process that decreases it slowly but surely, the following picture emerges.
 
 ![The Lotka-Volterra model with a linear process](media/sim-model-composition/lv-lin-proc.png)
 
@@ -365,7 +365,7 @@ Because directly plotting large number of individual trajectories may not produc
 
 The Web app located in the [`src/web`](src/web/) directory demonstrates how the `Simulation` object can be used asynchronously via a Web user interface.  A production-grade server-side logic handles client requests.  As shown of the screenshots below, the UI itself is organized into a logical sequence of five sections: Rules, Population, Probes, Simulation, and Output.
 
-The first figure below shows the results of syntactic rule analysis which discovers two relevant attributes (i.e., `income` and `flu`) and two relevant relations (i.e., `home` and `school`).  The second figure shows generating populations from a database.  The UI assists the user by suggesting attributes and relations to be used for forming groups by fuzzy-matching the database table column names against the sets of relevant attributs and relations.  For example, at least one rule makes use of the relation `school` and the UI suggests to form groups based on the foreign key column `school_id` due to the fuzzy-matching score of the two strings being high enough (`0.67`).
+The first figure below shows the results of syntactic rule analysis which discovers two relevant attributes (i.e., `income` and `flu`) and two relevant relations (i.e., `home` and `school`).  The second figure shows generating populations from a database.  The UI assists the user by suggesting attributes and relations to be used for forming groups by fuzzy-matching the database table column names against the sets of relevant attributes and relations.  For example, at least one rule makes use of the relation `school` and the UI suggests to form groups based on the foreign key column `school_id` due to the fuzzy-matching score of the two strings being high enough (`0.67`).
 
 ![Web UI 01](media/web-app/flu-ac-04.png)
 ![Web UI 02](media/web-app/flu-ac-05.png)
