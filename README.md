@@ -6,6 +6,7 @@ A simulation framework that fuses relational probabilistic models and agent-base
 ## Dependencies - Core Library ([`src/pram`](src/pram))
 
 - [Python 3.6](https://python.org)
+- [xxhash](https://pypi.org/project/xxhash/)
 - [dotmap](https://pypi.org/project/dotmap)
 - [sortedcontainers](http://www.grantjenks.com/docs/sortedcontainers/index.html)
 - [attrs](https://github.com/python-attrs/attrs)
