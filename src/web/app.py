@@ -53,7 +53,8 @@
 #             flower -A app.celery --port=5555
 #         Flask
 #             cd /Volumes/d/pitt/sci/pram/src/web
-#             FLASK_ENV=development FLASK_APP=web flask run --host=0.0.0.0
+#             # FLASK_ENV=development FLASK_APP=web flask run --host=0.0.0.0
+#             FLASK_ENV=development FLASK_APP=app flask run --host=0.0.0.0
 #         Materialize
 #             brew install sass/sass/sass
 #             cd /Volumes/d/pitt/sci/pram/src/web/static
@@ -73,7 +74,8 @@
 #             cd ~/prj/pram/web
 #             export LANG=en_US.UTF-8
 #             export LC_ALL=en_US.UTF-8
-#             FLASK_ENV=production FLASK_APP=web /usr/local/bin/flask-3.6 run --host=192.168.0.164 --port=5050
+#             # FLASK_ENV=production FLASK_APP=web /usr/local/bin/flask-3.6 run --host=192.168.0.164 --port=5050
+#             FLASK_ENV=production FLASK_APP=app /usr/local/bin/flask-3.6 run --host=192.168.0.164 --port=5050
 #
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -102,7 +104,7 @@ from flask_session import Session
 
 from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
 from pram.entity import GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
-from pram.rule   import Rule, GoToAndBackTimeAtRule, ResetSchoolDayRule, SEIRFluRule, TimeAlways, TimePoint
+from pram.rule   import Rule, GoToAndBackTimeAtRule, ResetSchoolDayRule, TimeAlways, TimePoint
 from pram.rule   import SimpleFluLocationRule, SimpleFluProgressRule
 from pram.sim    import Simulation, SimulationConstructionError
 from pram.util   import DB, Size
@@ -311,8 +313,7 @@ def rule_get_inf(rule):
 def rules_ls():
     rules = [
         rule_get_inf(SimpleFluProgressRule),
-        rule_get_inf(SimpleFluLocationRule),
-        rule_get_inf(SEIRFluRule)
+        rule_get_inf(SimpleFluLocationRule)
     ]
     return jsonify({ 'res': True, 'rules': rules })
 
