@@ -6,7 +6,6 @@ import json
 import math
 import numpy as np
 import os
-import sqlite3
 import xxhash
 
 from abc             import ABC
@@ -186,7 +185,7 @@ class Site(Resource):
         self.rel_name = rel_name  # name of the relation the site is the object of
         self.attr = attr or {}
         self.pop = pop  # pointer to the population (can be set elsewhere too)
-        self.groups = None  # None indicates the groups at the site might have changed and need to be retrieved again from the population
+        # self.groups = None  # None indicates the groups at the site might have changed and need to be retrieved again from the population
 
     def __eq__(self, other):
         '''
@@ -200,7 +199,6 @@ class Site(Resource):
         return hash(self.__key())
 
     def __repr__(self):
-        # return '{}({} {} {})'.format(self.__class__.__name__, self.name, self.__hash__(), self.attr)
         return '{}({})'.format(self.__class__.__name__, self.__hash__())
 
     def __str__(self):
@@ -208,6 +206,9 @@ class Site(Resource):
 
     def __key(self):
         return (self.name)
+
+    def freeze(self):
+        self.is_frozen = True
 
     @classmethod
     def gen_from_db(cls, db_fpath, tbl, name_col, rel_name=AT, attr=[], limit=0):
@@ -270,8 +271,8 @@ class Site(Resource):
     def get_pop_size(self, qry=None):
         return sum(g.m for g in self.get_groups_here(qry))
 
-    def invalidate_pop(self):
-        self.groups = None
+    # def invalidate_pop(self):
+    #     self.groups = None
 
     def set_pop(self, pop):
         self.pop = pop
@@ -604,7 +605,7 @@ class Group(Entity):
         return self.get_attr(name)
 
     @staticmethod
-    def gen_hash(attr, rel):
+    def gen_hash(attr, rel=None):
         '''
         Generates a hash for the attributes and relations dictionaries.  This sort of hash is desired because groups
         are judged functionally equivalent or not based on the content of those two dictionaries alone and nothing else

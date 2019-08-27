@@ -13,8 +13,9 @@ class MassFlowSpec(object):
     A list of objects of this class for one simulation iteration encodes the full picture of mass flow in th system.
     '''
 
-    src: Group = attrib()
-    dst: list  = attrib(factory=list)
+    m_pop : float = attrib(converter=float)  # total population mass at the time of mass flow
+    src   : Group = attrib()
+    dst   : list  = attrib(factory=list)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -109,7 +110,7 @@ class GroupPopulation(object):
     def add_site(self, site):
         h = site.get_hash()
         if h in self.sites.keys():
-            return
+            return self
 
         self.sites[h] = site
         site.set_pop(self)
@@ -136,7 +137,7 @@ class GroupPopulation(object):
         for g in self.groups.values():
             dst_groups_g = g.apply_rules(self, rules, iter, t, is_rule_setup, is_rule_cleanup, is_sim_setup)
             if dst_groups_g is not None:
-                mass_flow_specs.append(MassFlowSpec(g, dst_groups_g))
+                mass_flow_specs.append(MassFlowSpec(self.get_mass(), g, dst_groups_g))
                 src_group_hashes.add(g.get_hash())
 
         if len(mass_flow_specs) == 0:  # no mass to transfer
@@ -254,205 +255,3 @@ class GroupPopulation(object):
             self.sim.traj.save_state(mass_flow_specs)
 
         return self
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-# class MassGraph(object):
-#     '''
-#     A graph of locus and flow of mass.
-#
-#     This class holds the entire time-evolution of the group space and the associated mass flow.
-#
-#     This class currently uses graph-tool library.  I've also considered using the Python-native NetworkX, but
-#     graph-tool is faster, more featurefull, and performance-transparent (i.e., all operations are annotated with the
-#     big O notation).  The only problem with graph-tool is that it is more difficult to install, which is going to be
-#     signifiant for users, especially the casual ones who just want to get feel for the PRAM package.  This points
-#     towards a conteinerized version of PRAM as possibly desirable.
-#
-#     --------------------------------------------------------------------------------------------------------------------
-#
-#     Good visualization options
-#         Sankey diagram
-#             https://www.data-to-viz.com/graph/sankey.html
-#             https://medium.com/@plotlygraphs/4-interactive-sankey-diagram-made-in-python-3057b9ee8616
-#             http://www.sankey-diagrams.com
-#         Chord diagram
-#             https://www.data-to-viz.com/graph/chord.html
-#         Edge bundling diagram
-#             https://www.data-to-viz.com/graph/edge_bundling.html
-#         Arc diagram
-#             https://www.data-to-viz.com/graph/arc.html
-#         Galleries
-#             https://observablehq.com/@vega
-#
-#     --------------------------------------------------------------------------------------------------------------------
-#
-#     TODO
-#         Performance
-#             https://stackoverflow.com/questions/36193773/graph-tool-surprisingly-slow-compared-to-networkx/36202660#36202660
-#         Other
-#             https://graph-tool.skewed.de/static/doc/draw.html
-#             https://graph-tool.skewed.de/static/doc/flow.html
-#
-#     Ideas
-#         Determine groups involved in large mass dynamics and only show those
-#             Filter via range parameter (could be a statistic, e.g., IRQ)
-#         Automatically prune time ranges with little-to-no changes in mass dynamics
-#         Autocorrelation plot
-#         Calculate mass flow and summarize it statistically
-#         Use heatmap for group-group mass flow
-#             - A big heatmap with mass flow traveling in the direction of the diagonal is diagnostic of new groups
-#               being created and old ones not used and is a prime example of why autocompacting is a thing.
-#         Make the "vis" package to handle visualization
-#     '''
-#
-#     def __init__(self):
-#         self.g = gt.Graph()
-#
-#         # Vertex properties (graph-internal):
-#         self.vp = DotMap(
-#             iter = self.g.new_vp('int'),
-#             hash = self.g.new_vp('string'),
-#             mass = self.g.new_vp('double'),
-#             pos  = self.g.new_vp('vector<double>'),
-#             name = self.g.new_vp('string')
-#         )
-#
-#         # Edge properties (graph-internal):
-#         self.ep = DotMap(
-#             iter   = self.g.new_ep('int'),
-#             mass   = self.g.new_ep('double'),
-#             name   = self.g.new_ep('string'),
-#             draw_w = self.g.new_ep('double')
-#         )
-#
-#         self.group_hash_set = SortedSet()  # because groups can be removed via population compacting, we store all hashes (from the oldest to the newest)
-#         self.gg_flow = []                  # iteration-index group-group mass flow
-#
-#         self.n_iter = -1
-#         self.mass_max = 0
-#
-#     def capture_initial_state(self, pop):
-#         for (i,g) in enumerate(pop.groups.values()):
-#             v = self.g.add_vertex()
-#             self.vp.iter[v] = -1
-#             self.vp.hash[v] = g.get_hash()
-#             self.vp.mass[v] = g.m
-#             self.vp.pos [v] = (0, i * 2, 0)
-#             self.vp.name[v] = f'{g.m:.0f}'
-#
-#             self.mass_max += g.m
-#
-#         return self
-#
-#     def capture_state(self, pop, mass_flow_specs, iter, t):
-#         self.gg_flow.append({})
-#         v_cnt = 0  # for vertex y-coord
-#
-#         for mtf in mass_flow_specs:
-#             self.gg_flow[iter][mtf.src.get_hash()] = {}
-#
-#             # (1) Get the source group vertex:
-#             v_src = None
-#             v_src_lst = gt.find_vertex(self.g, self.vp.hash, mtf.src.get_hash())
-#             for v_src in v_src_lst:
-#                 if self.vp.iter[v_src] == iter - 1:
-#                     break
-#
-#             # (2) Add the destination group vertices:
-#             for g_dst in mtf.dst:
-#                 v_dst = None
-#
-#                 # Check if the vertex has already been added for the current iteration:
-#                 v_dst_lst = gt.find_vertex(self.g, self.vp.hash, g_dst.get_hash())
-#                 if len(v_dst_lst) > 0:
-#                     v_dst = v_dst_lst[-1]
-#                     if self.vp.iter[v_dst] != iter:
-#                         v_dst = None
-#                 else:
-#                     v_dst = None
-#
-#                 # Add the vertex:
-#                 if v_dst is None:
-#                     m = pop.groups[g_dst.get_hash()].m  # get that from the population to get the appropriate mass for the current iteration
-#
-#                     v_dst = self.g.add_vertex()
-#                     self.vp.iter[v_dst] = iter
-#                     self.vp.hash[v_dst] = g_dst.get_hash()
-#                     self.vp.mass[v_dst] = m
-#                     self.vp.pos [v_dst] = ((iter + 1) * 2, v_cnt * 2, 0)
-#                     self.vp.name[v_dst] = f'{m:.0f}'
-#                     v_cnt += 1
-#
-#                 # Add the edge:
-#                 e = self.g.add_edge(v_src, v_dst)
-#                 self.ep.iter  [e] = iter
-#                 self.ep.mass  [e] = g_dst.m
-#                 self.ep.name  [e] = f'{g_dst.m:.0f}'
-#                 self.ep.draw_w[e] = math.log(g_dst.m, 2)
-#
-#                 # Remember the groups' hashes:
-#                 self.group_hash_set.add(mtf.src.get_hash())
-#                 self.group_hash_set.add(g_dst.get_hash())
-#
-#                 # Update the group-group flow structure:
-#                 self.gg_flow[iter][mtf.src.get_hash()][g_dst.get_hash()] = g_dst.m
-#
-#         self.n_iter = iter
-#
-#         return self
-#
-#     def plot_heatmap(self, size, filepath):
-#         # data = np.zeros((self.n_iter, self.n_group, self.n_group), dtype=float)
-#
-#         iter = 1
-#         # data = np.array((len(self.group_hash_set), len(self.group_hash_set)))
-#         # data = {}
-#         data = []
-#         for h_src in self.group_hash_set:
-#             # data[h_src] = {}
-#             for h_dst in self.group_hash_set:
-#                 if self.gg_flow[iter] is not None and self.gg_flow[iter].get(h_src) is not None: # and self.gg_flow[iter].get(h_src).get(h_dst) is not None:
-#                     # data[h_src][h_dst] = self.gg_flow[iter].get(h_src).get(h_dst)
-#                     data.append({ 'x': h_src, 'y': h_dst, 'z': self.gg_flow[iter].get(h_src).get(h_dst) })
-#
-#         # print(data)
-#         # return self
-#
-#         # c = alt.Chart(alt.Data(values=data)).mark_rect().encode(x='x:O', y='y:O', color='z:Q')
-#         c = alt.Chart(alt.Data(values=data)).mark_rect().encode(x='x:O', y='y:O', color=alt.Color('z:Q', scale=alt.Scale(type='linear', range=['#bfd3e6', '#6e016b'])))
-#         c.save(filepath, webdriver='firefox')
-#
-#     def plot_states(self, size, filepath):
-#         # pos = gt.arf_layout(self.g, max_iter=10)
-#         gt.graph_draw(
-#             self.g, pos=self.vp.pos,
-#             vertex_text=self.vp.name, vertex_size=100, vertex_pen_width=2, vertex_color=[0,0,0,1.0], vertex_fill_color=[209/255,242/255,255/255,1.0], vertex_text_color=[0,0,0,1.0], vertex_halo=False, vertex_font_size=20, vertex_font_family='sans-serif',
-#             # vertex_pie_fractions=[]
-#             edge_text=self.ep.name, edge_font_size=20, edge_pen_width=self.ep.draw_w, edge_font_family='sans-serif',
-#             output_size=size, output=filepath
-#         )
-#
-#         return self
-#
-#     def plot_streamgraph_group(self, size, filepath):
-#         data = []
-#
-#         # for v in self.g.vertices():
-#         #     data.append({ "group": self.vp.hash[v], "iter": i + 1, "mass": self.vp.mass[v] })
-#
-#         for i in range(-1, self.n_iter):
-#             for v in gt.find_vertex(self.g, self.vp.iter, i):
-#                 data.append({ "group": self.vp.hash[v], "iter": i + 1, "mass": self.vp.mass[v] })
-#
-#         c = alt.Chart(alt.Data(values=data), width=size[0], height=size[1]).mark_area().encode(
-#             alt.X('iter:Q', axis=alt.Axis(domain=False, tickSize=0), scale=alt.Scale(domain=(0, self.n_iter))),
-#             alt.Y('sum(mass):Q', stack='center', scale=alt.Scale(domain=(0, self.mass_max))),
-#             alt.Color('group:N', scale=alt.Scale(scheme='category20b'))
-#         )
-#         c.configure_axis(grid=False)
-#         c.configure_view(strokeWidth=0)
-#         c.save(filepath, scale_factor=2.0, webdriver='firefox')
-#
-#     def set_group_names(self, names):
-#         pass

@@ -1917,12 +1917,7 @@ class SimpleFluProgressRule(Rule):
     def apply(self, pop, group, iter, t):
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
-            at  = group.get_rel(Site.AT)
-            n   = at.get_pop_size()                               # total    population at current location
-            n_i = at.get_pop_size(GroupQry(attr={ 'flu': 'i' }))  # infected population at current location
-
-            p_infection = float(n_i) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
-
+            p_infection = group.get_mass_at(GroupQry(attr={ 'flu': 'i' }))
             return [
                 GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'i' }),
                 GroupSplitSpec(p=1 - p_infection, attr_set={ 'flu': 's' })
@@ -2001,11 +1996,7 @@ class SimpleFluProgressMoodRule(Rule):
     def apply(self, pop, group, iter, t):
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
-            at  = group.get_rel(Site.AT)
-            n   = at.get_pop_size()                               # total    population at the group's current location
-            n_i = at.get_pop_size(GroupQry(attr={ 'flu': 'i' }))  # infected population at the group's current location
-
-            p_infection = float(n_i) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
+            p_infection = group.get_mass_at(GroupQry(attr={ 'flu': 'i' }))
 
             return [
                 GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'i', 'mood': 'annoyed' }),

@@ -53,7 +53,7 @@ from pram.util   import Time
 # fig = plt.figure(figsize=(10,2), dpi=150)
 # plt.plot(x, gamma(a=5.0, loc=5.0, scale=100.0).pdf(x) * 500)
 # plt.show()
-# exit(1)
+# sys.exit(1)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
