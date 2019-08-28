@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 import sqlite3
 
@@ -216,22 +217,42 @@ class ProbeMsgMode(Flag):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-Var   = namedtuple('Var', ['name', 'type'])           # having this inside of the Probe class breaks Flask/Celery
+Var   = namedtuple('Var',   ['name', 'type'])         # having this declaration inside of the Probe class and subclasses breaks Flask/Celery (@#!%$#)
 Const = namedtuple('Const', ['name', 'type', 'val'])  # ^
 
 class Probe(ABC):
-    def __init__(self, name, msg_mode=ProbeMsgMode.DISP, pop=None, memo=None):
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class GroupProbe(Probe, ABC):
+    '''
+    The extending classes need to populate the 'self.vars' list before calling the constructor of this ABC.
+    '''
+
+    def __init__(self, name, queries, qry_tot=None, consts=None, persistance=None, msg_mode=ProbeMsgMode.DISP, pop=None, memo=None):
+        '''
+        queries: iterable of GroupQry
+        '''
+
         self.name = name
+        self.queries = queries
+        self.qry_tot = qry_tot
+        self.consts = None
+        self.persistance = None
         self.msg_mode = msg_mode
         self.pop = pop  # pointer to the population (can be set elsewhere too)
         self.memo = memo
         self.msg = []  # used to cumulate messages (only when 'msg_mode & ProbeMsgMode == True')
 
+        self.set_consts(consts)
+        self.set_persistance(persistance)
+
     def __repr__(self):
         return '{}()'.format(self.__class__.__name__)
 
     def __str__(self):
-        return 'Probe'
+        return 'GroupProbe: {:16}  query-cnt: {:>3}'.format(self.name, len(self.queries))
 
     def clear(self):
         self.msg.clear()
@@ -251,36 +272,55 @@ class Probe(ABC):
     def run(self, i,t):
         pass
 
+    def set_consts(self, consts):
+        consts = consts or []
+
+        cn_db_used = set()  # to identify duplicates
+
+        for c in consts:
+            if c.name in ProbePersistance.VAR_NAME_KEYWORD:
+                raise ValueError(f"The following constant names are restricted: {ProbePersistance.VAR_NAME_KEYWORD}")
+
+            cn_db = DB.str_to_name(c.name)
+            if cn_db in cn_db_used:
+                raise ValueError(f"Variable name error: Name '{c.name}' translates into a database name '{cn_db}' which already exists.")
+
+            cn_db_used.add(cn_db)
+
+        self.consts = consts or []
+
+    def set_persistance(self, persistance):
+        if self.persistance == persistance:
+            return
+
+        self.persistance = persistance
+        if self.persistance is not None:
+            self.persistance.reg_probe(self)
+
     def set_pop(self, pop):
         self.pop = pop
 
 
+
+
 # ----------------------------------------------------------------------------------------------------------------------
-class GroupSizeProbe(Probe):
+class GroupAttrProbe(GroupProbe):
     def __init__(self, name, queries, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
-        '''
-        queries: iterable of GroupQry
-        '''
+        raise Error('Implementation pending completion.')
 
-        super().__init__(name, msg_mode, pop, memo)
-
-        self.queries = queries
-        self.qry_tot = qry_tot
-        self.consts = None
-        self.vars = []
-        self.persistance = None
+        self.stats = [np.mean, np.std, np.median, np.min, np.max]
 
         if var_names is None:
             self.vars = \
-                [Var(f'p{i}', 'float') for i in range(len(self.queries))] + \
-                [Var(f'm{i}', 'float') for i in range(len(self.queries))]
+                [Var(f'p{i}', 'float') for i in range(len(queries))] + \
+                [Var(f'm{i}', 'float') for i in range(len(queries))]
                 # proportions and numbers
-            # self.vars = [Probe.Var(f'v{i}', 'float') for i in range(len(self.queries))]
+            # self.vars = [GroupProbe.Var(f'v{i}', 'float') for i in range(len(queries))]
         else:
-            if len(var_names) != (len(self.queries) * 2):
-                raise ValueError(f'Incorrect number of variable names: {len(var_names)} supplied, {len(self.queries) * 2} expected (i.e., {len(self.queries)} for proportions and numbers each).')
-            # if len(var_names) != len(self.queries):
-            #     raise ValueError(f'Incorrect number of variable names: {len(var_names)} supplied, {len(self.queries)} expected.')
+            if len(var_names) != (len(queries) * 2):
+                raise ValueError(f'Incorrect number of variable names: {len(var_names)} supplied, {len(queries) * 2} expected (i.e., {len(queries)} for proportions and numbers each).')
+            # if len(var_names) != len(queries):
+            #     raise ValueError(f'Incorrect number of variable names: {len(var_names)} supplied, {len(queries)} expected.')
 
             vn_db_used = set()  # to identify duplicates
             for vn in var_names:
@@ -295,8 +335,7 @@ class GroupSizeProbe(Probe):
                 vn_db_used.add(vn_db)
                 self.vars.append(Var(vn_db, 'float'))
 
-        self.set_consts(consts)
-        self.set_persistance(persistance)
+        super().__init__(name, queries, qry_tot, consts, persistance, msg_mode, pop, memo)
 
     @classmethod
     def by_attr(cls, probe_name, attr_name, attr_values, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
@@ -310,11 +349,94 @@ class GroupSizeProbe(Probe):
 
         return cls(probe_name, [GroupQry(rel={ rel_name: v }) for v in rel_values], qry_tot, var_names, consts, persistance, msg_mode, pop, memo)
 
-    def __repr__(self):
-        return '{}()'.format(self.__class__.__name__)
+    def get_data(self):
+        pass
 
-    def __str__(self):
-        return 'Probe  name: {:16}  query-cnt: {:>3}'.format(self.name, len(self.queries))
+    def plot(self, series, fpath_fig=None, figsize=(8,8), legend_loc='upper right', dpi=300):
+        pass
+
+    def run(self, iter, t):
+        '''
+        Leaving both 'iter' and 't' at their default of 'None' will prevent persistance from being invokedand message cumulation.  It
+        will still allow print to stdout.  This is used by the sim.Simulation class to print the intial state of the
+        system (as seen by those probes that print) before the simulation run begins.
+        '''
+
+        if self.msg_mode != 0 or self.persistance:
+            n_tot = sum([g.m for g in self.pop.get_groups(self.qry_tot)])  # TODO: If the total mass never changed, we could memoize this (either here or in GroupPopulation).
+            n_qry = [sum([g.m for g in self.pop.get_groups(q)]) for q in self.queries]
+
+        # Message:
+        if self.msg_mode != 0:
+            msg = []
+            if n_tot > 0:
+                msg.append('{:2}  {}: ('.format(t if not t is None else '.', self.name))
+                for n in n_qry:
+                    msg.append('{:.2f} '.format(abs(round(n / n_tot, 2))))  # abs solves -0.00, likely due to rounding and string conversion
+                msg.append(')   (')
+                for n in n_qry:
+                    msg.append('{:>7} '.format(abs(round(n, 1))))  # abs solves -0.00, likely due to rounding and string conversion
+                msg.append(')   [{}]'.format(round(n_tot, 1)))
+            else:
+                msg.append('{:2}  {}: ---'.format(t if not t is None else '.', self.name))
+
+            if self.msg_mode & ProbeMsgMode.DISP:
+                print(''.join(msg))
+            if self.msg_mode & ProbeMsgMode.CUMUL:
+                self.msg.append(''.join(msg))
+
+        # Persistance:
+        if self.persistance and not iter is None:
+            vals_p = []
+            vals_n = []
+            for n in n_qry:
+                vals_p.append(n / n_tot)
+                vals_n.append(n)
+
+            self.persistance.persist(self, vals_p + vals_n, iter, t)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class GroupSizeProbe(GroupProbe):
+    def __init__(self, name, queries, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
+        if var_names is None:
+            self.vars = \
+                [Var(f'p{i}', 'float') for i in range(len(queries))] + \
+                [Var(f'm{i}', 'float') for i in range(len(queries))]
+                # proportions and numbers
+            # self.vars = [GroupProbe.Var(f'v{i}', 'float') for i in range(len(queries))]
+        else:
+            if len(var_names) != (len(queries) * 2):
+                raise ValueError(f'Incorrect number of variable names: {len(var_names)} supplied, {len(queries) * 2} expected (i.e., {len(queries)} for proportions and numbers each).')
+            # if len(var_names) != len(queries):
+            #     raise ValueError(f'Incorrect number of variable names: {len(var_names)} supplied, {len(queries)} expected.')
+
+            vn_db_used = set()  # to identify duplicates
+            for vn in var_names:
+                if vn in ProbePersistance.VAR_NAME_KEYWORD:
+                    raise ValueError(f"The following variable names are restricted: {ProbePersistance.VAR_NAME_KEYWORD}")
+
+                # vn_db = DB.str_to_name(vn)  # commented out because plotting method was expecting quoted values
+                vn_db = vn
+                if vn_db in vn_db_used:
+                    raise ValueError(f"Variable name error: Name '{vn}' translates into a database name '{vn_db}' which already exists.")
+
+                vn_db_used.add(vn_db)
+                self.vars.append(Var(vn_db, 'float'))
+
+        super().__init__(name, queries, qry_tot, consts, persistance, msg_mode, pop, memo)
+
+    @classmethod
+    def by_attr(cls, probe_name, attr_name, attr_values, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
+        ''' Generates QueryGrp objects automatically for the attribute name and values specified. '''
+
+        return cls(probe_name, [GroupQry(attr={ attr_name: v }) for v in attr_values], qry_tot, var_names, consts, persistance, msg_mode, pop, memo)
+
+    @classmethod
+    def by_rel(cls, probe_name, rel_name, rel_values, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
+        ''' Generates QueryGrp objects automatically for the relation name and values specified. '''
+
+        return cls(probe_name, [GroupQry(rel={ rel_name: v }) for v in rel_values], qry_tot, var_names, consts, persistance, msg_mode, pop, memo)
 
     def get_data(self):
         if not self.persistance:
@@ -367,28 +489,3 @@ class GroupSizeProbe(Probe):
                 vals_n.append(n)
 
             self.persistance.persist(self, vals_p + vals_n, iter, t)
-
-    def set_consts(self, consts):
-        consts = consts or []
-
-        cn_db_used = set()  # to identify duplicates
-
-        for c in consts:
-            if c.name in ProbePersistance.VAR_NAME_KEYWORD:
-                raise ValueError(f"The following constant names are restricted: {ProbePersistance.VAR_NAME_KEYWORD}")
-
-            cn_db = DB.str_to_name(c.name)
-            if cn_db in cn_db_used:
-                raise ValueError(f"Variable name error: Name '{c.name}' translates into a database name '{cn_db}' which already exists.")
-
-            cn_db_used.add(cn_db)
-
-        self.consts = consts or []
-
-    def set_persistance(self, persistance):
-        if self.persistance == persistance:
-            return
-
-        self.persistance = persistance
-        if self.persistance is not None:
-            self.persistance.reg_probe(self)

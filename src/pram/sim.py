@@ -897,6 +897,14 @@ class SimulationSetter(object):
     def __init__(self, sim):
         self.sim = sim
 
+    def cb_after_iter(self, fn):
+        self.sim.set_cb_after_iter(fn)
+        return self
+
+    def cb_before_iter(self, fn):
+        self.sim.set_cb_before_iter(fn)
+        return self
+
     def done(self):
         return self.sim
 
@@ -974,6 +982,9 @@ class Simulation(object):
     (discrete) sequence of events in time.  DES contrast with continuous simulation in which the system state is
     changed continuously over time on the basis of a set of differential equations defining the rates of change of
     state variables.
+
+    All function callbacks (cb) should take only one argument, the Simulation object, because everything is accessible
+    given that single reference.
     '''
 
     def __init__(self, traj=None, rand_seed=None, do_keep_mass_flow_specs=False):
@@ -1007,19 +1018,8 @@ class Simulation(object):
             rule_dynamic = DynamicRuleAnalyzer(self)
         )
 
-        self.pragma = DotMap(
-            analyze = True,                  # flag: analyze the simulation and suggest improvements?
-            autocompact = False,             # flag: remove empty groups after every iteration?
-            autoprune_groups = False,        # flag: remove attributes and relations not referenced by rules?
-            autostop = False,                # flag
-            autostop_n = 0,                  #
-            autostop_p = 0,                  #
-            autostop_t = 10,                 #
-            live_info = False,               #
-            live_info_ts = False,            #
-            probe_capture_init = True,       # flag: let probes capture the pre-run state of the simulation?
-            rule_analysis_for_db_gen = True  # flag: should static rule analysis results help form DB groups
-        )
+        self.reset_cb()
+        self.reset_pragmas()
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.rand_seed or ""})'
@@ -1462,11 +1462,34 @@ class Simulation(object):
         self.rules.discard(rule)
         return self
 
+    def reset_cb(self):
+        self.cb = DotMap(
+            after_iter  = None,
+            before_iter = None
+        )
+        return self
+
     def reset_pop(self):
         self.run_cnt = 0
         self.is_setup_done = False
         self.pop = GroupPopulation()
         gc.collect()
+        return self
+
+    def reset_pragmas(self):
+        self.pragma = DotMap(
+            analyze = True,                  # flag: analyze the simulation and suggest improvements?
+            autocompact = False,             # flag: remove empty groups after every iteration?
+            autoprune_groups = False,        # flag: remove attributes and relations not referenced by rules?
+            autostop = False,                # flag
+            autostop_n = 0,                  #
+            autostop_p = 0,                  #
+            autostop_t = 10,                 #
+            live_info = False,               #
+            live_info_ts = False,            #
+            probe_capture_init = True,       # flag: let probes capture the pre-run state of the simulation?
+            rule_analysis_for_db_gen = True  # flag: should static rule analysis results help form DB groups
+        )
         return self
 
     def reset_probes(self):
@@ -1554,6 +1577,9 @@ class Simulation(object):
 
         self.timer.start()
         for i in range(self.timer.get_i_left()):
+            if self.cb.before_iter is not None:
+                self.cb.before_iter(self)
+
             if self.pragma.live_info:
                 self._inf(f'Iteration {self.timer.i + 1} of {self.timer.i_max}')
                 self._inf(f'    Group count: {self.pop.get_group_cnt()}')
@@ -1601,6 +1627,9 @@ class Simulation(object):
             if self.pragma.autocompact:
                 self._inf(f'    Compacting the model')
                 self.compact()
+
+            if self.cb.after_iter is not None:
+                self.cb.after_iter(self)
 
         self.timer.stop()
 
@@ -1656,6 +1685,14 @@ class Simulation(object):
 
     def set(self):
         return SimulationSetter(self)
+
+    def set_cb_after_iter(self, fn):
+        self.cb.after_iter = fn
+        return self
+
+    def set_cb_before_iter(self, fn):
+        self.cb.before_iter = fn
+        return self
 
     def set_fn_group_setup(self, fn):
         self.fn.group_setup = fn
