@@ -9,10 +9,14 @@
 
 import altair as alt
 import gc
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import random
 import sqlite3
+
+from scipy.fftpack import fft
+from scipy         import signal
 
 from .graph import MassGraph
 from .util  import DB
@@ -50,6 +54,18 @@ class Trajectory(object):
             self.sim.traj = self
 
         self.mass_graph = None  # MassGraph object (instantiated when needed)
+
+    @staticmethod
+    def comp_fft(y, T, N):
+        '''
+        y - the signal
+        T - Nyquist sampling criterion
+        N - sampling rate
+        '''
+
+        f = np.linspace(0.0, 1.0/(2.0*T), N//2)
+        fft = 2.0/N * np.abs(fft(y)[0:N//2])
+        return (f, fft)
 
     def compact(self):
         self.rem_mass_graph()
@@ -100,11 +116,18 @@ class Trajectory(object):
         self.mass_graph.plot_mass_flow_time_series(scale, filepath, iter_range, v_prop, e_prop)
         return self
 
-    def plot_mass_locus_freq(self, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
+    def plot_mass_locus_fft(self, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
         if self.ens is None:
             raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
 
-        plot = self.ens.plot_mass_locus_freq(self, size, filepath, iter_range, sampling_rate, do_sort, do_ret_plot)
+        plot = self.ens.plot_mass_locus_fft(self, size, filepath, iter_range, sampling_rate, do_sort, do_ret_plot)
+        return plot if do_ret_plot else self
+
+    def plot_mass_locus_scaleogram(self, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
+        if self.ens is None:
+            raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
+
+        plot = self.ens.plot_mass_locus_scaleogram(self, size, filepath, iter_range, sampling_rate, do_sort, do_ret_plot)
         return plot if do_ret_plot else self
 
     def plot_mass_locus_streamgraph(self, size, filepath, iter_range=(-1, -1), do_sort=False, do_ret_plot=False):
@@ -418,8 +441,12 @@ class TrajectoryEnsemble(object):
 
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_freq(self, traj, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
-        from scipy.fftpack import fft
+    def plot_mass_locus_fft(self, traj, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
+        '''
+        Fast Fourier Transform (FFT)
+
+        The Fourier Transform will work very well when the frequency spectrum is stationary.
+        '''
 
         # (1) Data:
         data = { 'td': {}, 'fd': {} }  # time- and frequency-domain
@@ -427,7 +454,7 @@ class TrajectoryEnsemble(object):
             # (1.1) Normalize iteration bounds:
             iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [traj.id])
             n_iter = iter_range[1] - min(iter_range[0], 0)
-            title = f'Trajectory Ensemble Mass Locus Oscillations (Sampling Rate of {sampling_rate} on Iterations {iter_range[0]+1} to {iter_range[1]+1})'
+            title = f'Trajectory Mass Locus Spectrum (FFT; Sampling Rate of {sampling_rate} on Iterations {iter_range[0]+1} to {iter_range[1]+1})'
 
             # (1.2) Construct time-domain data bundle:
             for r in c.execute('''
@@ -443,14 +470,20 @@ class TrajectoryEnsemble(object):
                 data['td'][r['grp']].append(r['m'])
 
             # (1.3) Move to frequency domain:
-            t = 1 / sampling_rate  # Nyquist sampling criteria
-            x = np.linspace(0.0, 1.0 / (2.0 * t), int(sampling_rate / 2))  # ^
+            N = sampling_rate
+            T = 1 / sampling_rate  # Nyquist sampling criteria
+            xf = np.linspace(0.0, 1.0/(2.0*T), N//2)
 
             # import matplotlib.pyplot as plt
             for g in data['td'].keys():
-                y = fft(data['td'][g])                                          # positive and negative frequencies
-                y = 2 / sampling_rate * np.abs(y[0:np.int(sampling_rate / 2)])  # positive frequencies only
-                data['fd'][g] = [{ 'grp': g, 'x': z[0], 'y': z[1] / n_iter } for z in zip(x,y)]
+                yf = fft(data['td'][g])        # positive and negative frequencies
+                yf = 2/N * np.abs(yf[0:N//2])  # positive frequencies only
+                # data['fd'][g] = [{ 'grp': g, 'x': z[0], 'y': z[1] / n_iter } for z in zip(xf,yf)]
+                data['fd'][g] = [{ 'grp': g, 'x': z[0], 'y': z[1] } for z in zip(xf,yf)]
+
+                # yf = fft(data['td'][g])        # positive and negative frequencies
+                # yf = 2/N * np.abs(yf[0:N//2])  # positive frequencies only
+                # data['fd'][g] = [{ 'grp': g, 'x': z[0], 'y': z[1] / n_iter } for z in zip(xf,yf)]
 
                 # fig = plt.figure(figsize=size)
                 # # plt.legend(['Susceptible', 'Infectious', 'Recovered'], loc='upper right')
@@ -469,7 +502,7 @@ class TrajectoryEnsemble(object):
         ).mark_line(
             strokeWidth=1, opacity=0.75, interpolate='basis', tension=1
         ).encode(
-            alt.X('x:Q', axis=alt.Axis(title='Frequency', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
+            alt.X('x:Q', axis=alt.Axis(title='Frequency', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, sampling_rate // 2))),
             alt.Y('y:Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
             alt.Color('grp:N', legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15))
             # alt.Order('year(data):O')
@@ -481,6 +514,54 @@ class TrajectoryEnsemble(object):
         )
 
         return plot if do_ret_plot else self
+
+    def plot_mass_locus_scaleogram(self, traj, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
+        '''
+        Currently, Image Mark in not supported in Vega-Lite.  Consequently, raster images cannot be displayed via
+        Altair.  The relevant issue is: https://github.com/vega/vega-lite/issues/3758
+        '''
+
+        # https://docs.obspy.org/tutorial/code_snippets/continuous_wavelet_transform.html
+        # https://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.signal.cwt.html
+
+        # (1) Data:
+        data = { 'td': {}, 'fd': {} }  # time- and frequency-domain
+        with self.conn as c:
+            # (1.1) Normalize iteration bounds:
+            iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [traj.id])
+            n_iter = iter_range[1] - min(iter_range[0], 0)
+            title = f'Trajectory Mass Locus Scalogram (Sampling Rate of {sampling_rate} on Iterations {iter_range[0]+1} to {iter_range[1]+1})'
+
+            # (1.2) Construct time-domain data bundle:
+            for r in c.execute('''
+                    SELECT COALESCE(gn.name, g.hash) AS grp, g.m
+                    FROM grp g
+                    INNER JOIN iter i ON i.id = g.iter_id
+                    LEFT JOIN grp_name gn ON gn.hash = g.hash
+                    WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
+                    ORDER BY gn.ord, g.id''',
+                    [traj.id, iter_range[0], iter_range[1]]):
+                if data['td'].get(r['grp']) is None:
+                    data['td'][r['grp']] = []
+                data['td'][r['grp']].append(r['m'])
+
+        # (2) Move to frequency domain and plot:
+        widths = np.arange(1, sampling_rate // 2 + 1)
+
+        fig, ax = plt.subplots(len(data['td']), 1, figsize=size, sharex=True, sharey=True)
+        fig.subplots_adjust(hspace=0, wspace=0)
+        plt.suptitle(title, fontweight='bold')
+        plt.xlabel('Time', fontweight='bold')
+        fig.text(0.08, 0.5, 'Frequency', ha='center', va='center', rotation='vertical', fontweight='bold')
+
+        for (i,g) in enumerate(data['td'].keys()):
+            data['fd'][g] = signal.cwt(data['td'][g], signal.ricker, widths)  # "Mexican hat wavelet"
+            ax[i].imshow(data['fd'][g], extent=[-1, 1, 1, sampling_rate // 2 + 1], cmap='PRGn', aspect='auto', vmax=abs(data['fd'][g]).max(), vmin=-abs(data['fd'][g]).max())
+            ax[i].set_ylabel(g, fontweight='bold')
+
+        fig.savefig(filepath, dpi=300)
+
+        return fig if do_ret_plot else self
 
     def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), nsamples=0, do_sort=False, do_ret_plot=False):
         # (1) Sample trajectories (if necessary) + set title:
