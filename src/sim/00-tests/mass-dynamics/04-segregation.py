@@ -50,5 +50,7 @@ def get_out_dir(filename):
     return os.path.join(os.path.dirname(__file__), 'out', filename)
 
 # te.traj[1].plot_mass_flow_time_series(filepath=get_out_dir('_plot.png'), iter_range=(-1,7), v_prop=False, e_prop=True)
-te.traj[1].plot_mass_locus_streamgraph((900,400), get_out_dir('_plot.png'))
+# te.traj[1].plot_mass_locus_streamgraph((900,400), get_out_dir('_plot.png'))
 # te.traj[1].plot_heatmap((800,800), get_out_dir('_plot.png'), (-1,20))
+
+te.traj[1].plot_mass_locus_recurrence((16,8), get_out_dir('_plot.png'), Group.gen_hash(attr={ 'team': 'blue' }, rel={ Site.AT: loc[0] }), iter_range=(-1, 4000))

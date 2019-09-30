@@ -80,5 +80,9 @@ te = (TrajectoryEnsemble().
 )
 
 # te.traj[1].plot_mass_flow_time_series(filepath=get_out_dir('_plot.png'), iter_range=(-1,20), v_prop=False, e_prop=True)
-te.traj[1].plot_mass_locus_streamgraph((1200,600), get_out_dir('_plot.png'), do_sort=True)
+# te.traj[1].plot_mass_locus_streamgraph((1200,600), get_out_dir('_plot.png'), do_sort=True)
 # te.traj[1].plot_heatmap((800,800), get_out_dir('_plot.png'), (-1,20))
+
+# te.traj[1].plot_mass_locus_recurrence((16,8), get_out_dir('_plot.png'), Group.gen_hash(attr={ 'flu': 's' }), iter_range=(-1, -1))
+# te.traj[1].plot_mass_locus_recurrence((16,8), get_out_dir('_plot.png'), Group.gen_hash(attr={ 'flu': 'i' }), iter_range=(-1, 4000))
+# te.traj[1].plot_mass_locus_recurrence((16,8), get_out_dir('_plot.png'), Group.gen_hash(attr={ 'flu': 'r' }), iter_range=(-1, 4000))

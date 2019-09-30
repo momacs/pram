@@ -6,6 +6,9 @@ import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 
+import pyrqa
+
+
 from scipy.stats import beta
 
 from dotmap      import DotMap
@@ -144,5 +147,20 @@ def get_out_dir(filename):
 # te.traj[1].plot_mass_locus_scaleogram((16,8), get_out_dir('_plot.png'), iter_range=(-1, 4999), sampling_rate=100, do_sort=True)
 # te.traj[1].plot_mass_locus_scaleogram((16,8), get_out_dir('_plot.png'),                        sampling_rate=100, do_sort=True)
 
-# te.plot_mass_locus_line((1200,600), get_out_dir('_plot.png'), iter_range=(-1, -1), nsamples=10, do_sort=True)
-# te.plot_mass_locus_line_aggr((1200,600), get_out_dir('_plot.png'), iter_range=(-1, 2000), do_sort=True)
+# te.traj[1].plot_mass_locus_spectrogram((16,8), get_out_dir('_plot.png'), sampling_rate=None, win_len=100, noverlap=75, do_sort=True)
+
+# te.traj[1].plot_mass_locus_recurrence((12,12), get_out_dir('_plot.png'), iter_range=(-1, 4000), neighbourhood=pyrqa.neighbourhood.FixedRadius(), embedding_dimension=1, time_delay=2)
+
+# te.traj[1].plot_mass_locus_recurrence((16,8), get_out_dir('_plot.png'), Group.gen_hash(attr={ 'flu': 's' }), iter_range=(-1, 4000))
+# te.traj[1].plot_mass_locus_recurrence((16,8), get_out_dir('_plot.png'), Group.gen_hash(attr={ 'flu': 'i' }), iter_range=(-1, 4000))
+# te.traj[1].plot_mass_locus_recurrence((16,8), get_out_dir('_plot.png'), Group.gen_hash(attr={ 'flu': 'r' }), iter_range=(-1, 4000))
+
+# te.plot_mass_locus_line((2400,600), get_out_dir('_plot.png'), iter_range=(-1, -1), nsamples=10, do_sort=True)
+# te.plot_mass_locus_line_aggr((2400,600), get_out_dir('_plot.png'), iter_range=(-1, 2000), do_sort=True)
+
+# te.plot_mass_locus_polar((12,12), get_out_dir('_plot.png'), iter_range=(-1, -1), nsamples=10, n_iter_per_rot=0, do_sort=True)
+# te.plot_mass_locus_polar((12,12), get_out_dir('_plot.png'), iter_range=(-1, -1), nsamples=10, n_iter_per_rot=1000, do_sort=True)
+# te.plot_mass_locus_polar((12,12), get_out_dir('_plot.png'), iter_range=(999, -1), nsamples=10, n_iter_per_rot=1000, do_sort=True)
+
+# te.plot_mass_locus_polar((12,12), get_out_dir('_plot.png'), iter_range=(999, -1), nsamples=10, n_iter_per_rot=379, do_sort=True)
+# te.plot_mass_locus_polar((12,12), get_out_dir('_plot.png'), iter_range=(999, -1), nsamples=10, n_iter_per_rot=1845, do_sort=True)

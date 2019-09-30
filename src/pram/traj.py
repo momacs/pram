@@ -1,4 +1,4 @@
-    # Altair
+# Altair
 #     Docs
 #         Customization: https://altair-viz.github.io/user_guide/customization.html
 #         Error band: https://altair-viz.github.io/user_guide/generated/core/altair.ErrorBandDef.html#altair.ErrorBandDef
@@ -15,11 +15,13 @@ import os
 import random
 import sqlite3
 
+from pyrqa.neighbourhood import FixedRadius
 from scipy.fftpack import fft
 from scipy         import signal
 
-from .graph import MassGraph
-from .util  import DB
+from .graph  import MassGraph
+from .signal import Signal
+from .util   import DB
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -55,9 +57,15 @@ class Trajectory(object):
 
         self.mass_graph = None  # MassGraph object (instantiated when needed)
 
+    def _check_ens(self):
+        if self.ens is None:
+            raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
+
     @staticmethod
     def comp_fft(y, T, N):
         '''
+        Computes Fast Fourier Transform (FFT).
+
         y - the signal
         T - Nyquist sampling criterion
         N - sampling rate
@@ -72,24 +80,27 @@ class Trajectory(object):
         return self
 
     def gen_mass_graph(self):
-        if self.ens is None:
-            raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
-
+        self._check_ens()
         if self.mass_graph is None:
             self.mass_graph = self.ens.gen_mass_graph(self)
 
         return self
 
-    def load_sim(self):
-        if self.ens is None:
-            raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
+    def get_signal(self, do_prob=False):
+        self._check_ens()
+        return self.ens.get_signal(self, do_prob)
 
+    def get_time_series(self, group_hash):
+        self._check_ens()
+        return self.ens.get_time_series(self, group_hash)
+
+    def load_sim(self):
+        self._check_ens()
         self.ens.load_sim(self)
         return self
 
     def plot_heatmap(self, size, filepath):
-        if self.ens is None:
-            raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
+        self._check_ens()
 
         # data = np.zeros((self.n_iter, self.n_group, self.n_group), dtype=float)
 
@@ -117,23 +128,27 @@ class Trajectory(object):
         return self
 
     def plot_mass_locus_fft(self, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
-        if self.ens is None:
-            raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
-
+        self._check_ens()
         plot = self.ens.plot_mass_locus_fft(self, size, filepath, iter_range, sampling_rate, do_sort, do_ret_plot)
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_scaleogram(self, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
-        if self.ens is None:
-            raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
+    def plot_mass_locus_recurrence(self, size, filepath, iter_range=(-1, -1), neighbourhood=FixedRadius(), embedding_dimension=1, time_delay=2, do_ret_plot=False):
+        self._check_ens()
+        plot = self.ens.plot_mass_locus_recurrence(self, size, filepath, iter_range, neighbourhood, embedding_dimension, time_delay, do_ret_plot)
+        return plot if do_ret_plot else self
 
+    def plot_mass_locus_scaleogram(self, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
+        self._check_ens()
         plot = self.ens.plot_mass_locus_scaleogram(self, size, filepath, iter_range, sampling_rate, do_sort, do_ret_plot)
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_streamgraph(self, size, filepath, iter_range=(-1, -1), do_sort=False, do_ret_plot=False):
-        if self.ens is None:
-            raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
+    def plot_mass_locus_spectrogram(self, size, filepath, iter_range=(-1, -1), sampling_rate=None, win_len=None, noverlap=None, do_sort=False, do_ret_plot=False):
+        self._check_ens()
+        plot = self.ens.plot_mass_locus_spectrogram(self, size, filepath, iter_range, sampling_rate, win_len, noverlap, do_sort, do_ret_plot)
+        return plot if do_ret_plot else self
 
+    def plot_mass_locus_streamgraph(self, size, filepath, iter_range=(-1, -1), do_sort=False, do_ret_plot=False):
+        self._check_ens()
         plot = self.ens.plot_mass_locus_streamgraph(self, size, filepath, iter_range, do_sort, do_ret_plot)
         return plot if do_ret_plot else self
 
@@ -148,16 +163,12 @@ class Trajectory(object):
         return self
 
     def save_sim(self):
-        if self.ens is None:
-            raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
-
+        self._check_ens()
         self.ens.save_sim(self)
         return self
 
     def save_state(self, mass_flow_specs):
-        if self.ens is None:
-            raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
-
+        self._check_ens()
         self.ens.save_state(self, mass_flow_specs)
         return self
 
@@ -169,6 +180,13 @@ class TrajectoryEnsemble(object):
 
     All database-related logic is implemented in this class, even if it might as well belong to the Trajectory class.
     This provides an important benefit of keeping that logic from being spread all over the class hierarchy.
+
+    --------------------------------------------------------------------------------------------------------------------
+
+    Database design notes
+        - While having a 'traj_id' field in the 'grp_name' table seems like a reasonable choice, a trajectory ensemble
+          is assumed to hold only similar trajectories.  Therefore, the 'grp' and 'grp_name' tables can simply be
+          joined on the 'hash' field.
 
     --------------------------------------------------------------------------------------------------------------------
 
@@ -378,6 +396,48 @@ class TrajectoryEnsemble(object):
 
         return g
 
+    def get_signal(self, traj, do_prob=False):
+        '''
+        Returns time series of masses of all groups.  Proportions of the total mass can be requested as well.
+        '''
+
+        n_iter_max = self._db_get_one('''
+            SELECT MAX(n_iter) AS n_iter FROM (
+            SELECT g.hash, COUNT(*) AS n_iter FROM grp g
+            INNER JOIN iter i ON i.id = g.iter_id
+            INNER JOIN traj t ON t.id = i.traj_id
+            WHERE t.id = ?
+            GROUP BY g.hash
+            )''', [traj.id]
+        )
+
+        y = 'm_p' if do_prob else 'm'
+        signal = Signal()
+
+        for g in self.conn.execute('SELECT DISTINCT g.hash, gn.name FROM grp g LEFT JOIN grp_name gn ON gn.hash = g.hash ORDER BY gn.ord, g.id').fetchall():
+            s = np.full([1, n_iter_max], np.nan)  # account for missing values in the signal series
+            for iter in self.conn.execute(f'''
+                    SELECT i.i + 1 AS i, g.{y} AS y FROM grp g
+                    INNER JOIN iter i ON i.id = g.iter_id
+                    INNER JOIN traj t ON t.id = i.traj_id
+                    LEFT JOIN grp_name gn ON gn.hash = g.hash
+                    WHERE t.id = ? AND g.hash = ?
+                    ORDER BY gn.ord, g.hash, i.i
+                    ''', [traj.id, g['hash']]).fetchall():
+                s[0,iter['i']] = iter['y']
+            signal.add_series(s, g['name'] or g['hash'])
+
+        return signal
+
+    def get_time_series(self, traj, group_hash):
+        return self.conn.execute('''
+            SELECT g.m, g.m_p, i.i FROM grp g
+            INNER JOIN iter i ON i.id = g.iter_id
+            INNER JOIN traj t ON t.id = i.traj_id
+            WHERE t.id = ? AND g.hash = ?
+            ORDER BY i.i
+            ''', [traj.id, group_hash]).fetchall()
+
     def load_sim(self, traj):
         traj.sim = DB.blob2obj(self.conn.execute('SELECT sim FROM traj WHERE id = ?', [traj.id]).fetchone()[0])
         traj.sim.traj = traj  # restore the link severed at save time
@@ -563,15 +623,81 @@ class TrajectoryEnsemble(object):
 
         return fig if do_ret_plot else self
 
+    def plot_mass_locus_spectrogram(self, traj, size, filepath, iter_range=(-1, -1), sampling_rate=None, win_len=None, noverlap=None, do_sort=False, do_ret_plot=False):
+        '''
+        Docs
+            https://kite.com/python/docs/matplotlib.mlab.specgram
+        Examples
+            https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/specgram_demo.html#sphx-glr-gallery-images-contours-and-fields-specgram-demo-py
+            https://stackoverflow.com/questions/35932145/plotting-with-matplotlib-specgram
+            https://pythontic.com/visualization/signals/spectrogram
+            http://www.toolsmiths.com/wavelet/wavbox
+        TODO
+            http://ataspinar.com/2018/12/21/a-guide-for-using-the-wavelet-transform-in-machine-learning/
+
+            https://www.sciencedirect.com/topics/neuroscience/signal-processing
+            https://www.google.com/search?client=firefox-b-1-d&q=Signal+Processing+for+Neuroscientists+pdf
+
+            https://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.signal.cwt.html
+            https://www.semanticscholar.org/paper/A-wavelet-based-tool-for-studying-non-periodicity-Ben%C3%ADtez-Bol%C3%B3s/b7cb0789bd2d29222f2def7b70095f95eb72358c
+            https://www.google.com/search?q=time-frequency+plane+decomposition&client=firefox-b-1-d&source=lnms&tbm=isch&sa=X&ved=0ahUKEwiDxu3R9bXkAhWXqp4KHUSuBqYQ_AUIEigB&biw=1374&bih=829#imgrc=q2MCGaBIY3lrSM:
+            https://www.mathworks.com/help/wavelet/examples/classify-time-series-using-wavelet-analysis-and-deep-learning.html;jsessionid=de786cc8324218efefc12d75c292
+        '''
+
+        # (1) Data:
+        data = { 'td': {}, 'fd': {} }  # time- and frequency-domain
+        with self.conn as c:
+            # (1.1) Normalize iteration bounds:
+            iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [traj.id])
+            n_iter = iter_range[1] - min(iter_range[0], 0)
+
+            # (1.2) Construct time-domain data bundle:
+            for r in c.execute('''
+                    SELECT COALESCE(gn.name, g.hash) AS grp, g.m
+                    FROM grp g
+                    INNER JOIN iter i ON i.id = g.iter_id
+                    LEFT JOIN grp_name gn ON gn.hash = g.hash
+                    WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
+                    ORDER BY gn.ord, g.id''',
+                    [traj.id, iter_range[0], iter_range[1]]):
+                if data['td'].get(r['grp']) is None:
+                    data['td'][r['grp']] = []
+                data['td'][r['grp']].append(r['m'])
+
+        # (2) Plot:
+        sampling_rate = sampling_rate or self._db_get_one('SELECT MAX(i) + 1 FROM iter WHERE traj_id = ?', [traj.id])
+        win_len = win_len or sampling_rate // 100
+
+        NFFT = win_len           # the length of the windowing segments
+        Fs = sampling_rate // 1  # the sampling frequency (same as sampling rate so we get 0..1 time range)
+        noverlap = noverlap or NFFT // 2
+
+        fig, ax = plt.subplots(len(data['td']), 1, figsize=size, sharex=True, sharey=True)
+        fig.subplots_adjust(hspace=0, wspace=0)
+        plt.suptitle(f'Trajectory Mass Locus Spectrogram (STFT; Sampling rate: {sampling_rate}, window size: {win_len}, window overlap: {noverlap}; Iterations: {iter_range[0]+1}-{iter_range[1]+1})', fontweight='bold')
+        plt.xlabel('Time', fontweight='bold')
+        fig.text(0.08, 0.5, 'Frequency', ha='center', va='center', rotation='vertical', fontweight='bold')
+
+        for (i,g) in enumerate(data['td'].keys()):
+            ax[i].specgram(data['td'][g], NFFT=NFFT, Fs=Fs, noverlap=noverlap)  # cmap=plt.cm.gist_heat
+            ax[i].set_ylabel(g, fontweight='bold')
+
+        fig.savefig(filepath, dpi=300)
+
+        return fig if do_ret_plot else self
+
     def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), nsamples=0, do_sort=False, do_ret_plot=False):
         # (1) Sample trajectories (if necessary) + set title:
         traj_sample = []
         if nsamples <=0 or nsamples >= len(self.traj):
             traj_sample = self.traj.values()
-            title = f'Trajectory Ensemble Mass Locus (n={len(self.traj)})'
+            title = f'Trajectory Ensemble Mass Locus (n={len(self.traj)}; Iterations {iter_range[0]+1} to {iter_range[1]+1})'
         else:
             traj_sample = random.sample(list(self.traj.values()), nsamples)
-            title = f'Trajectory Ensemble Mass Locus (Random Sample of {len(traj_sample)} from {len(self.traj)})'
+            title = f'Trajectory Ensemble Mass Locus (Random Sample of {len(traj_sample)} from {len(self.traj)}; Iterations {iter_range[0]+1} to {iter_range[1]+1})'
+
+        # iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [next(iter(traj_sample)).id])
+        # title += f'Iterations {iter_range[0]+1} to {iter_range[1]+1})'
 
         # (2) Plot trajectories:
         plots = []
@@ -660,6 +786,100 @@ class TrajectoryEnsemble(object):
         )
 
         return plot if do_ret_plot else self
+
+    def plot_mass_locus_polar(self, size, filepath, iter_range=(-1, -1), nsamples=0, n_iter_per_rot=0, do_sort=False, do_ret_plot=False):
+        '''
+        Altair does not currently support projections, so we must revert to good old matplotlib.
+        '''
+
+        # (1) Sample trajectories (if necessary) + set parameters and plot title:
+        traj_sample = []
+        if nsamples <=0 or nsamples >= len(self.traj):
+            traj_sample = self.traj.values()
+            title = f'Trajectory Ensemble Mass Locus (n={len(self.traj)}; '
+        else:
+            traj_sample = random.sample(list(self.traj.values()), nsamples)
+            title = f'Trajectory Ensemble Mass Locus (Random Sample of {len(traj_sample)} from {len(self.traj)}; '
+
+        iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [next(iter(traj_sample)).id])
+        n_iter_per_rot = n_iter_per_rot if (n_iter_per_rot > 0) else iter_range[1] - iter_range[0]
+        theta = np.arange(iter_range[0] + 1, iter_range[1] + 2, 1) * 2 * np.pi / n_iter_per_rot
+        if n_iter_per_rot == iter_range[1] - iter_range[0]:
+            title += f'Iterations {iter_range[0]+1} to {iter_range[1]+1})'
+        else:
+            title += f'Iterations {iter_range[0]+1} to {iter_range[1]+1} rotating every {n_iter_per_rot})'
+
+        # (2) Plot trajectories:
+        n_cmap = 10  # used to cycle through the colors later on
+        cmap = plt.get_cmap(f'tab{n_cmap}')
+        fig = plt.figure(figsize=size)
+        plt.grid(alpha=0.20, antialiased=True)
+        plt.suptitle(title, fontweight='bold')
+        ax = plt.subplot(111, projection='polar')
+        ax.set_rmax(1.00)
+        ax.set_rticks([0.25, 0.50, 0.75])
+        # ax.set_rlabel_position(0)
+
+        for (i,t) in enumerate(traj_sample):
+            # (2.2) Retrieve the mass dynamics signal:
+            signal = self.get_signal(t, True)
+
+            # (2.3) Plot the signal:
+            for (j,s) in enumerate(signal.S):
+                ax.plot(theta, s[iter_range[0] + 1:iter_range[1] + 2], lw=1, linestyle='-', alpha=0.1, color=cmap(j % n_cmap), mfc='none', antialiased=True)
+            if i == 0:
+                ax.legend(signal.names, loc='upper right')
+
+        fig.tight_layout()
+        plt.subplots_adjust(top=0.92)
+        fig.savefig(filepath, dpi=300)
+
+        return fig if do_ret_plot else self
+
+    def plot_mass_locus_recurrence(self, traj, size, filepath, iter_range=(-1, -1), neighbourhood=FixedRadius(), embedding_dimension=1, time_delay=2, do_ret_plot=False):
+        '''
+        https://en.wikipedia.org/wiki/Recurrence_plot
+
+        TODO: Multivariate extensions of recurrence plots include cross recurrence plots and joint recurrence plots.
+        '''
+
+        from pyrqa.time_series     import TimeSeries
+        from pyrqa.settings        import Settings
+        from pyrqa.computing_type  import ComputingType
+        # from pyrqa.neighbourhood   import FixedRadius
+        from pyrqa.metric          import EuclideanMetric
+        from pyrqa.computation     import RQAComputation
+        from pyrqa.computation     import RPComputation
+        from pyrqa.image_generator import ImageGenerator
+
+        iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [traj.id])
+        signal = traj.get_signal()
+        ts = TimeSeries(list(zip(*signal.S)), embedding_dimension=embedding_dimension, time_delay=time_delay)  # len(signal.S)
+
+        # with self.conn as c:
+            # ts = TimeSeries([r['m'] for r in c.execute('''
+            #         SELECT g.m FROM grp g
+            #         INNER JOIN iter i ON i.id = g.iter_id
+            #         WHERE i.traj_id = ? AND i.i BETWEEN ? AND ? AND g.hash = ?
+            #         ORDER BY i.i''',
+            #         [traj.id, iter_range[0], iter_range[1], group_hash]
+            #     )], embedding_dimension=1, time_delay=2)
+
+
+        settings = Settings(ts, computing_type=ComputingType.Classic, neighbourhood=neighbourhood, similarity_measure=EuclideanMetric, theiler_corrector=1)
+        
+        computation = RQAComputation.create(settings, verbose=True)
+        result = computation.run()
+        result.min_diagonal_line_length = 2
+        result.min_vertical_line_length = 2
+        result.min_white_vertical_line_lelngth = 2
+        print(result)
+
+        computation = RPComputation.create(settings)
+        result = computation.run()
+        ImageGenerator.save_recurrence_plot(result.recurrence_matrix_reverse, filepath)
+
+        return result if do_ret_plot else self
 
     def plot_mass_locus_streamgraph(self, traj, size, filepath, iter_range=(-1, -1), do_sort=False, do_ret_plot=False):
         # (1) Data:

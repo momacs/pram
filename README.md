@@ -20,6 +20,9 @@ A simulation framework that fuses relational probabilistic models and agent-base
 - [altair](https://altair-viz.github.io)
 - [selenium](https://selenium-python.readthedocs.io/) (for saving `altair` graphs)
 - [Gecko Driver](https://github.com/mozilla/geckodriver/releases) or [Chrome Driver](https://sites.google.com/a/chromium.org/chromedriver/) and a recent version of either of the respective Web browser (i.e., Firefox or Chrome; for saving `altair` graphs)
+- [PyRQA](https://pypi.org/project/PyRQA/)
+- [pybind11](https://pybind11.readthedocs.io/en/stable/) (for `PyRQA`)
+- [PyOpenCL](https://documen.tician.de/pyopencl/) (for `PyRQA`)
 
 
 ## Dependencies - Simulation Library ([`src/sim`](src/sim))

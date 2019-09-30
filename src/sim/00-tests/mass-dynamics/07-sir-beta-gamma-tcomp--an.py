@@ -1,15 +1,10 @@
-'''
-A test of the mass transfer graph.
-'''
-
 import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 
+import entropy
 import math
 import numpy as np
-import pyrqa
-
 
 from scipy.stats import beta
 
@@ -22,29 +17,13 @@ from pram.sim    import Simulation
 from pram.traj   import Trajectory, TrajectoryEnsemble
 
 
+# import importlib
+# sim = importlib.import_module('07-sir-beta-gamma-tcomp')
+# from sim import *
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 fpath_db = os.path.join(os.path.dirname(__file__), 'data', '07-sir-gamma-beta-tcomp.sqlite3')
-
-n_traj = 10
-n_iter = 7000
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-# Plot the gamma distribution used later on:
-
-# import numpy as np
-# import matplotlib.pyplot as plt
-#
-# from scipy.stats import gamma
-#
-# print(gamma(a=5.0, loc=5.0, scale=25.0).pdf(100) * 125)
-# print(gamma.pdf(x=100, a=5.0, loc=5.0, scale=25.0) * 125)
-#
-# x = np.linspace(0, 2000, 10000)
-# fig = plt.figure(figsize=(10,2), dpi=150)
-# plt.plot(x, gamma(a=5.0, loc=5.0, scale=25.0).pdf(x) * 125)
-# plt.show()
-# sys.exit(1)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -133,52 +112,93 @@ class RecurrentFluGammaProcess(Process):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-if __name__ == "__main__":
-    # (1) Generate:
-    # if os.path.isfile(fpath_db):
-    #     os.remove(fpath_db)
-    #
-    # te = (
-    #     TrajectoryEnsemble(fpath_db).
-    #         add_trajectories([
-    #             Trajectory(
-    #                 sim=(Simulation().
-    #                     add([
-    #                         ODESystemMass(f_sir_model, [DotMap(attr={ 'flu': 's' }), DotMap(attr={ 'flu': 'i' }), DotMap(attr={ 'flu': 'r' })], dt=0.1),
-    #                         FluRandomBetaProcess(),
-    #                         RecurrentFluGammaProcess(),
-    #                         # SIRSTimeCompressProcess(),
-    #                         Group(m=950, attr={ 'flu': 's' }),
-    #                         Group(m= 50, attr={ 'flu': 'i' }),
-    #                     ])
-    #                 )
-    #             ) for _ in range(n_traj)
-    #         ]).
-    #         set_group_names([
-    #             (0, 'S', Group.gen_hash(attr={ 'flu': 's' })),
-    #             (1, 'I', Group.gen_hash(attr={ 'flu': 'i' })),
-    #             (2, 'R', Group.gen_hash(attr={ 'flu': 'r' }))
-    #         ]).
-    #         run(n_iter)
-    # )
+import matplotlib.pyplot as plt
+import sobi
 
-    # (2) Load:
-    te = TrajectoryEnsemble(fpath_db).stats()
+te = TrajectoryEnsemble(fpath_db).stats()
+signal = te.traj[1].get_signal()
+s = signal.S
 
-    # (3) Plot:
-    def get_out_dir(filename):
-        return os.path.join(os.path.dirname(__file__), 'out', filename)
 
-    # te.traj[1].plot_mass_locus_streamgraph((1200,600), get_out_dir('_plot.png'), iter_range=(-1, 2000), do_sort=True)
-    # te.traj[1].plot_mass_locus_fft((1200,200), get_out_dir('_plot.png'), sampling_rate=100, do_sort=True)
-    # te.traj[1].plot_mass_locus_spectrogram((16,8), get_out_dir('_plot.png'), sampling_rate=None, win_len=100, noverlap=75, do_sort=True)
-    # te.traj[1].plot_mass_locus_scaleogram((16,8), get_out_dir('_plot.png'), sampling_rate=100, do_sort=True)
+# signal.plot_autocorr((16,6), filename=None)
+# sys.exit(0)
 
-    te.traj[1].plot_mass_locus_recurrence((12,12), get_out_dir('_plot.png'), iter_range=(-1, -1), neighbourhood=pyrqa.neighbourhood.FixedRadius(), embedding_dimension=1, time_delay=1)
 
-    # te.plot_mass_locus_line((2400,600), get_out_dir('_plot.png'), iter_range=(-1, -1), nsamples=10, do_sort=True)
-    # te.plot_mass_locus_line_aggr((2400,600), get_out_dir('_plot.png'), iter_range=(-1, -1), do_sort=True)
+# The Signal class tests:
+# print(f'S: {s[0,0]} {s[0,-1]}')
+# print(f'I: {s[1,0]} {s[1,-1]}')
+# print(f'R: {s[2,0]} {s[2,-1]}')  # nan as the 1st value confirmed
+# sys.exit(0)
 
-    # te.plot_mass_locus_polar((12,12), get_out_dir('_plot.png'), iter_range=(-1, -1), nsamples=10, n_iter_per_rot=0, do_sort=True)
-    # te.plot_mass_locus_polar((12,12), get_out_dir('_plot.png'), iter_range=(-1, -1), nsamples=10, n_iter_per_rot=1000, do_sort=True)
-    # te.plot_mass_locus_polar((12,12), get_out_dir('_plot.png'), iter_range=(999, -1), nsamples=10, n_iter_per_rot=1000, do_sort=True)
+
+# plt.plot(s[0])
+# plt.plot(s[1])
+# plt.plot(S[2])
+# plt.show()
+# sys.exit(0)
+
+
+# from pandas.plotting import autocorrelation_plot
+# fig, axes = plt.subplots(3,1,figsize=(16,3), dpi=100)
+# autocorrelation_plot(s[0,1:], ax=axes[0])
+# autocorrelation_plot(s[1,1:], ax=axes[1])
+# autocorrelation_plot(s[2,1:], ax=axes[2])
+# plt.show()
+# sys.exit(0)
+
+
+# from statsmodels.tsa.stattools import acf, pacf
+# from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+# fig, axes = plt.subplots(2,1,figsize=(16,3), dpi=100)
+# plot_acf(s[0], lags=2000, ax=axes[0])
+# plot_pacf(s[0], lags=2000, ax=axes[1])
+# plt.show()
+# sys.exit(0)
+
+
+# SOBI:
+# S,A,W = sobi.sobi(s[:,1:], num_lags=None, eps=1.0e-6, random_order=True)
+
+
+# print(S.shape)
+# print(A)
+
+
+# plt.plot(ts['s']['i'], ts['s']['m'])
+# plt.plot(S[0])
+# plt.plot(S[1])
+# plt.plot(S[2])
+# plt.show()
+# sys.exit(0)
+
+
+# si = 0
+#
+# fig, ax1 = plt.subplots()
+# color = 'tab:red'
+# ax1.set_xlabel('iter')
+# ax1.set_ylabel('X', color=color)
+# ax1.plot(s[si], color=color)
+# ax1.tick_params(axis='y', labelcolor=color)
+#
+# ax2 = ax1.twinx()
+# color = 'tab:blue'
+# ax2.set_ylabel('S', color=color)
+# ax2.plot(S[si], color=color)
+# ax2.tick_params(axis='y', labelcolor=color)
+#
+# plt.show()
+
+
+# Entropy:
+print(entropy.perm_entropy(s[0], order=3, normalize=True))                 # Permutation entropy
+print(entropy.spectral_entropy(s[0], 100, method='welch', normalize=True)) # Spectral entropy
+print(entropy.svd_entropy(s[0], order=3, delay=1, normalize=True))         # Singular value decomposition entropy
+print(entropy.app_entropy(s[0], order=2, metric='chebyshev'))              # Approximate entropy
+print(entropy.sample_entropy(s[0], order=2, metric='chebyshev'))           # Sample entropy
+
+
+fpath_db = os.path.join(os.path.dirname(__file__), 'data', '06-sir-gamma-beta.sqlite3')
+te = TrajectoryEnsemble(fpath_db).stats()
+s = te.traj[1].get_signal().S
+print(entropy.app_entropy(s[0], order=2, metric='chebyshev'))              # Approximate entropy
