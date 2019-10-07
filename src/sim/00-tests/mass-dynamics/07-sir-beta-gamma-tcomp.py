@@ -176,8 +176,8 @@ if __name__ == "__main__":
 
     te.traj[1].plot_mass_locus_recurrence((12,12), get_out_dir('_plot.png'), iter_range=(-1, -1), neighbourhood=pyrqa.neighbourhood.FixedRadius(), embedding_dimension=1, time_delay=1)
 
-    # te.plot_mass_locus_line((2400,600), get_out_dir('_plot.png'), iter_range=(-1, -1), nsamples=10, do_sort=True)
-    # te.plot_mass_locus_line_aggr((2400,600), get_out_dir('_plot.png'), iter_range=(-1, -1), do_sort=True)
+    # te.plot_mass_locus_line((2400,600), get_out_dir('_plot.png'), iter_range=(-1, -1), nsamples=10)
+    # te.plot_mass_locus_line_aggr((2400,600), get_out_dir('_plot.png'), iter_range=(-1, -1))
 
     # te.plot_mass_locus_polar((12,12), get_out_dir('_plot.png'), iter_range=(-1, -1), nsamples=10, n_iter_per_rot=0, do_sort=True)
     # te.plot_mass_locus_polar((12,12), get_out_dir('_plot.png'), iter_range=(-1, -1), nsamples=10, n_iter_per_rot=1000, do_sort=True)

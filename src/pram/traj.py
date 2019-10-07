@@ -132,6 +132,11 @@ class Trajectory(object):
         plot = self.ens.plot_mass_locus_fft(self, size, filepath, iter_range, sampling_rate, do_sort, do_ret_plot)
         return plot if do_ret_plot else self
 
+    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), do_ret_plot=False):
+        self._check_ens()
+        plot = self.ens.plot_mass_locus_line(size, filepath, iter_range, self, 0, do_ret_plot)
+        return plot if do_ret_plot else self
+
     def plot_mass_locus_recurrence(self, size, filepath, iter_range=(-1, -1), neighbourhood=FixedRadius(), embedding_dimension=1, time_delay=2, do_ret_plot=False):
         self._check_ens()
         plot = self.ens.plot_mass_locus_recurrence(self, size, filepath, iter_range, neighbourhood, embedding_dimension, time_delay, do_ret_plot)
@@ -686,103 +691,148 @@ class TrajectoryEnsemble(object):
 
         return fig if do_ret_plot else self
 
-    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), nsamples=0, do_sort=False, do_ret_plot=False):
-        # (1) Sample trajectories (if necessary) + set title:
-        traj_sample = []
-        if nsamples <=0 or nsamples >= len(self.traj):
-            traj_sample = self.traj.values()
-            title = f'Trajectory Ensemble Mass Locus (n={len(self.traj)}; Iterations {iter_range[0]+1} to {iter_range[1]+1})'
+    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), traj=None, nsamples=0, do_ret_plot=False):
+        '''
+        If 'traj' is not None, only that trajectory is plotted.  Otherwise, 'nsample' determines the number of
+        trajectories plotted.  Specifically, if smaller than or equal to zero, all trajectories are plotted; otherwise,
+        the given number of trajectories is selected randomly.  If the number provided exceeds the number of
+        trajectories present in the ensamble, all of them are plotted.
+        '''
+
+        # (1) Sample trajectories (if necessary) + set title + set line alpha:
+        if traj is not None:
+            traj_sample = [traj]
+            title = f'Trajectory Mass Locus'  #  (Iterations {iter_range[0]+1} to {iter_range[1]+1})
+            opacity = 1.00
         else:
-            traj_sample = random.sample(list(self.traj.values()), nsamples)
-            title = f'Trajectory Ensemble Mass Locus (Random Sample of {len(traj_sample)} from {len(self.traj)}; Iterations {iter_range[0]+1} to {iter_range[1]+1})'
+            traj_sample = []
+            if nsamples <=0 or nsamples >= len(self.traj):
+                traj_sample = self.traj.values()
+                title = f'Trajectory Ensemble Mass Locus (n={len(self.traj)})'
+            else:
+                traj_sample = random.sample(list(self.traj.values()), nsamples)
+                title = f'Trajectory Ensemble Mass Locus (Random Sample of {len(traj_sample)} from {len(self.traj)})'
+            opacity = max(0.25, 1.00 / len(traj_sample))
 
         # iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [next(iter(traj_sample)).id])
         # title += f'Iterations {iter_range[0]+1} to {iter_range[1]+1})'
 
-        # (2) Plot trajectories:
+        # (2) Group sorting (needs to be done here due to Altair's peculiarities):
+        with self.conn as c:
+            sort = [r['name'] for r in c.execute('SELECT DISTINCT COALESCE(gn.name, g.hash) AS name FROM grp g LEFT JOIN grp_name gn ON gn.hash = g.hash ORDER BY gn.ord, g.id')]
+
+        # (3) Plot trajectories:
         plots = []
-        for t in traj_sample:
-            # (2.1) Normalize iteration bounds:
+        for (ti,t) in enumerate(traj_sample):
+            # (3.1) Normalize iteration bounds:
             iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [t.id])
 
-            # (2.2) Construct the trajectory data bundle:
+            # (3.2) Construct the trajectory data bundle:
             data = []
             with self.conn as c:
-                for r in c.execute('SELECT i.i, g.m, g.hash FROM grp g INNER JOIN iter i ON i.id = g.iter_id WHERE i.traj_id = ? AND i.i BETWEEN ? AND ? ORDER BY i.i', [t.id, iter_range[0], iter_range[1]]):
-                    data.append({ 'i': r['i'] + 1, 'm': r['m'], 'grp': r['hash'] })
+                for r in c.execute('''
+                        SELECT i.i, g.m, COALESCE(gn.name, g.hash) AS name
+                        FROM grp g
+                        INNER JOIN iter i ON i.id = g.iter_id
+                        LEFT JOIN grp_name gn ON gn.hash = g.hash
+                        WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
+                        ORDER BY i.i''', [t.id, iter_range[0], iter_range[1]]):
+                    data.append({ 'i': r['i'] + 1, 'm': r['m'], 'grp': r['name'] })
 
-            # (2.3) Plot the trajectory:
+            # (3.3) Plot the trajectory:
             plots.append(
                 alt.Chart(
                     alt.Data(values=data)
-                ).properties(
-                    title=title, width=size[0], height=size[1]
                 ).mark_line(
-                    strokeWidth=1, opacity=0.25, interpolate='basis', tension=1  # basis, basis-closed, cardinal, cardinal-closed, bundle(tension)
+                    strokeWidth=1, opacity=opacity, interpolate='basis', tension=1  # basis, basis-closed, cardinal, cardinal-closed, bundle(tension)
                 ).encode(
                     alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
                     alt.Y('m:Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
-                    alt.Color('grp:N', legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15))  # scale=alt.Scale(scheme='category20b')
+                    color=(
+                        alt.Color('grp:N', scale=alt.Scale(scheme='tableau10'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
+                        if ti == 0 else
+                        alt.Color('grp:N', scale=alt.Scale(scheme='tableau10'), sort=sort, legend=None)
+                    )
                     # alt.Order('year(data):O')
                 )
             )
 
-        plot = alt.layer(*plots)
-        plot.configure_view(
+        plot = alt.layer(
+            *plots
+        ).properties(
+            title=title, width=size[0], height=size[1]
+        ).configure_view(
             # strokeWidth=1
         ).configure_title(
             fontSize=20
+        ).resolve_scale(
+            color='independent'
         ).save(
-            filepath, scale_factor=2.0, webdriver='firefox'
+            filepath, scale_factor=2.0, webdriver='chrome'
         )
 
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_line_aggr(self, size, filepath, iter_range=(-1, -1), band_type='iqr', do_sort=False, do_ret_plot=False):
+    def plot_mass_locus_line_aggr(self, size, filepath, iter_range=(-1, -1), band_type='iqr', do_ret_plot=False):
+        '''
+        Ordering the legend of a composite chart
+            https://stackoverflow.com/questions/55783286/control-legend-color-and-order-when-joining-two-charts-in-altair
+            https://github.com/altair-viz/altair/issues/820
+        '''
+
         title = f'Trajectory Ensemble Mass Locus (Mean + {band_type.upper()}; n={len(self.traj)})'
 
         # (1) Normalize iteration bounds:
         iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter', [])
 
-        # (2) Plot:
-        # (2.1) Construct data bundle:
-        data = []
-        for i in range(iter_range[0], iter_range[1] + 1, 1):
-            with self.conn as c:
-                for r in c.execute('SELECT g.m, g.hash FROM grp g INNER JOIN iter i ON i.id = g.iter_id WHERE i.i = ?', [i]):
-                    data.append({ 'i': i + 1, 'm': r['m'], 'grp': r['hash'] })
+        # (2) Group sorting (needs to be done here due to Altair's peculiarities):
+        with self.conn as c:
+            sort = [r['name'] for r in c.execute('SELECT DISTINCT COALESCE(gn.name, g.hash) AS name FROM grp g LEFT JOIN grp_name gn ON gn.hash = g.hash ORDER BY gn.ord, g.id')]
 
-        # (2.2) Plot iterations:
+        # (3) Plot:
+        # (3.1) Construct data bundle:
+        data = []
+        with self.conn as c:
+            for r in c.execute('''
+                    SELECT i.i, g.m, COALESCE(gn.name, g.hash) AS name
+                    FROM grp g
+                    INNER JOIN iter i ON i.id = g.iter_id
+                    INNER JOIN traj t ON t.id = i.traj_id
+                    LEFT JOIN grp_name gn ON gn.hash = g.hash
+                    WHERE i.i BETWEEN ? AND ?
+                    ORDER BY t.id, i.i, gn.ord''', [iter_range[0], iter_range[1]]):
+                data.append({ 'i': r['i'] + 1, 'm': r['m'], 'grp': r['name'] })
+
+        # (3.2) Plot iterations:
         plot_line = alt.Chart(
-                alt.Data(values=data)
-            ).properties(
-                title=title, width=size[0], height=size[1]
             ).mark_line(
                 strokeWidth=1, interpolate='basis'#, tension=1  # basis, basis-closed, cardinal, cardinal-closed, bundle(tension)
             ).encode(
                 alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
                 alt.Y('mean(m):Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
-                alt.Color('grp:N', legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15))
+                alt.Color('grp:N', scale=alt.Scale(scheme='tableau10'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
             )
 
         plot_band = alt.Chart(  # https://altair-viz.github.io/user_guide/generated/core/altair.ErrorBandDef.html#altair.ErrorBandDef
-                alt.Data(values=data)
-            ).properties(
-                title=title, width=size[0], height=size[1]
             ).mark_errorband(
                 extent=band_type, interpolate='basis'#, tension=1  # opacity, basis, basis-closed, cardinal, cardinal-closed, bundle(tension)
             ).encode(
                 alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
                 alt.Y('mean(m):Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
-                alt.Color('grp:N', legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15))
+                alt.Color('grp:N', scale=alt.Scale(scheme='tableau10'), legend=None, sort=sort)
             )
 
-        plot = plot_band + plot_line
-        plot.configure_view(
+        plot = alt.layer(
+            plot_band, plot_line, data=alt.Data(values=data)
+        ).properties(
+            title=title, width=size[0], height=size[1]
+        ).configure_view(
         ).configure_title(
             fontSize=20
+        ).resolve_scale(
+            color='independent'
         ).save(
-            filepath, scale_factor=2.0, webdriver='firefox'
+            filepath, scale_factor=2.0, webdriver='chrome'
         )
 
         return plot if do_ret_plot else self
@@ -867,7 +917,7 @@ class TrajectoryEnsemble(object):
 
 
         settings = Settings(ts, computing_type=ComputingType.Classic, neighbourhood=neighbourhood, similarity_measure=EuclideanMetric, theiler_corrector=1)
-        
+
         computation = RQAComputation.create(settings, verbose=True)
         result = computation.run()
         result.min_diagonal_line_length = 2

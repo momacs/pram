@@ -406,6 +406,7 @@ class GroupSizeProbe(GroupProbe):
                 # proportions and numbers
             # self.vars = [GroupProbe.Var(f'v{i}', 'float') for i in range(len(queries))]
         else:
+            self.vars = []
             if len(var_names) != (len(queries) * 2):
                 raise ValueError(f'Incorrect number of variable names: {len(var_names)} supplied, {len(queries) * 2} expected (i.e., {len(queries)} for proportions and numbers each).')
             # if len(var_names) != len(queries):

@@ -150,8 +150,9 @@
 #         c SimulationPlotter                                                                  [2019.04.10]
 #         c StaticRuleAnalyzer                                                                 [2019.03.02 - 2019.04.14]
 #         c DynamicRuleAnalyzer                                                                [2019.03.02 - 2019.05.04]
-#         c Trajectory                                                                         [2019.07.12 - 2019.07.29]
-#         c TrajectoryEnsemble                                                                 [2019.07.12 - 2019.07.29]
+#         c Trajectory                                                                         [2019.07.12 - ...]
+#         c TrajectoryEnsemble                                                                 [2019.07.12 - ...]
+#         c Signal                                                                             [2019.08.20 - 2019.08.20]
 #         Entities
 #             c Agent                                                                          [2018.12.16 - 2019.01.05]
 #             c Entity                                                                         [2018.12.16 - 2019.03.22]

@@ -106,5 +106,5 @@ def get_out_dir(filename):
 # te.traj[1].plot_mass_locus_streamgraph((1200,600), get_out_dir('_plot.png'), do_sort=True)
 # te.traj[1].plot_mass_locus_freq((12,6), get_out_dir('_plot.png'), do_sort=True)
 
-# te.plot_mass_locus_line((1200,600), get_out_dir('_plot.png'), nsamples=100, do_sort=True)
-# te.plot_mass_locus_line_aggr((1200,600), get_out_dir('_plot.png'), do_sort=True)
+# te.plot_mass_locus_line((1200,600), get_out_dir('_plot.png'), nsamples=100)
+# te.plot_mass_locus_line_aggr((1200,600), get_out_dir('_plot.png'))

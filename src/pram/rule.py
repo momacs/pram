@@ -49,6 +49,28 @@ class TimeInt(Time):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+@attrs(slots=True)
+class Iter(object):
+    pass
+
+
+@attrs(slots=True)
+class IterAlways(Iter):
+    pass
+
+
+@attrs(slots=True)
+class IterPoint(Iter):
+    i: float = attrib(default=0, converter=int)
+
+
+@attrs(slots=True)
+class IterInt(Iter):
+    i0: int = attrib(default=  0, converter=int)
+    i1: int = attrib(default=100, converter=int)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class Rule(ABC):
     '''
     A rule that can be applied to a group and may augment that group or split it into multiple subgroups.
@@ -67,15 +89,16 @@ class Rule(ABC):
     pop = None
     compile_spec = None
 
-    def __init__(self, name, t, name_human=None, memo=None):
+    def __init__(self, name, t=TimeAlways(), i=IterAlways(), name_human=None, memo=None):
         '''
-        t: Time
+        t: Time class object
         '''
 
         Err.type(t, 't', Time)
 
         self.name = name
         self.t = t
+        self.i = i
         self.memo = memo
         self.name_human = name_human or name
 
@@ -120,18 +143,31 @@ class Rule(ABC):
         return f'{prefix}{name}_' + ''.join(random.sample(string.ascii_letters + string.digits, rand_len))
 
     def is_applicable(self, group, iter, t):
-        ''' Verifies if the rule is applicable given the context. '''
+        ''' Verifies if the rule is applicable to the group at the current iteration and current time. '''
 
+        is_i_ok = True
+        if isinstance(self.i, IterAlways):
+            is_i_ok = is_i_ok and True
+        elif isinstance(self.i, IterPoint):
+            is_i_ok = is_i_ok and self.i.i == iter
+        elif isinstance(self.i, IterInt):
+            # is_i_ok = is_i_ok and self.i.i0 <= iter <= self.i.i1
+            is_i_ok = is_i_ok and self.i.i0 <= iter
+            is_i_ok = is_i_ok and (iter <= self.i.i1 or self.i.i1 == 0)
+        else:
+            raise TypeError("Type '{}' used for specifying rule timing not yet implemented (Rule.is_applicable).".format(type(self.t).__name__))
+
+        is_t_ok = True
         if isinstance(self.t, TimeAlways):
-            return True
+            is_t_ok = is_t_ok and True
+        elif isinstance(self.t, TimePoint):
+            is_t_ok = is_t_ok and self.t.t == t
+        elif isinstance(self.t, TimeInt):
+            is_t_ok = is_t_ok and self.t.t0 <= t <= self.t.t1
+        else:
+            raise TypeError("Type '{}' used for specifying rule timing not yet implemented (Rule.is_applicable).".format(type(self.t).__name__))
 
-        if isinstance(self.t, TimePoint):
-            return self.t.t == t
-
-        if isinstance(self.t, TimeInt):
-            return self.t.t0 <= t <= self.t.t1
-
-        raise TypeError("Type '{}' used for specifying rule timing not yet implemented (Rule.is_applicable).".format(type(self.t).__name__))
+        return is_i_ok and is_t_ok
 
     def set_t_unit(self, ms):
         self.t_unit_ms = ms
@@ -302,8 +338,8 @@ class TimeSeriesObs(Rule, ABC):
         { 'x1': [1,2,3], 'x2': [4,5,6] }
     '''
 
-    def __init__(self, x, name='time-series', t=TimeAlways(), memo=None):
-        super().__init__(name, t, memo)
+    def __init__(self, x, name='time-series', t=TimeAlways(), i=IterAlways(), memo=None):
+        super().__init__(name, t, i, memo)
         self.x = x  # f(t)
 
     def apply(self, pop, group, iter, t):
@@ -319,8 +355,8 @@ class FibonacciSeq(Sequence, DifferenceEquation):
     F0-F20: 0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597 2584 4181 6765
     '''
 
-    def __init__(self, attr='fib', name='fibonacci-seq', t=TimeAlways()):
-        super().__init__(name, t)
+    def __init__(self, attr='fib', name='fibonacci-seq', t=TimeAlways(), i=IterAlways()):
+        super().__init__(name, t, i)
 
         self.attr   = attr                             # n
         self.attr_1 = Rule.get_rand_name(f'{attr}_1')  # n-1
@@ -356,8 +392,8 @@ class CompoundInterstSeq(Sequence, DifferenceEquation):
         n - compund frequency [months]
     '''
 
-    def __init__(self, attr, r, n, name='compund-interst-seq', t=TimeAlways()):
-        super().__init__(name, t)
+    def __init__(self, attr, r, n, name='compund-interst-seq', t=TimeAlways(), i=IterAlways()):
+        super().__init__(name, t, i)
 
         self.attr = attr
         self.r = r
@@ -374,7 +410,7 @@ class CompoundInterstSeq(Sequence, DifferenceEquation):
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbabilisticEquation(Equation):
     '''
-    A algebraic equation p(t), where p(t) \in [0,1] (i.e., it yields a probability).
+    An algebraic equation p(t), where $p(t) \in [0,1]$ (i.e., it yields a probability).
     '''
 
     pass
@@ -422,8 +458,8 @@ class ODESystem(Rule):
     The above equations are called linearized equations or equations of first variation.
     '''
 
-    def __init__(self, f, y0, name='ode-system', t=TimeAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
-        super().__init__(name, t, memo)
+    def __init__(self, f, y0, name='ode-system', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
+        super().__init__(name, t, i, memo)
 
         self.y0 = y0  # initial condition
         self.dt = dt  # TODO: should change with the change in the timer
@@ -475,8 +511,8 @@ class ODESystemAttr(Rule):
         y0 - initial condition attributes (i.e., a list of group attribute names)
     '''
 
-    def __init__(self, f, y0, name='ode-system', t=TimeAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
-        super().__init__(name, t, memo)
+    def __init__(self, f, y0, name='ode-system', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
+        super().__init__(name, t, i, memo)
 
         self.y0 = y0
         self.y0_val = None  # initial condition
@@ -544,8 +580,8 @@ class ODESystemMass(Rule):
         y0 - initial condition (i.e., a list of group attribute names)
     '''
 
-    def __init__(self, f, queries, name='ode-system-mass', t=TimeAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
-        super().__init__(name, t, memo)
+    def __init__(self, f, queries, name='ode-system-mass', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
+        super().__init__(name, t, i, memo)
 
         self.queries = queries
         self.y0_mass = None  # initial condition

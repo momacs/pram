@@ -28,6 +28,13 @@ __pycache__/
 *.sqlite3
 *.png
 
+*.gz
+*.pdf
+*.out
+*.log
+*.aux
+*.tex
+
 .RData
 .Rhistory
 
