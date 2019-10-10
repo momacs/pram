@@ -60,7 +60,6 @@ sir_b = make_sir(0.50, uniform(loc=0.01, scale=0.14).rvs(), i=IterInt(900 + gamm
 class RecurrentFluProcess(GammaDistributionProcess):
     def apply(self, pop, group, iter, t):
         p = self.get_p(iter)
-        # print(f'{iter} {group.ga("flu")} {p}')
         return [GroupSplitSpec(p=p, attr_set={ 'flu': 's' }), GroupSplitSpec(p=1-p)]
 
     def is_applicable(self, group, iter, t):
