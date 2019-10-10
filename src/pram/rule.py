@@ -5,6 +5,8 @@ Nomenclature disambiguation
 '''
 
 import math
+import matplotlib.pyplot as plt
+import numpy as np
 import random
 import string
 
@@ -12,7 +14,7 @@ from abc             import abstractmethod, ABC
 from attr            import attrs, attrib
 from dotmap          import DotMap
 from enum            import IntEnum
-from scipy.stats     import lognorm, poisson, rv_discrete
+from scipy.stats     import gamma, lognorm, norm, poisson, rv_discrete
 from scipy.integrate import ode, solve_ivp
 
 from .entity import GroupQry, GroupSplitSpec, Site
@@ -89,7 +91,7 @@ class Rule(ABC):
     pop = None
     compile_spec = None
 
-    def __init__(self, name, t=TimeAlways(), i=IterAlways(), name_human=None, memo=None):
+    def __init__(self, name='rule', t=TimeAlways(), i=IterAlways(), name_human=None, memo=None):
         '''
         t: Time class object
         '''
@@ -153,9 +155,9 @@ class Rule(ABC):
         elif isinstance(self.i, IterInt):
             # is_i_ok = is_i_ok and self.i.i0 <= iter <= self.i.i1
             is_i_ok = is_i_ok and self.i.i0 <= iter
-            is_i_ok = is_i_ok and (iter <= self.i.i1 or self.i.i1 == 0)
+            is_i_ok = is_i_ok and (iter <= self.i.i1 or self.i.i1 <= 0)
         else:
-            raise TypeError("Type '{}' used for specifying rule timing not yet implemented (Rule.is_applicable).".format(type(self.t).__name__))
+            raise TypeError("Type '{}' used for specifying rule iteration not yet implemented (Rule.is_applicable).".format(type(self.i).__name__))
 
         is_t_ok = True
         if isinstance(self.t, TimeAlways):
@@ -345,6 +347,76 @@ class TimeSeriesObs(Rule, ABC):
     def apply(self, pop, group, iter, t):
         # self.x[iter]
         pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class DistributionProcess(Process, ABC):
+    '''
+    A maximum of 'p_max' proportion of mass should be converted (i.e., at the mode of the distribution).  The
+    distribution that describes mass conversion is internally scaled to match that argument.  If 'None', no scaling is
+    performed
+    '''
+
+    def __init__(self, name='distrib-proc', t=TimeAlways(), i=IterAlways(), p_max=None, memo=None):
+        super().__init__(name=name, t=t, i=i, memo=memo)
+
+        self.p_max = p_max
+        self.dist = None    # the scipy distribution object (the extending class needs to call set_dist() to set this)
+        self.mode = None    # the mode of the distribution (ditto)
+        self.p_mult = None  # probability multiplier that scales the distribution to p_max at its mode (ditto)
+        self.p = None       # a frozen distribution (ditto)
+
+        # Iteration offset:
+        if isinstance(self.i, IterAlways):
+            self.iter0 = 0
+        elif isinstance(self.i, IterPoint):
+            self.iter0 = self.i.i
+        elif isinstance(self.i, IterInt):
+            self.iter0 = self.i.i0
+
+    def get_p(self, iter):
+        return self.p(iter - self.iter0)
+
+    def plot(self, figsize=(10,2), fmt='g-', lw=1, label=None, dpi=150, do_legend=True, do_show=True):
+        fig = plt.figure(figsize=figsize, dpi=dpi)
+        x = np.linspace(self.dist.ppf(0.01), self.dist.ppf(0.99), 100)
+        plt.plot(x, self.dist.pdf(x) * self.p_mult, fmt, lw=lw, label=label or self.plot_label)
+        if do_legend:
+            plt.legend(loc='best', frameon=False)
+        if do_show:
+            plt.show()
+        return fig
+
+    def set_dist(self, dist, mode):
+        self.dist = dist
+        self.mode = mode
+        self.p_mult = 1.0 if self.p_max is None else self.p_max / self.dist.pdf(self.mode)
+        self.p = lambda iter: self.dist.pdf(iter) * self.p_mult
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class GammaDistributionProcess(DistributionProcess, ABC):
+    def __init__(self, name='gamma-distrib-proc', t=TimeAlways(), i=IterAlways(), p_max=None, a=1.0, loc=0.0, scale=1.0, label=None, memo=None):
+        super().__init__(name=name, t=t, i=i, p_max=p_max, memo=memo)
+
+        self.a = a
+        self.loc = loc
+        self.scale = scale
+        self.plot_label = label or f'Gamma({self.a},{self.scale})'
+
+        self.set_dist(gamma(a=self.a, loc=self.loc, scale=self.scale), (self.a - 1) * self.scale)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class NormalDistributionProcess(DistributionProcess, ABC):
+    def __init__(self, name='norm-distrib-proc', t=TimeAlways(), i=IterAlways(), p_max=None, loc=0.0, scale=1.0, label=None, memo=None):
+        super().__init__(name=name, t=t, i=i, p_max=p_max, memo=memo)
+
+        self.loc = loc
+        self.scale = scale
+        self.plot_label = label or f'Normal({self.loc},{self.scale})'
+
+        self.set_dist(norm(loc=self.loc, scale=self.scale), self.loc)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -798,8 +870,8 @@ class DiscreteInvMarkovChain(MarkovChain, DiscreteSpacetimeStochasticProcess, St
     tm_i[2] -> A:flu = 'r'
     '''
 
-    def __init__(self, var, tm, name='markov-chain', t=TimeAlways(), memo=None):
-        super().__init__(name, t, memo)
+    def __init__(self, var, tm, name='markov-chain', t=TimeAlways(), i=IterAlways(), memo=None):
+        super().__init__(name, t, i, memo)
 
         if sum([i for x in list(tm.values()) for i in x]) != float(len(tm)):
             raise ValueError(f"'{self.__class__.__name__}' class: Probabilities in the transition model must add up to 1")
@@ -905,8 +977,8 @@ class BernoulliScheme(DiscreteInvMarkovChain):
     past states).
     '''
 
-    def __init__(self, attr='state', vals=(0,1), name='bernoulli-process', t=TimeAlways(), memo=None):
-        super().__init__(var, { vals[0]: [1-p, p], vals[1]: [1-p, p] }, name, t, memo)
+    def __init__(self, attr='state', vals=(0,1), name='bernoulli-process', t=TimeAlways(), i=IterAlways(), memo=None):
+        super().__init__(var, { vals[0]: [1-p, p], vals[1]: [1-p, p] }, name, t, i, memo)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -920,8 +992,8 @@ class BernoulliProcess(BernoulliScheme):
     Binomial Markov Chain.
     '''
 
-    def __init__(self, p=0.5, attr='state', vals=(0,1), name='bernoulli-process', t=TimeAlways(), memo=None):
-        super().__init__(attr, { vals[0]: [1-p, p], vals[1]: [1-p, p] }, name, t, memo)
+    def __init__(self, p=0.5, attr='state', vals=(0,1), name='bernoulli-process', t=TimeAlways(), i=IterAlways(), memo=None):
+        super().__init__(attr, { vals[0]: [1-p, p], vals[1]: [1-p, p] }, name, t, i, memo)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1131,8 +1203,8 @@ class SISModel(DiscreteInvMarkovChain):
         SISModel('flu', 0.05, 0.10)
     '''
 
-    def __init__(self, var, beta, gamma, name='sis-model', t=TimeAlways(), memo=None):
-        super().__init__(var, { 's': [1 - beta, beta], 'i': [gamma, 1 - gamma] }, name, t, memo)
+    def __init__(self, var, beta, gamma, name='sis-model', t=TimeAlways(), i=IterAlways(), memo=None):
+        super().__init__(var, { 's': [1 - beta, beta], 'i': [gamma, 1 - gamma] }, name, t, i, memo)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1153,8 +1225,8 @@ class SIRSModel(DiscreteInvMarkovChain):
         SIRSModel('flu', 0.05, 0.20, 0.00)  # SIR
     '''
 
-    def __init__(self, var, beta, gamma, alpha, name='sir-model', t=TimeAlways(), memo=None):
-        super().__init__(var, { 's': [1 - beta, beta, 0.00], 'i': [0.00, 1 - gamma, gamma], 'r': [alpha, 0.00, 1 - alpha] }, name, t, memo)
+    def __init__(self, var, beta, gamma, alpha, name='sir-model', t=TimeAlways(), i=IterAlways(), memo=None):
+        super().__init__(var, { 's': [1 - beta, beta, 0.00], 'i': [0.00, 1 - gamma, gamma], 'r': [alpha, 0.00, 1 - alpha] }, name, t, i, memo)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

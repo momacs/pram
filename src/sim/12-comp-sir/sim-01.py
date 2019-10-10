@@ -1,5 +1,7 @@
 '''
 Multiple composite SIR models.
+
+This simulation builds up a more a more complicated example of two SIR models interacting.
 '''
 
 import os,sys
@@ -11,11 +13,9 @@ import matplotlib.pyplot as plt
 from dotmap import DotMap
 from scipy.stats import gamma, uniform
 
-from pram.data   import GroupSizeProbe
 from pram.entity import Group, GroupSplitSpec
-from pram.rule   import Process, ODESystemMass, IterAlways, IterInt, TimeAlways
+from pram.rule   import ODESystemMass, GammaDistributionProcess, IterAlways, IterInt, TimeAlways
 from pram.sim    import Simulation
-from pram.util   import Time
 from pram.traj   import Trajectory, TrajectoryEnsemble
 
 
@@ -75,7 +75,7 @@ fpath_db = os.path.join(os.path.dirname(__file__), 'data', 'sir-x2.sqlite3')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# The SIR models constructor:
+# The SIR models generator (helper):
 
 def make_sir(beta, gamma, t=TimeAlways(), i=IterAlways(), dt=0.1):
     def f_sir_model(t, state):
@@ -98,7 +98,7 @@ def make_sir(beta, gamma, t=TimeAlways(), i=IterAlways(), dt=0.1):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# The actual SIR models:
+# The actual SIR models used:
 
 # 01 SIR A1:
 # sir_a1 = make_sir(0.10, 0.05, i=IterAlways(), dt=0.1)
@@ -131,79 +131,80 @@ sir_a1 = make_sir(0.10, 0.05, i=IterAlways(), dt=0.1)
 def make_sir_b1_random_delay_gamma(iter0=900, iter0_dist=gamma(a=5.0, loc=5.0, scale=25.0), gamma=uniform(loc=0.01, scale=0.14)):
     iter0_rnd = iter0_dist.rvs()
     gamma_rnd = gamma.rvs()
-    # print(f'rand-iter: {iter0_rnd}  rand-gamma: {gamma_rnd}')
     return make_sir(0.50, gamma_rnd, i=IterInt(iter0 + iter0_rnd,0), dt=0.1)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# The recurrent flu gamma process:
+# The recurrent flu process:
 
-class RecurrentFluGammaProcess(Process):
-    '''
-    A maximum of 'p_max' proportion of mass should be converted.  The gamma distribution that describes mass conversion
-    is internally scaled to match that argument.
-    '''
-
-    def __init__(self, iter0=2000, p_max=1.00):
-        super().__init__(t=TimeAlways(), name='rec-flu-gamma-proc')
-
-        self.iter0 = iter0
-        self.gamma_a = 5.0
-        self.gamma_loc = 0.0
-        self.gamma_scale = 50.0
-        self.mode = (self.gamma_a - 1) * self.gamma_scale
-        self.gamma_p_mult = p_max / gamma(a=self.gamma_a, loc=self.gamma_loc, scale=self.gamma_scale).pdf(self.mode)
-        self.p = lambda iter: gamma(a=self.gamma_a, loc=self.gamma_loc, scale=self.gamma_scale).pdf(iter) * self.gamma_p_mult
-
+class RecurrentFluProcess(GammaDistributionProcess):
     def apply(self, pop, group, iter, t):
-        p = self.p(iter - self.iter0)
+        p = self.get_p(iter)
         return [GroupSplitSpec(p=p, attr_set={ 'flu': 's' }), GroupSplitSpec(p=1-p)]
 
     def is_applicable(self, group, iter, t):
-        return super().is_applicable(group, iter, t) and iter >= self.iter0 and group.ha({ 'flu': 'r' })
+        return super().is_applicable(group, iter, t) and group.ha({ 'flu': 'r' })
+
+
+# RecurrentFluProcess(a=5.0, scale=50.0).plot()
+# RecurrentFluProcess(p_max=0.5, a=5.0, scale=50.0).plot()
+# RecurrentFluProcess(p_max=1.0, a=5.0, scale=50.0).plot()
+# sys.exit(1)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# from pram.rule import NormalDistributionProcess
+# class ProcessN(NormalDistributionProcess):
+#     def apply(self, pop, group, iter, t):
+#         return None
+
+# ProcessN().plot()
+# ProcessN(p_max=1.0).plot()
+# sys.exit(1)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Generate data:
 
-# if os.path.isfile(fpath_db): os.remove(fpath_db)
-#
-# te = (
-#     TrajectoryEnsemble(fpath_db).
-#         add_trajectories([
-#             Trajectory(
-#                 sim=(Simulation().
-#                     add([
-#                         sir_a1,
-#                         # sir_b1,
-#                         # make_sir_b1_fixed_delay(iter0),
-#                         # make_sir_b1_random_delay(iter0),
-#                         # make_sir_b1_random_delay(),
-#                         # make_sir_b1_random_delay(iter0_dist=gamma(a=5.0, loc=50.0, scale=25.0)),
-#                         make_sir_b1_random_delay_gamma(),
-#                         RecurrentFluGammaProcess(p_max=gamma_proc_p_max),
-#                         Group(m=950, attr={ 'flu': 's' }),
-#                         Group(m= 50, attr={ 'flu': 'i' })
-#                     ])
-#                 )
-#             # ) for _ in range(1)
-#             # ) for iter0 in [900, 950, 1000, 1050, 1100]
-#             # ) for _ in range(5)
-#             ) for gamma_proc_p_max in uniform(loc=0.75, scale=0.20).rvs(10)
-#         ]).
-#         set_group_names([
-#             (0, 'S', Group.gen_hash(attr={ 'flu': 's' })),
-#             (1, 'I', Group.gen_hash(attr={ 'flu': 'i' })),
-#             (2, 'R', Group.gen_hash(attr={ 'flu': 'r' }))
-#         ]).
-#         run(4000)
-# )
+if os.path.isfile(fpath_db): os.remove(fpath_db)
+
+te = (
+    TrajectoryEnsemble(fpath_db).
+        add_trajectories([
+            Trajectory(
+                sim=(Simulation().
+                    add([
+                        sir_a1,
+                        # sir_b1,
+                        # make_sir_b1_fixed_delay(iter0),
+                        # make_sir_b1_random_delay(iter0),
+                        # make_sir_b1_random_delay(),
+                        # make_sir_b1_random_delay(iter0_dist=gamma(a=5.0, loc=50.0, scale=25.0)),
+                        make_sir_b1_random_delay_gamma(),
+
+                        RecurrentFluProcess(i=IterInt(2000,0), p_max=gamma_proc_p_max, a=5.0, scale=50.0),
+                        Group(m=950, attr={ 'flu': 's' }),
+                        Group(m= 50, attr={ 'flu': 'i' })
+                    ])
+                )
+            # ) for _ in range(5)
+            # ) for iter0 in [900, 950, 1000, 1050, 1100]
+            # ) for gamma_proc_p_max in uniform(loc=0.75, scale=0.20).rvs(1)
+            ) for gamma_proc_p_max in [1.00]
+        ]).
+        set_group_names([
+            (0, 'S', Group.gen_hash(attr={ 'flu': 's' })),
+            (1, 'I', Group.gen_hash(attr={ 'flu': 'i' })),
+            (2, 'R', Group.gen_hash(attr={ 'flu': 'r' }))
+        ]).
+        run(4000)
+)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Load data:
 
-te = TrajectoryEnsemble(fpath_db).stats()
+# te = TrajectoryEnsemble(fpath_db).stats()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
