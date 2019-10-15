@@ -48,7 +48,7 @@ def make_sir(beta, gamma, t=TimeAlways(), i=IterAlways(), dt=0.1):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# The actual SIR models used:
+# The actual SIR models used (model instances):
 
 sir_a = make_sir(0.10, 0.05, i=IterAlways(), dt=0.1)
 sir_b = make_sir(0.50, uniform(loc=0.01, scale=0.14).rvs(), i=IterInt(900 + gamma(a=5.0, loc=5.0, scale=25.0).rvs(), 0), dt=0.1)
@@ -69,36 +69,38 @@ class RecurrentFluProcess(GammaDistributionProcess):
 # ----------------------------------------------------------------------------------------------------------------------
 # Generate data:
 
-# if os.path.isfile(fpath_db): os.remove(fpath_db)
-#
-# te = (
-#     TrajectoryEnsemble(fpath_db).
-#         add_trajectories([
-#             Trajectory(
-#                 sim=(Simulation().
-#                     add([
-#                         sir_a,
-#                         sir_b,
-#                         RecurrentFluProcess(i=IterInt(2000,0), p_max=gamma_proc_p_max, a=5.0, scale=50.0),
-#                         Group(m=950, attr={ 'flu': 's' }),
-#                         Group(m= 50, attr={ 'flu': 'i' })
-#                     ])
-#                 )
-#             ) for gamma_proc_p_max in uniform(loc=0.75, scale=0.20).rvs(5)
-#         ]).
-#         set_group_names([
-#             (0, 'S', Group.gen_hash(attr={ 'flu': 's' })),
-#             (1, 'I', Group.gen_hash(attr={ 'flu': 'i' })),
-#             (2, 'R', Group.gen_hash(attr={ 'flu': 'r' }))
-#         ]).
-#         run(4000)
-# )
+if os.path.isfile(fpath_db): os.remove(fpath_db)
+
+te = (
+    TrajectoryEnsemble(fpath_db).
+        add_trajectories([
+            Trajectory(
+                sim=(Simulation().
+                    add([
+                        # make time interaction more clear
+                        # make making/running distinction more clear
+                        make_sir(0.10, 0.05, i=IterAlways(), dt=0.1),
+                        make_sir(0.50, uniform(loc=0.01, scale=0.14).rvs(), i=IterInt(900 + gamma(a=5.0, loc=5.0, scale=25.0).rvs(), 0), dt=0.1),
+                        RecurrentFluProcess(i=IterInt(2000,0), p_max=gamma_proc_p_max, a=5.0, scale=50.0),
+                        Group(m=950, attr={ 'flu': 's' }),
+                        Group(m= 50, attr={ 'flu': 'i' })
+                    ])
+                )
+            ) for gamma_proc_p_max in [None]  # uniform(loc=0.75, scale=0.20).rvs(5)
+        ]).
+        set_group_names([
+            (0, 'S', Group.gen_hash(attr={ 'flu': 's' })),
+            (1, 'I', Group.gen_hash(attr={ 'flu': 'i' })),
+            (2, 'R', Group.gen_hash(attr={ 'flu': 'r' }))
+        ]).
+        run(4000)
+)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Load data:
 
-te = TrajectoryEnsemble(fpath_db).stats()
+# te = TrajectoryEnsemble(fpath_db).stats()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -107,4 +109,4 @@ te = TrajectoryEnsemble(fpath_db).stats()
 def get_out_dir(filename): return os.path.join(os.path.dirname(__file__), 'out', filename)
 
 te.plot_mass_locus_line((1200,300), get_out_dir('_plot-line.png'), iter_range=(-1, -1), nsamples=0)
-te.plot_mass_locus_line_aggr((1200,300), get_out_dir('_plot-iqr.png'), iter_range=(-1, -1))
+# te.plot_mass_locus_line_aggr((1200,300), get_out_dir('_plot-iqr.png'), iter_range=(-1, -1))

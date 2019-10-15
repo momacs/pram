@@ -30,8 +30,7 @@ from .util   import Err, Time as TimeU
 
 # ----------------------------------------------------------------------------------------------------------------------
 @attrs(slots=True)
-class Time(object):
-    pass
+class Time(ABC): pass
 
 
 @attrs(slots=True)
@@ -52,8 +51,7 @@ class TimeInt(Time):
 
 # ----------------------------------------------------------------------------------------------------------------------
 @attrs(slots=True)
-class Iter(object):
-    pass
+class Iter(ABC): pass
 
 
 @attrs(slots=True)
@@ -70,6 +68,17 @@ class IterPoint(Iter):
 class IterInt(Iter):
     i0: int = attrib(default=  0, converter=int)
     i1: int = attrib(default=100, converter=int)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# class TimeCtrl(object):
+#     pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# class IterCtrl(object):
+#     def __init__(self, rule):
+#         self.rule = rule
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -97,12 +106,14 @@ class Rule(ABC):
         '''
 
         Err.type(t, 't', Time)
+        Err.type(i, 'i', Iter)
 
         self.name = name
-        self.t = t
-        self.i = i
         self.memo = memo
         self.name_human = name_human or name
+
+        self._set_t(t)
+        self._set_i(i)
 
         self.t_unit_ms = None  # set via set_t_unit() by the simulation every time it runs
         self.t_mul = 0.00      # ^
@@ -127,6 +138,32 @@ class Rule(ABC):
 
         if isinstance(self.t, TimeInt):
             return 'Rule  name: {:16}  t: ({:>4},{:>4})'.format(self.name, round(self.t.t0, 1), round(self.t.t1, 1))
+
+    def _set_i(self, i):
+        ii = isinstance
+        if ii(i, Iter):
+            self.i = i
+        elif i is None:
+            self.i = IterAlways()
+        elif ii(i, int):
+            self.i = Iter(i)
+        elif (ii(i, list) or ii(i, tuple) or ii(i, np.ndarray)) and len(i) == 2 and (ii(i[0], int) or ii(i[0], float)) and (ii(i[1], int) or ii(i[1], float)):
+            self.i = IterInt(round(max(0, i[0])), round(max(0, i[1])))  # 0 is the smallest sensible number; integers only
+        else:
+            raise ValueError("Wrong type of the argument 'i' specified.")
+
+    def _set_t(self, t):
+        ii = isinstance
+        if ii(t, Time):
+            self.t = t
+        elif i is None:
+            self.t = TimeAlways()
+        elif ii(t, int):
+            self.t = Time(t)
+        elif (ii(t, list) or ii(t, tuple)) and len(t) == 2 and (ii(t[0], int) or ii(t[0], float)) and (ii(t[1], int) or ii(t[1], float)):
+            self.t = TimeInt(round(max(0, t[0])), round(max(0, t[1])))  # 0 is the smallest sensible number; integers only
+        else:
+            raise ValueError("Wrong type of the argument 't' specified.")
 
     @abstractmethod
     def apply(self, pop, group, iter, t):
@@ -1185,48 +1222,6 @@ class BirthDeathProcess(MarkovProcess):
 
     def apply(self, pop, group, iter, t):
         return None
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-class SISModel(DiscreteInvMarkovChain):
-    '''
-    The SIS epidemiological model without vital dynamics.
-
-    Model parameters:
-        beta  - transmission rate
-        gamma - recovery rate
-
-
-    ----[ Notation A ]----
-
-    code:
-        SISModel('flu', 0.05, 0.10)
-    '''
-
-    def __init__(self, var, beta, gamma, name='sis-model', t=TimeAlways(), i=IterAlways(), memo=None):
-        super().__init__(var, { 's': [1 - beta, beta], 'i': [gamma, 1 - gamma] }, name, t, i, memo)
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-class SIRSModel(DiscreteInvMarkovChain):
-    '''
-    The SIR(S) epidemiological model without vital dynamics.
-
-    Model parameters:
-        beta  - transmission rate
-        gamma - recovery rate
-        alpha - immunity loss rate (alpha = 0 implies life-long immunity)
-
-
-    ----[ Notation A ]----
-
-    code:
-        SIRSModel('flu', 0.05, 0.20, 0.10)  # SIRS
-        SIRSModel('flu', 0.05, 0.20, 0.00)  # SIR
-    '''
-
-    def __init__(self, var, beta, gamma, alpha, name='sir-model', t=TimeAlways(), i=IterAlways(), memo=None):
-        super().__init__(var, { 's': [1 - beta, beta, 0.00], 'i': [0.00, 1 - gamma, gamma], 'r': [alpha, 0.00, 1 - alpha] }, name, t, i, memo)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

@@ -45,10 +45,10 @@ class Trajectory(object):
     basis.
     '''
 
-    def __init__(self, name=None, memo=None, sim=None, ensemble=None, id=None):
+    def __init__(self, sim=None, name=None, memo=None, ensemble=None, id=None):
+        self.sim  = sim
         self.name = name
         self.memo = memo
-        self.sim  = sim
         self.id   = id
         self.ens  = ensemble  # TrajectoryEnsemble that contains this object
 
@@ -301,6 +301,7 @@ class TrajectoryEnsemble(object):
         if not is_extant:
             with self.conn as c:
                 c.executescript(self.DDL)
+            self.is_db_empty = True
             print('New database initialized')
 
         # Database exists:
@@ -312,6 +313,7 @@ class TrajectoryEnsemble(object):
             if do_load_sims:
                 self.load_sims()
 
+            self.is_db_empty = False
             n_traj = self._db_get_one('SELECT COUNT(*) FROM traj', [])
             print(f'Using existing database (trajectories loaded: {n_traj})')
 
@@ -691,7 +693,7 @@ class TrajectoryEnsemble(object):
 
         return fig if do_ret_plot else self
 
-    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), traj=None, nsamples=0, do_ret_plot=False):
+    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), traj=None, nsamples=0, opacity_min=0.1, do_ret_plot=False):
         '''
         If 'traj' is not None, only that trajectory is plotted.  Otherwise, 'nsample' determines the number of
         trajectories plotted.  Specifically, if smaller than or equal to zero, all trajectories are plotted; otherwise,
@@ -712,7 +714,7 @@ class TrajectoryEnsemble(object):
             else:
                 traj_sample = random.sample(list(self.traj.values()), nsamples)
                 title = f'Trajectory Ensemble Mass Locus (Random Sample of {len(traj_sample)} from {len(self.traj)})'
-            opacity = max(0.25, 1.00 / len(traj_sample))
+            opacity = max(opacity_min, 1.00 / len(traj_sample))
 
         # iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [next(iter(traj_sample)).id])
         # title += f'Iterations {iter_range[0]+1} to {iter_range[1]+1})'
@@ -749,9 +751,9 @@ class TrajectoryEnsemble(object):
                     alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
                     alt.Y('m:Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
                     color=(
-                        alt.Color('grp:N', scale=alt.Scale(scheme='tableau10'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
+                        alt.Color('grp:N', scale=alt.Scale(scheme='set1'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
                         if ti == 0 else
-                        alt.Color('grp:N', scale=alt.Scale(scheme='tableau10'), sort=sort, legend=None)
+                        alt.Color('grp:N', scale=alt.Scale(scheme='set1'), sort=sort, legend=None)
                     )
                     # alt.Order('year(data):O')
                 )
@@ -810,7 +812,7 @@ class TrajectoryEnsemble(object):
             ).encode(
                 alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
                 alt.Y('mean(m):Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
-                alt.Color('grp:N', scale=alt.Scale(scheme='tableau10'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
+                alt.Color('grp:N', scale=alt.Scale(scheme='set1'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
             )
 
         plot_band = alt.Chart(  # https://altair-viz.github.io/user_guide/generated/core/altair.ErrorBandDef.html#altair.ErrorBandDef
@@ -819,7 +821,7 @@ class TrajectoryEnsemble(object):
             ).encode(
                 alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
                 alt.Y('mean(m):Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
-                alt.Color('grp:N', scale=alt.Scale(scheme='tableau10'), legend=None, sort=sort)
+                alt.Color('grp:N', scale=alt.Scale(scheme='set1'), legend=None, sort=sort)
             )
 
         plot = alt.layer(
@@ -1032,11 +1034,15 @@ class TrajectoryEnsemble(object):
         return self
 
     def run(self, iter_or_dur=1):
+        if iter_or_dur < 1:
+            return
+
         for i,t in enumerate(self.traj.values()):
             print(f'Running trajectory {i+1} of {len(self.traj)} (iter count: {iter_or_dur}): {t.name or "unnamed simulation"}')
             t.run(iter_or_dur)
 
         self.save_sims()
+        self.is_db_empty = False
         return self
 
     def save_sim(self, traj):

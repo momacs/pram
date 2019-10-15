@@ -400,11 +400,12 @@ from collections import namedtuple, Counter
 from dotmap      import DotMap
 from scipy.stats import gaussian_kde
 
-from .data   import GroupSizeProbe, Probe
-from .entity import Agent, Group, GroupQry, Site
-from .pop    import GroupPopulation
-from .rule   import Rule
-from .util   import Err, FS, Time
+from .data        import GroupSizeProbe, Probe
+from .entity      import Agent, Group, GroupQry, Site
+from .pop         import GroupPopulation
+from .rule        import Rule
+from .util        import Err, FS, Time
+from .model.model import Model
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1043,6 +1044,8 @@ class Simulation(object):
                     self.add_probe(i)
                 elif isinstance(i, Rule):
                     self.add_rule(i)
+                elif isinstance(i, Model):
+                    self.add_rule(i.rule)
                 elif isinstance(i, Site):
                     self.add_site(i)
             return self
@@ -1088,7 +1091,12 @@ class Simulation(object):
         if len(self.pop.groups) > 0:
             raise SimulationConstructionError('A rule is being added but groups already exist; rules need be added before groups.')
 
-        self.rules.append(rule)
+        elif isinstance(rule, Rule):
+            self.rules.append(rule)
+        elif isinstance(rule, Model):
+            self.add_rule(rule.rule)
+
+        # self.rules.append(rule)
         self.analysis.rule_static.analyze_rules(self.rules)  # keep the results of the static rule analysis current
 
         return self

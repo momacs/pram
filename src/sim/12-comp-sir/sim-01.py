@@ -153,10 +153,10 @@ class RecurrentFluProcess(GammaDistributionProcess):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# from pram.rule import NormalDistributionProcess
-# class ProcessN(NormalDistributionProcess):
-#     def apply(self, pop, group, iter, t):
-#         return None
+from pram.rule import NormalDistributionProcess
+class ProcessN(NormalDistributionProcess):
+    def apply(self, pop, group, iter, t):
+        return None
 
 # ProcessN().plot()
 # ProcessN(p_max=1.0).plot()
