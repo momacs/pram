@@ -76,12 +76,12 @@ if te.is_db_empty:  # generate simulation data if the trajectory ensemble databa
             (Simulation().
                 add([
                     SIRSModel('flu', beta=0.10, gamma=0.05, solver=MCSolver()),
-                    SIRSModel('flu', beta=0.50, gamma=U(0.01, 0.15), i=[5 + TN(0, 50, 5.0, 10.0), 0], solver=MCSolver()),
+                    SIRSModel('flu', beta=0.50, gamma=U(0.01, 0.15), i=[5 + TN(0,50,5,10), 0], solver=MCSolver()),
                     MakeSusceptibleProcess(i=[50,0], a=3.0, scale=flu_proc_scale),
                     Group(m=1000, attr={ 'flu': 's' })
                 ])
             )
-        ) for flu_proc_scale in U(1.0, 5.0, 3)
+        ) for flu_proc_scale in U(1,5, 3)
     ])
     te.set_group_names(group_names)
     te.run(120)
