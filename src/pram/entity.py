@@ -951,7 +951,7 @@ class Group(Entity):
         n     = at.get_pop_size()     #     population at current location
         n_qry = at.get_pop_size(qry)  # sub-population at current location
 
-        return float(n_qry) / float(n)
+        return float(n_qry) / float(n) if n > 0 else 0
 
     def get_rel(self, name=None):
         if name and self.rel_used is not None:
