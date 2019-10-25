@@ -146,7 +146,9 @@ class Rule(ABC):
         elif i is None:
             self.i = IterAlways()
         elif ii(i, int):
-            self.i = Iter(i)
+            self.i = IterPoint(i)
+        elif ii(i, float):
+            self.i = IterPoint(round(i))
         elif (ii(i, list) or ii(i, tuple) or ii(i, np.ndarray)) and len(i) == 2 and (ii(i[0], int) or ii(i[0], float)) and (ii(i[1], int) or ii(i[1], float)):
             self.i = IterInt(round(max(0, i[0])), round(max(0, i[1])))  # 0 is the smallest sensible number; integers only
         else:
@@ -156,10 +158,12 @@ class Rule(ABC):
         ii = isinstance
         if ii(t, Time):
             self.t = t
-        elif i is None:
+        elif t is None:
             self.t = TimeAlways()
         elif ii(t, int):
-            self.t = Time(t)
+            self.t = TimePoint(t)
+        elif ii(t, float):
+            self.t = TimePoint(round(t))
         elif (ii(t, list) or ii(t, tuple)) and len(t) == 2 and (ii(t[0], int) or ii(t[0], float)) and (ii(t[1], int) or ii(t[1], float)):
             self.t = TimeInt(round(max(0, t[0])), round(max(0, t[1])))  # 0 is the smallest sensible number; integers only
         else:
@@ -180,6 +184,11 @@ class Rule(ABC):
     @staticmethod
     def get_rand_name(name, prefix='__', rand_len=12):
         return f'{prefix}{name}_' + ''.join(random.sample(string.ascii_letters + string.digits, rand_len))
+
+    def get_inner_models(self):
+        ''' Must return an iterable (as implied by the plural "models"). '''
+
+        return []
 
     def is_applicable(self, group, iter, t):
         ''' Verifies if the rule is applicable to the group at the current iteration and current time. '''
@@ -207,6 +216,9 @@ class Rule(ABC):
             raise TypeError("Type '{}' used for specifying rule timing not yet implemented (Rule.is_applicable).".format(type(self.t).__name__))
 
         return is_i_ok and is_t_ok
+
+    def set_params(self):
+        pass
 
     def set_t_unit(self, ms):
         self.t_unit_ms = ms
@@ -531,6 +543,21 @@ class ODeltaESystem(Rule):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+class ODEDerivatives(ABC):
+    def __init__(self):
+        self.params = DotMap()
+
+    @abstractmethod
+    def get_fn(t, state):
+        pass
+
+    def set_params(self, **kwargs):
+        for (k,v) in kwargs.items():
+            if v is not None:
+                self.params[k] = v
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class ODESystem(Rule):
     '''
     Wraps a numeric integrator to solve a system of ordinary differential equations (ODEs) that do not interact with
@@ -567,13 +594,14 @@ class ODESystem(Rule):
     The above equations are called linearized equations or equations of first variation.
     '''
 
-    def __init__(self, f, y0, name='ode-system', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
+    def __init__(self, fn_deriv, y0, name='ode-system', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
         super().__init__(name, t, i, memo)
 
         self.y0 = y0  # initial condition
         self.dt = dt  # TODO: should change with the change in the timer
+        self.ni_name = ni_name
 
-        self.ni = ode(f).set_integrator(ni_name, method='bdf')  # numeric integrator
+        self.ni = ode(fn_deriv).set_integrator(self.ni_name, method='bdf')  # numeric integrator
         self.ni.set_initial_value(self.y0, 0)
 
         if f_params is not None:
@@ -606,6 +634,10 @@ class ODESystem(Rule):
 
         return [t,y]
 
+    def set_params(self, fn_deriv):
+        self.ni = ode(f).set_integrator(self.ni_name, method='bdf')
+        self.ni.set_initial_value(self.hist.y[-1], 0)  # TODO: Test this
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ODESystemAttr(Rule):
@@ -620,14 +652,14 @@ class ODESystemAttr(Rule):
         y0 - initial condition attributes (i.e., a list of group attribute names)
     '''
 
-    def __init__(self, f, y0, name='ode-system', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
+    def __init__(self, fn_deriv, y0, name='ode-system', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
         super().__init__(name, t, i, memo)
 
         self.y0 = y0
         self.y0_val = None  # initial condition
         self.dt = dt  # TODO: should change with the change in the timer
-
-        self.ni = ode(f).set_integrator(ni_name, method='bdf')  # numeric integrator
+        self.ni_name = ni_name
+        self.ni = ode(fn_deriv).set_integrator(ni_name, method='bdf')  # numeric integrator
         # self.ni.set_initial_value(self.y0, 0)
 
         if f_params is not None:
@@ -669,6 +701,9 @@ class ODESystemAttr(Rule):
     def is_applicable(self, group, iter, t):
         return super().is_applicable(group, iter, t) and group.ha(self.y0)
 
+    def set_params(self, fn_deriv):
+        self.ni = ode(f).set_integrator(self.ni_name, method='bdf')
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ODESystemMass(Rule):
@@ -689,14 +724,16 @@ class ODESystemMass(Rule):
         y0 - initial condition (i.e., a list of group attribute names)
     '''
 
-    def __init__(self, f, queries, name='ode-system-mass', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
+    def __init__(self, derivatives, queries, name='ode-system-mass', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
         super().__init__(name, t, i, memo)
 
+        self.derivatives = derivatives
         self.queries = queries
         self.y0_mass = None  # initial condition
         self.dt = dt  # TODO: should change with the change in the timer
+        self.ni_name = ni_name
 
-        self.ni = ode(f).set_integrator(ni_name, method='bdf')  # numeric integrator
+        self.ni = ode(self.derivatives.get_fn()).set_integrator(self.ni_name, method='bdf')  # numeric integrator
         # self.ni.set_initial_value(self.y0, 0)
 
         if f_params is not None:
@@ -757,6 +794,10 @@ class ODESystemMass(Rule):
 
     # def is_applicable(self, group, iter, t):
     #     return super().is_applicable(group, iter, t) and group.ha(self.y0)
+
+    def set_params(self, **kwargs):
+        self.derivatives.set_params(**kwargs)
+        self.ni = ode(self.derivatives.get_fn()).set_integrator(self.ni_name, method='bdf')
 
 
 # ----------------------------------------------------------------------------------------------------------------------

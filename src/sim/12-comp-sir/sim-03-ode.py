@@ -62,17 +62,18 @@ if not os.path.isfile(fpath_db):
                             SIRSModel('flu', beta=0.10, gamma=0.05, solver=ODESolver()),
                             SIRSModel('flu', beta=0.50, gamma=uniform(loc=0.01, scale=0.14).rvs(), i=IterInt(900 + truncnorm(0, 600, 100, 100.0).rvs(), 0), solver=ODESolver()),
                             FluProcess(i=IterInt(2000,0), p_max=None, a=5.0, scale=scale),
-                            Group(m=1000, attr={ 'flu': 's' })
+                            Group(m=950, attr={ 'flu': 's' }),
+                            Group(m= 50, attr={ 'flu': 'i' })
                         ])
                     )
-                ) for scale in uniform(loc=40.0, scale=60.0).rvs(3)
+                ) for scale in uniform(loc=40.0, scale=60.0).rvs(1)
             ]).
             set_group_names([
                 (0, 'S', Group.gen_hash(attr={ 'flu': 's' })),
                 (1, 'I', Group.gen_hash(attr={ 'flu': 'i' })),
                 (2, 'R', Group.gen_hash(attr={ 'flu': 'r' }))
             ]).
-            run(4000)
+            run(2000)
     )
 
 # Load the existing trajectory ensemble database:
@@ -81,4 +82,4 @@ else:
 
 # Visualize:
 te.plot_mass_locus_line((1200,300), get_out_fpath('_plot-line.png'), opacity_min=0.2)
-te.plot_mass_locus_line_aggr((1200,300), get_out_fpath('_plot-iqr.png'))
+# te.plot_mass_locus_line_aggr((1200,300), get_out_fpath('_plot-iqr.png'))

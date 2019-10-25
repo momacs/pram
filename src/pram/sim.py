@@ -1091,8 +1091,10 @@ class Simulation(object):
         if len(self.pop.groups) > 0:
             raise SimulationConstructionError('A rule is being added but groups already exist; rules need be added before groups.')
 
-        elif isinstance(rule, Rule):
-            self.rules.append(rule)
+        if isinstance(rule, Rule):
+            self.add_rules(rule.get_inner_models())
+            if rule not in self.rules:
+                self.rules.append(rule)
         elif isinstance(rule, Model):
             self.add_rule(rule.rule)
 

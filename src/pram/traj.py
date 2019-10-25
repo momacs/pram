@@ -263,7 +263,9 @@ class TrajectoryEnsemble(object):
         # CONSTRAINT fk__rule__traj FOREIGN KEY (traj_id) REFERENCES traj (id) ON UPDATE CASCADE ON DELETE CASCADE
         # );
 
-    def __init__(self, fpath_db=None, do_load_sims=True):
+    FLUSH_EVERY = 16  # frequency of flushing data to the database
+
+    def __init__(self, fpath_db=None, do_load_sims=True, flush_every=FLUSH_EVERY):
         self.traj = {}  # index by DB ID
         self.conn = None
         self.hosts = []  # hostnames of machines that will run trajectories
@@ -693,7 +695,7 @@ class TrajectoryEnsemble(object):
 
         return fig if do_ret_plot else self
 
-    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), traj=None, nsamples=0, opacity_min=0.1, do_ret_plot=False):
+    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), traj=None, nsamples=0, opacity_min=0.1, col_scheme='set1', do_ret_plot=False):
         '''
         If 'traj' is not None, only that trajectory is plotted.  Otherwise, 'nsample' determines the number of
         trajectories plotted.  Specifically, if smaller than or equal to zero, all trajectories are plotted; otherwise,
@@ -751,9 +753,9 @@ class TrajectoryEnsemble(object):
                     alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
                     alt.Y('m:Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
                     color=(
-                        alt.Color('grp:N', scale=alt.Scale(scheme='set1'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
+                        alt.Color('grp:N', scale=alt.Scale(scheme=col_scheme), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
                         if ti == 0 else
-                        alt.Color('grp:N', scale=alt.Scale(scheme='set1'), sort=sort, legend=None)
+                        alt.Color('grp:N', scale=alt.Scale(scheme=col_scheme), sort=sort, legend=None)
                     )
                     # alt.Order('year(data):O')
                 )
@@ -775,7 +777,7 @@ class TrajectoryEnsemble(object):
 
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_line_aggr(self, size, filepath, iter_range=(-1, -1), band_type='iqr', do_ret_plot=False):
+    def plot_mass_locus_line_aggr(self, size, filepath, iter_range=(-1, -1), band_type='iqr', col_scheme='set1', do_ret_plot=False):
         '''
         Ordering the legend of a composite chart
             https://stackoverflow.com/questions/55783286/control-legend-color-and-order-when-joining-two-charts-in-altair
@@ -812,7 +814,7 @@ class TrajectoryEnsemble(object):
             ).encode(
                 alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
                 alt.Y('mean(m):Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
-                alt.Color('grp:N', scale=alt.Scale(scheme='set1'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
+                alt.Color('grp:N', scale=alt.Scale(scheme=col_scheme), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
             )
 
         plot_band = alt.Chart(  # https://altair-viz.github.io/user_guide/generated/core/altair.ErrorBandDef.html#altair.ErrorBandDef
@@ -821,7 +823,7 @@ class TrajectoryEnsemble(object):
             ).encode(
                 alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
                 alt.Y('mean(m):Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
-                alt.Color('grp:N', scale=alt.Scale(scheme='set1'), legend=None, sort=sort)
+                alt.Color('grp:N', scale=alt.Scale(scheme=col_scheme), legend=None, sort=sort)
             )
 
         plot = alt.layer(
