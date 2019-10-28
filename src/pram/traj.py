@@ -402,7 +402,10 @@ class TrajectoryEnsemble(object):
 
         agent = { 'attr': {}, 'rel': {} }
         with self.conn as c:
-            n_iter = max(0, min(n_iter, self._db_get_one('SELECT MAX(i) FROM iter WHERE traj_id = ?', [traj.id])))
+            if n_iter <= -1:
+                n_iter = self._db_get_one('SELECT MAX(i) FROM iter WHERE traj_id = ?', [traj.id])
+            else:
+                n_iter = max(0, min(n_iter, self._db_get_one('SELECT MAX(i) FROM iter WHERE traj_id = ?', [traj.id])))
 
             for i in range(-1, n_iter):
                 if i == -1:  # setting the initial group
