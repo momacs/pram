@@ -222,6 +222,10 @@ class GroupPopulation(object):
         '''
         Transfers the mass as described by the list of "destination" groups.  "Source" groups (i.e., those that
         participate in mass transfer) have their masses reset before the most-transfer mass is tallied up.
+
+        Because this method is called only once per simulation iteration, it is a good place to put
+        simulation-wide computations that should happen after the iteration-specific computations have
+        been completed (e.g., the entirety of mass transfer has been figured out).
         '''
 
         m_flow_tot = 0  # total mass transfered

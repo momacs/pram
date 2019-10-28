@@ -117,7 +117,7 @@ import sobi
 
 te = TrajectoryEnsemble(fpath_db).stats()
 signal = te.traj[1].get_signal()
-s = signal.S
+s = signal.series
 
 
 # signal.plot_autocorr((16,6), filename=None)
@@ -200,5 +200,5 @@ print(entropy.sample_entropy(s[0], order=2, metric='chebyshev'))           # Sam
 
 fpath_db = os.path.join(os.path.dirname(__file__), 'data', '06-sir-gamma-beta.sqlite3')
 te = TrajectoryEnsemble(fpath_db).stats()
-s = te.traj[1].get_signal().S
+s = te.traj[1].get_signal().series
 print(entropy.app_entropy(s[0], order=2, metric='chebyshev'))              # Approximate entropy

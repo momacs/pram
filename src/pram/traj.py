@@ -79,6 +79,14 @@ class Trajectory(object):
         self.rem_mass_graph()
         return self
 
+    def gen_agent(self, n_iter=-1):
+        self._check_ens()
+        return self.ens.gen_agent(self, n_iter)
+
+    def gen_agent_pop(self, n_agents=1, n_iter=-1):
+        self._check_ens()
+        return self.ens.gen_agent_pop(self, n_agents, n_iter)
+
     def gen_mass_graph(self):
         self._check_ens()
         if self.mass_graph is None:
@@ -380,6 +388,53 @@ class TrajectoryEnsemble(object):
         for t in self.traj:
             t.compact()
         return self
+
+    def gen_agent(self, traj, n_iter=-1):
+        '''
+        Step 1 : Pick the agent's initial group taking into account the initial mass distribution among the groups
+        Step 2+: Pick the next group taking into account transition probabilities to all possible groups
+
+        Because step 1 always takes place, the resulting list of agent's states will be of size 'n_iter + 1'.
+        '''
+
+        agent = { 'attr': {}, 'rel': {} }
+        with self.conn as c:
+            n_iter = max(0, min(n_iter, self._db_get_one('SELECT MAX(i) FROM iter WHERE traj_id = ?', [traj.id])))
+
+            # Set the initial group:
+            groups = list(zip(*[[r[0], round(r[1],2)] for r in c.execute('SELECT g.id, g.m_p FROM grp g INNER JOIN iter i ON i.id = g.iter_id WHERE i.traj_id = ? AND i.i = ?', [traj.id, -1])]))
+            grp_id = random.choices(groups[0], groups[1])[0]
+            grp_attr = DB.blob2obj(self._db_get_one('SELECT attr FROM grp WHERE id = ?', [grp_id]))
+            grp_rel  = DB.blob2obj(self._db_get_one('SELECT rel  FROM grp WHERE id = ?', [grp_id]))
+            for (k,v) in grp_attr.items():
+                agent['attr'][k] = [None] + [None] * n_iter
+                agent['attr'][k][0] = v
+                # agent['attr'][k] = np.chararray((1, n_iter + 1))
+                # agent['attr'][k][0,i+1] = v
+            for (k,v) in grp_rel.items():
+                agent['rel'][k] = [None] + [None] * n_iter
+                agent['rel'][k][0] = v
+
+            # Generate a sequence of group transitions:
+            for i in range(n_iter):
+                flow = list(zip(*[[r[0], round(r[1],2)] for r in c.execute('SELECT g_dst.id, mf.m_p FROM mass_flow mf INNER JOIN iter i ON i.id = mf.iter_id INNER JOIN grp g_src ON g_src.id = mf.grp_src_id INNER JOIN grp g_dst ON g_dst.id = mf.grp_dst_id WHERE i.traj_id = ? AND i.i = ? AND g_src.id = ?', [traj.id, i, grp_id])]))
+                if sum(flow[1]) > 0:  # prevent errors when the sum is zero
+                    grp_id = random.choices(flow[0], flow[1])[0]
+                grp_attr = DB.blob2obj(self._db_get_one('SELECT attr FROM grp WHERE id = ?', [grp_id]))
+                grp_rel  = DB.blob2obj(self._db_get_one('SELECT rel  FROM grp WHERE id = ?', [grp_id]))
+                for (k,v) in grp_attr.items():
+                    if agent['attr'][k] is None:
+                        agent['attr'][k] = [None] + [None] * n_iter
+                    agent['attr'][k][i+1] = v
+                for (k,v) in grp_rel.items():
+                    if agent['rel'][k] is None:
+                        agent['rel'][k] = [None] + [None] * n_iter
+                    agent['rel'][k][0] = v
+
+        return agent
+
+    def gen_agent_pop(self, traj, n_agents=1, n_iter=-1):
+        return [self.gen_agent(traj, n_iter) for _ in range(n_agents)]
 
     def gen_mass_graph(self, traj):
         g = MassGraph()
