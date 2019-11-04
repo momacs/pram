@@ -889,7 +889,7 @@ class TrajectoryEnsemble(object):
         ).resolve_scale(
             color='independent'
         ).save(
-            filepath, scale_factor=2.0, webdriver='chrome'
+            filepath, scale_factor=2.0, webdriver='firefox'
         )
 
         return plot if do_ret_plot else self
@@ -954,7 +954,7 @@ class TrajectoryEnsemble(object):
         ).resolve_scale(
             color='independent'
         ).save(
-            filepath, scale_factor=2.0, webdriver='chrome'
+            filepath, scale_factor=2.0, webdriver='firefox'
         )
 
         return plot if do_ret_plot else self
