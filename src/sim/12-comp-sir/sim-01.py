@@ -170,6 +170,7 @@ if os.path.isfile(fpath_db): os.remove(fpath_db)
 
 te = (
     TrajectoryEnsemble(fpath_db).
+        set_pragma_memoize_group_ids(True).
         add_trajectories([
             Trajectory(
                 sim=(Simulation().

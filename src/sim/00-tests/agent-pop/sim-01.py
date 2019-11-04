@@ -53,7 +53,7 @@ if te.is_db_empty:
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-te.traj[1].plot_mass_locus_line((1200,300), get_out_fpath('sim-01.png'))
+# te.traj[1].plot_mass_locus_line((1200,300), get_out_fpath('sim-01.png'))
 
 print(te.traj[1].gen_agent(4))        # four-iteration simulation
 print(te.traj[1].gen_agent_pop(2,3))  # two-agent population simulated for three iterations

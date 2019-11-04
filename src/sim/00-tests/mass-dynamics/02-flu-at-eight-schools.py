@@ -97,8 +97,8 @@ s = (Simulation().
 def get_out_dir(filename):
     return os.path.join(os.path.dirname(__file__), 'out', filename)
 
-te = TrajectoryEnsemble().add_trajectory(Trajectory('flu-at-eight-schools', None, s)).run(100)
+te = TrajectoryEnsemble().add_trajectory(Trajectory(s)).run(100)
 
-# te.traj[1].plot_mass_flow_time_series(filepath=get_out_dir('_plot.png'), iter_range=(-1,10), v_prop=False, e_prop=True)
-te.traj[1].plot_mass_locus_streamgraph((1200,600), get_out_dir('_plot.png'))
-# te.traj[1].plot_heatmap((800,800), get_out_dir('_plot.png'), (-1,20))
+# te.traj[1].plot_mass_flow_time_series(filepath=get_out_dir('_plot-ts.png'), iter_range=(-1,10), v_prop=False, e_prop=True)
+te.traj[1].plot_mass_locus_streamgraph((1200,300), get_out_dir('_plot-steam.png'))
+# te.traj[1].plot_heatmap((800,800), get_out_dir('_plot-heatmap.png'), (-1,20))

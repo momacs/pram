@@ -1035,34 +1035,34 @@ class Group(Entity):
         full functionality of the Group class to any function that uses the result of the present method.
         '''
 
-        groups = []  # split result (i.e., new groups)
-        p_sum = 0.0
-        n_sum = 0.0
+        groups = []  # split result (i.e., new groups; note that those groups may already exist in the simulation)
+        p_sum = 0.0  # sum of split proportions (being probabilities, they must sum up to 1)
+        m_sum = 0.0  # sum of total mass redistributed via group splitting
 
         for (i,s) in enumerate(specs):
             if i == len(specs) - 1:  # last group spec
                 p = 1 - p_sum        # complement the probability
-                n = self.m - n_sum   # make sure we're not missing anybody due to floating-point arithmetic
+                m = self.m - m_sum   # make sure we're not missing anybody due to floating-point arithmetic
             else:
                 p = s.p
-                n = self.m * p
-                # n = math.floor(self.m * p)  # conservative floor() use to make sure we don't go over due to rounding
+                m = self.m * p
+                # m = math.floor(self.m * p)  # conservative floor() use to make sure we don't go over due to rounding
 
             p_sum += p
-            n_sum += n
+            m_sum += m
 
-            if n == 0:  # preventing instantiating empty groups
+            if m == 0:  # preventing instantiating empty groups
                 continue
 
             attr = Group.gen_dict(self.attr, s.attr_set, s.attr_del)
             rel  = Group.gen_dict(self.rel,  s.rel_set,  s.rel_del)
 
-            # g = Group('{}.{}'.format(self.name, i), n, attr, rel)
+            # g = Group('{}.{}'.format(self.name, i), m, attr, rel)
             # if g == self:
             #     g.name = self.name
             # groups.append(g)
 
-            groups.append(Group(None, n, attr, rel))  # do not use group name any more
+            groups.append(Group(None, m, attr, rel))  # None means we do not use group names any more
 
             if p_sum == 1.0:  # the remaining split specs must have p=0 so we might as well skip them
                 break

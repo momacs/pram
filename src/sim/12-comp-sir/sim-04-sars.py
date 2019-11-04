@@ -69,35 +69,27 @@ class SARSQuarantineIntervention(Intervention):  # extends the Intervention prim
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Delete the trajectory ensemble database:
 if os.path.isfile(fpath_db): os.remove(fpath_db)
 
-# Generate a trajectory ensemble database:
-if not os.path.isfile(fpath_db):
-    te = (
-        TrajectoryEnsemble(fpath_db).
-            add_trajectories([
-                Trajectory(
-                    (Simulation().
-                        add([
-                            SARSQuarantineIntervention(
-                                SEQIHRModel('sars', beta=0.80, alpha_n=0.75, alpha_q=0.40, delta_n=0.01, delta_i=0.03, mu=0.01, chi=0.01, phi=0.20, rho=0.75, solver=ODESolver()),
-                                chi=0.99,
-                                i=intervention_onset
-                            ),
-                            Group(m=950, attr={ 'sars': 's' }),
-                            Group(m= 50, attr={ 'sars': 'e' })
-                        ])
-                    )
-                ) for intervention_onset in TN(30,120, 75,100, 1)  # a 10-trajectory ensemble
-            ]).
-            set_group_names(group_names).
-            run(400)
-    )
+te = TrajectoryEnsemble(fpath_db)
 
-# Load the existing trajectory ensemble database:
-else:
-    te = TrajectoryEnsemble(fpath_db)
+if te.is_db_empty:  # generate simulation data if the trajectory ensemble database is empty
+    te.set_pragma_memoize_group_ids(True)
+    te.add_trajectories([
+        (Simulation().
+            add([
+                SARSQuarantineIntervention(
+                    SEQIHRModel('sars', beta=0.80, alpha_n=0.75, alpha_q=0.40, delta_n=0.01, delta_i=0.03, mu=0.01, chi=0.01, phi=0.20, rho=0.75, solver=ODESolver()),
+                    chi=0.99,
+                    i=intervention_onset
+                ),
+                Group(m=950, attr={ 'sars': 's' }),
+                Group(m= 50, attr={ 'sars': 'e' })
+            ])
+        ) for intervention_onset in TN(30,120, 75,100, 1)  # a 10-trajectory ensemble
+    ])
+    te.set_group_names(group_names)
+    te.run(400)
 
 # Visualize:
 te.plot_mass_locus_line     ((1200,300), get_out_fpath('_plot-line.png'), col_scheme='tableau10', opacity_min=0.2)

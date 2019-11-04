@@ -15,12 +15,14 @@ import os
 import random
 import sqlite3
 
+from dotmap              import DotMap
 from pyrqa.neighbourhood import FixedRadius
-from scipy.fftpack import fft
-from scipy         import signal
+from scipy.fftpack       import fft
+from scipy               import signal
 
 from .graph  import MassGraph
 from .signal import Signal
+from .sim    import Simulation
 from .util   import DB
 
 
@@ -229,16 +231,15 @@ class TrajectoryEnsemble(object):
         CONSTRAINT fk__iter__traj FOREIGN KEY (traj_id) REFERENCES traj (id) ON UPDATE CASCADE ON DELETE CASCADE
         );
 
-        CREATE TABLE grp (
+        CREATE TABLE mass_locus (
         id      INTEGER PRIMARY KEY AUTOINCREMENT,
         iter_id INTEGER,
-        hash    TEXT NOT NULL,
+        grp_id  INTEGER,
         m       REAL NOT NULL,
         m_p     REAL NOT NULL,
-        attr    BLOB,
-        rel     BLOB,
-        UNIQUE (iter_id, hash),
-        CONSTRAINT fk__grp__iter FOREIGN KEY (iter_id) REFERENCES iter (id) ON UPDATE CASCADE ON DELETE CASCADE
+        UNIQUE (iter_id, grp_id),
+        CONSTRAINT fk__mass_locus__iter FOREIGN KEY (iter_id) REFERENCES iter (id) ON UPDATE CASCADE ON DELETE CASCADE,
+        CONSTRAINT fk__mass_locus__grp  FOREIGN KEY (grp_id)  REFERENCES grp  (id) ON UPDATE CASCADE ON DELETE CASCADE
         );
 
         CREATE TABLE mass_flow (
@@ -253,6 +254,13 @@ class TrajectoryEnsemble(object):
         CONSTRAINT fk__mass_flow__grp_dst FOREIGN KEY (grp_dst_id) REFERENCES grp  (id) ON UPDATE CASCADE ON DELETE CASCADE
         );
 
+        CREATE TABLE grp (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        hash    TEXT NOT NULL UNIQUE,
+        attr    BLOB,
+        rel     BLOB
+        );
+
         CREATE TABLE grp_name (
         id   INTEGER PRIMARY KEY AUTOINCREMENT,
         ord  INTEGER,
@@ -260,6 +268,20 @@ class TrajectoryEnsemble(object):
         name TEXT NOT NULL
         );
         '''
+
+        # Add indices in case PostgreSQL was to be used (i.e., an actual production env)
+
+        # CREATE TABLE grp (
+        # id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        # iter_id INTEGER,
+        # hash    TEXT NOT NULL,
+        # m       REAL NOT NULL,
+        # m_p     REAL NOT NULL,
+        # attr    BLOB,
+        # rel     BLOB,
+        # UNIQUE (iter_id, hash),
+        # CONSTRAINT fk__grp__iter FOREIGN KEY (iter_id) REFERENCES iter (id) ON UPDATE CASCADE ON DELETE CASCADE
+        # );
 
         # CREATE TABLE rule (
         # id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -277,6 +299,14 @@ class TrajectoryEnsemble(object):
         self.traj = {}  # index by DB ID
         self.conn = None
         self.hosts = []  # hostnames of machines that will run trajectories
+
+        self.pragma = DotMap(
+            memoize_group_ids = False  # keep group hash-to-db-id map in memory (faster but increases memory utilization)
+        )
+
+        self.cache = DotMap(
+            group_hash_to_id = {}
+        )
 
         self._db_conn_open(fpath_db, do_load_sims)
 
@@ -366,7 +396,14 @@ class TrajectoryEnsemble(object):
         return self
 
     def add_trajectory(self, t):
-        if self._db_get_one('SELECT COUNT(*) FROM traj WHERE name = ?', [t.name]) > 0:
+        '''
+        For convenience, 't' can be either a Trajectory class instance of a Simulation class instance.  In the latter
+        case, a Trajectory object will automatically be created with the default values.
+        '''
+
+        if isinstance(t, Simulation):
+            t = Trajectory(t)
+        elif t.name is not None and self._db_get_one('SELECT COUNT(*) FROM traj WHERE name = ?', [t.name]) > 0:
             return print(f'A trajectory with the name specified already exists: {t.name}')
 
         with self.conn as c:
@@ -394,8 +431,10 @@ class TrajectoryEnsemble(object):
         Generate a single agent's group transition path based on population-level mass dynamics that a PRAM simulation
         operates on.
 
-        Step 1 : Pick the agent's initial group taking into account the initial mass distribution among the groups
-        Step 2+: Pick the next group taking into account transition probabilities to all possible next groups
+        This is a two-step process:
+
+        (1)  Pick the agent's initial group taking into account the initial mass distribution among the groups
+        (2+) Pick the next group taking into account transition probabilities to all possible next groups
 
         Because step 1 always takes place, the resulting list of agent's states will be of size 'n_iter + 1'.
         '''
@@ -408,9 +447,9 @@ class TrajectoryEnsemble(object):
                 n_iter = max(0, min(n_iter, self._db_get_one('SELECT MAX(i) FROM iter WHERE traj_id = ?', [traj.id])))
 
             for i in range(-1, n_iter):
-                if i == -1:  # setting the initial group
+                if i == -1:  # (1) setting the initial group
                     groups = list(zip(*[[r[0], round(r[1],2)] for r in c.execute('SELECT g.id, g.m_p FROM grp g INNER JOIN iter i ON i.id = g.iter_id WHERE i.traj_id = ? AND i.i = ?', [traj.id, -1])]))
-                else:  # generating a sequence of group transitions
+                else:  # (2) generating a sequence of group transitions
                     groups = list(zip(*[[r[0], round(r[1],2)] for r in c.execute('SELECT g_dst.id, mf.m_p FROM mass_flow mf INNER JOIN iter i ON i.id = mf.iter_id INNER JOIN grp g_src ON g_src.id = mf.grp_src_id INNER JOIN grp g_dst ON g_dst.id = mf.grp_dst_id WHERE i.traj_id = ? AND i.i = ? AND g_src.id = ?', [traj.id, i, grp_id])]))
 
                 if sum(groups[1]) > 0:  # prevents errors when the sum is zero (should always be True for the 1st iter)
@@ -434,7 +473,12 @@ class TrajectoryEnsemble(object):
         with self.conn as c:
             # Groups (vertices):
             for i in range(-1, n_iter + 1):
-                for r in c.execute('SELECT g.hash, g.m, g.m_p FROM grp g INNER JOIN iter i ON i.id = g.iter_id WHERE i.traj_id = ? AND i.i = ? ORDER BY g.id', [traj.id, i]):
+                for r in c.execute('''
+                        SELECT g.hash, ml.m, ml.m_p FROM grp g
+                        INNER JOIN mass_locus ml ON ml.grp_id = g.id
+                        INNER JOIN iter i ON i.id = ml.iter_id
+                        WHERE i.traj_id = ? AND i.i = ?
+                        ORDER BY g.id''', [traj.id, i]):
                     g.add_group(i, r['hash'], r['m'], r['m_p'])
 
             # Mass flow (edges):
@@ -460,7 +504,8 @@ class TrajectoryEnsemble(object):
         n_iter_max = self._db_get_one('''
             SELECT MAX(n_iter) AS n_iter FROM (
             SELECT g.hash, COUNT(*) AS n_iter FROM grp g
-            INNER JOIN iter i ON i.id = g.iter_id
+            INNER JOIN mass_locus ml ON ml.grp_id = g.id
+            INNER JOIN iter i ON i.id = ml.iter_id
             INNER JOIN traj t ON t.id = i.traj_id
             WHERE t.id = ?
             GROUP BY g.hash
@@ -474,12 +519,12 @@ class TrajectoryEnsemble(object):
             s = np.full([1, n_iter_max], np.nan)  # account for missing values in the signal series
             for iter in self.conn.execute(f'''
                     SELECT i.i + 1 AS i, g.{y} AS y FROM grp g
-                    INNER JOIN iter i ON i.id = g.iter_id
+                    INNER JOIN mass_locus ml ON ml.grp_id = g.id
+                    INNER JOIN iter i ON i.id = ml.iter_id
                     INNER JOIN traj t ON t.id = i.traj_id
                     LEFT JOIN grp_name gn ON gn.hash = g.hash
                     WHERE t.id = ? AND g.hash = ?
-                    ORDER BY gn.ord, g.hash, i.i
-                    ''', [traj.id, g['hash']]).fetchall():
+                    ORDER BY gn.ord, g.hash, i.i''', [traj.id, g['hash']]).fetchall():
                 s[0,iter['i']] = iter['y']
             signal.add_series(s, g['name'] or g['hash'])
 
@@ -574,13 +619,21 @@ class TrajectoryEnsemble(object):
 
             # (1.2) Construct time-domain data bundle:
             for r in c.execute('''
-                    SELECT COALESCE(gn.name, g.hash) AS grp, g.m
+                    SELECT i.i, ml.m, COALESCE(gn.name, g.hash) AS name
                     FROM grp g
-                    INNER JOIN iter i ON i.id = g.iter_id
+                    INNER JOIN mass_locus ml ON g.id = ml.grp_id
+                    INNER JOIN iter i ON i.id = ml.iter_id
+                    INNER JOIN traj t ON t.id = i.traj_id
                     LEFT JOIN grp_name gn ON gn.hash = g.hash
                     WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
-                    ORDER BY gn.ord, g.id''',
-                    [traj.id, iter_range[0], iter_range[1]]):
+                    ORDER BY gn.ord, g.id''', [traj.id, iter_range[0], iter_range[1]]):
+                    # SELECT COALESCE(gn.name, g.hash) AS grp, g.m
+                    # FROM grp g
+                    # INNER JOIN iter i ON i.id = g.iter_id
+                    # LEFT JOIN grp_name gn ON gn.hash = g.hash
+                    # WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
+                    # ORDER BY gn.ord, g.id''',
+                    # [traj.id, iter_range[0], iter_range[1]]):
                 if data['td'].get(r['grp']) is None:
                     data['td'][r['grp']] = []
                 data['td'][r['grp']].append(r['m'])
@@ -650,13 +703,21 @@ class TrajectoryEnsemble(object):
 
             # (1.2) Construct time-domain data bundle:
             for r in c.execute('''
-                    SELECT COALESCE(gn.name, g.hash) AS grp, g.m
+                    SELECT i.i, ml.m, COALESCE(gn.name, g.hash) AS name
                     FROM grp g
-                    INNER JOIN iter i ON i.id = g.iter_id
+                    INNER JOIN mass_locus ml ON g.id = ml.grp_id
+                    INNER JOIN iter i ON i.id = ml.iter_id
+                    INNER JOIN traj t ON t.id = i.traj_id
                     LEFT JOIN grp_name gn ON gn.hash = g.hash
                     WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
-                    ORDER BY gn.ord, g.id''',
-                    [traj.id, iter_range[0], iter_range[1]]):
+                    ORDER BY gn.ord, g.id''', [traj.id, iter_range[0], iter_range[1]]):
+                    # SELECT COALESCE(gn.name, g.hash) AS grp, g.m
+                    # FROM grp g
+                    # INNER JOIN iter i ON i.id = g.iter_id
+                    # LEFT JOIN grp_name gn ON gn.hash = g.hash
+                    # WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
+                    # ORDER BY gn.ord, g.id''',
+                    # [traj.id, iter_range[0], iter_range[1]]):
                 if data['td'].get(r['grp']) is None:
                     data['td'][r['grp']] = []
                 data['td'][r['grp']].append(r['m'])
@@ -709,13 +770,21 @@ class TrajectoryEnsemble(object):
 
             # (1.2) Construct time-domain data bundle:
             for r in c.execute('''
-                    SELECT COALESCE(gn.name, g.hash) AS grp, g.m
+                    SELECT i.i, ml.m, COALESCE(gn.name, g.hash) AS name
                     FROM grp g
-                    INNER JOIN iter i ON i.id = g.iter_id
+                    INNER JOIN mass_locus ml ON g.id = ml.grp_id
+                    INNER JOIN iter i ON i.id = ml.iter_id
+                    INNER JOIN traj t ON t.id = i.traj_id
                     LEFT JOIN grp_name gn ON gn.hash = g.hash
                     WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
-                    ORDER BY gn.ord, g.id''',
-                    [traj.id, iter_range[0], iter_range[1]]):
+                    ORDER BY i.i, gn.ord''', [traj.id, iter_range[0], iter_range[1]]):
+                    # SELECT COALESCE(gn.name, g.hash) AS grp, g.m
+                    # FROM grp g
+                    # INNER JOIN iter i ON i.id = g.iter_id
+                    # LEFT JOIN grp_name gn ON gn.hash = g.hash
+                    # WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
+                    # ORDER BY gn.ord, g.id''',
+                    # [traj.id, iter_range[0], iter_range[1]]):
                 if data['td'].get(r['grp']) is None:
                     data['td'][r['grp']] = []
                 data['td'][r['grp']].append(r['m'])
@@ -782,12 +851,13 @@ class TrajectoryEnsemble(object):
             data = []
             with self.conn as c:
                 for r in c.execute('''
-                        SELECT i.i, g.m, COALESCE(gn.name, g.hash) AS name
+                        SELECT i.i, ml.m, COALESCE(gn.name, g.hash) AS name
                         FROM grp g
-                        INNER JOIN iter i ON i.id = g.iter_id
+                        INNER JOIN mass_locus ml ON g.id = ml.grp_id
+                        INNER JOIN iter i ON i.id = ml.iter_id
                         LEFT JOIN grp_name gn ON gn.hash = g.hash
                         WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
-                        ORDER BY i.i''', [t.id, iter_range[0], iter_range[1]]):
+                        ORDER BY i.i, gn.ord''', [t.id, iter_range[0], iter_range[1]]):
                     data.append({ 'i': r['i'] + 1, 'm': r['m'], 'grp': r['name'] })
 
             # (3.3) Plot the trajectory:
@@ -845,9 +915,10 @@ class TrajectoryEnsemble(object):
         data = []
         with self.conn as c:
             for r in c.execute('''
-                    SELECT i.i, g.m, COALESCE(gn.name, g.hash) AS name
+                    SELECT i.i, ml.m, COALESCE(gn.name, g.hash) AS name
                     FROM grp g
-                    INNER JOIN iter i ON i.id = g.iter_id
+                    INNER JOIN mass_locus ml ON g.id = ml.grp_id
+                    INNER JOIN iter i ON i.id = ml.iter_id
                     INNER JOIN traj t ON t.id = i.traj_id
                     LEFT JOIN grp_name gn ON gn.hash = g.hash
                     WHERE i.i BETWEEN ? AND ?
@@ -992,21 +1063,20 @@ class TrajectoryEnsemble(object):
             # (1.2) Determine max mass sum:
             m_max = self._db_get_one('''
                 SELECT ROUND(MAX(m_sum),4) FROM (
-                SELECT SUM(m) AS m_sum FROM grp g INNER JOIN iter i on i.id = g.iter_id WHERE i.traj_id = ? GROUP BY g.iter_id
-                )''',
-                [traj.id]
-            )  # without rounding, weird-ass max values can appear due to inexact floating-point arithmetic (four decimals is arbitrary)
+                SELECT SUM(m) AS m_sum FROM mass_locus ml INNER JOIN iter i on i.id = ml.iter_id WHERE i.traj_id = ? GROUP BY ml.iter_id
+                )''', [traj.id]
+            )  # without rounding, weird-ass max values can appear due to inexact floating-point arithmetic (four decimals is arbitrary though)
 
             # (1.3) Construct the data bundle:
             for r in c.execute('''
-                    SELECT COALESCE(gn.name, g.hash) AS grp, g.m, i.i
-                    FROM grp g
-                    INNER JOIN iter i ON i.id = g.iter_id
+                    SELECT i.i, ml.m, COALESCE(gn.name, g.hash) AS name FROM grp g
+                    INNER JOIN mass_locus ml ON g.id = ml.grp_id
+                    INNER JOIN iter i ON i.id = ml.iter_id
+                    INNER JOIN traj t ON t.id = i.traj_id
                     LEFT JOIN grp_name gn ON gn.hash = g.hash
                     WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
-                    ORDER BY i.i, gn.ord, g.id''',
-                    [traj.id, iter_range[0], iter_range[1]]):
-                data.append({ 'grp': r['grp'], 'i': r['i'] + 1, 'm': r['m'] })
+                    ORDER BY i.i, gn.ord, g.id''', [traj.id, iter_range[0], iter_range[1]]):
+                data.append({ 'grp': r['name'], 'i': r['i'] + 1, 'm': r['m'] })
 
             # (1.4) Group sorting (needs to be done here due to Altair's peculiarities):
             if do_sort:
@@ -1082,7 +1152,7 @@ class TrajectoryEnsemble(object):
 
         return self
 
-    def run(self, iter_or_dur=1):
+    def run(self, iter_or_dur=1, do_memoize_group_ids=False):
         if iter_or_dur < 1:
             return
 
@@ -1119,7 +1189,8 @@ class TrajectoryEnsemble(object):
 
         with self.conn as c:
             iter_id = self.save_iter(traj, c)
-            self.save_groups(traj, iter_id, c)
+            # self.save_groups(traj, iter_id, c)
+            self.save_mass_locus(traj, iter_id, c)
             self.save_mass_flow(traj, iter_id, mass_flow_specs, c)
 
         return self
@@ -1157,8 +1228,8 @@ class TrajectoryEnsemble(object):
 
     def save_mass_flow(self, traj, iter_id, mass_flow_specs, conn):
         '''
-        Inserts the mass flow among all groups for the given iteration and trajectory.  No mass flow is present for the
-        initial state of a simulation.
+        Inserts the mass flow among all groups for the given iteration and trajectory.  Mass flow is present for all
+        but the initial state of a simulation.
         '''
 
         if mass_flow_specs is None:
@@ -1173,6 +1244,49 @@ class TrajectoryEnsemble(object):
                     'INSERT INTO mass_flow (iter_id, grp_src_id, grp_dst_id, m, m_p) VALUES (?,?,?,?,?)',
                     [iter_id, g_src_id, g_dst_id, g_dst.m, g_dst.m / mfs.m_pop]
                 )
+
+        return self
+
+    def save_mass_locus(self, traj, iter_id, conn):
+        '''
+        Persists all new groups and masses of all groups participating in the current iteration and trajectory.  The
+        attributes and relations of all groups are saved in the database which enables restoring the state of the
+        simulation at any point in time.
+
+        https://stackoverflow.com/questions/198692/can-i-pickle-a-python-dictionary-into-a-sqlite3-text-field
+        '''
+
+        m_pop = traj.sim.pop.get_mass()  # to get proportion of mass flow
+        for g in traj.sim.pop.groups.values():
+            # Persist the group if new:
+            if self._db_get_one('SELECT COUNT(*) FROM grp WHERE hash = ?', [g.get_hash()], conn) == 0:
+                for s in g.rel.values():  # sever the 'pop.sim.traj.traj_ens._conn' link (or pickle error)
+                    s.pop = None
+
+                group_id = conn.execute(
+                    'INSERT INTO grp (hash, attr, rel) VALUES (?,?,?)',
+                    [g.get_hash(), DB.obj2blob(g.attr), DB.obj2blob(g.rel)]
+                ).lastrowid
+
+                if self.pragma.memoize_group_ids:
+                    self.cache.group_hash_to_id[g.get_hash()] = group_id
+
+                for s in g.rel.values():  # restore the link
+                    s.pop = traj.sim.pop
+            else:
+                if self.pragma.memoize_group_ids:
+                    group_id = self.cache.group_hash_to_id.get(g.get_hash())
+                    if group_id is None:  # precaution
+                        group_id = self._db_get_id('grp', f'hash = "{g.get_hash()}"', conn=conn)
+                        self.cache.group_hash_to_id[g.get_hash()] = group_id
+                else:
+                    group_id = self._db_get_id('grp', f'hash = "{g.get_hash()}"', conn=conn)
+
+            # Persist the group's mass:
+            conn.execute(
+                'INSERT INTO mass_locus (iter_id, grp_id, m, m_p) VALUES (?,?,?,?)',
+                [iter_id, group_id, g.m, g.m / m_pop]
+            )
 
         return self
 
@@ -1193,6 +1307,10 @@ class TrajectoryEnsemble(object):
 
     def set_hosts(self, hosts):
         self.hosts = hosts
+        return self
+
+    def set_pragma_memoize_group_ids(self, value):
+        self.pragma.memoize_group_ids = value
         return self
 
     def stats(self):
