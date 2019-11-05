@@ -1,10 +1,9 @@
 #!/bin/sh
 
 do_venv=1
-
 name=pram
 
-if [[ -d $name ]]; then
+if [ -d $name ]; then
     echo "Directory '$name' already exists."
     exit 1
 fi
@@ -33,7 +32,7 @@ apt update
 apt install python-graph-tool python3-graph-tool
 
 # Clone the repo, install Python dependencies, and run a simple PRAM simulation:
-if [[ "$do_venv" == "1" ]]; then
+if [ "$do_venv" == "1" ]; then
 	python3 -m venv $name
 	cd $name
 	source ./bin/activate
