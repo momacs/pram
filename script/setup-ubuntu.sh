@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/bin/bash
+
+set -e
 
 do_venv=1  # set to 0 to install without a venv
 name=pram
