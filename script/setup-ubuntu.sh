@@ -11,10 +11,10 @@ fi
 # Ask for intent confirmation:
 if [ "$do_venv" -eq "1" ]; then
     read -p 'Install with Python venv? [y/n] ' res
-    if [ "$res" -ne "y" -o "$res" -ne "Y" ]; then exit 0; fi
+    if [ "$res" != "y" -a "$res" != "Y" ]; then exit 0; fi
 else
     read -p 'Install without Python venv (i.e., into system site directories)? [y/n] ' res
-    if [ "$res" -ne "y" -o "$res" -ne "Y" ]; then exit 0; fi
+    if [ "$res" != "y" -a "$res" != "Y" ]; then exit 0; fi
 fi
 
 # Update the OS:
