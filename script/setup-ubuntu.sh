@@ -56,6 +56,7 @@ else
     cd $name
 fi
 
+pip3 install wheel
 pip3 install -r requirements.txt
 cd src/sim/01-simple
 python3 sim.py
