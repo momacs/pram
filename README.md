@@ -47,7 +47,7 @@ Front-end:
 ## Setup
 ### Ubuntu
 
-The following script is the prefered method of deploying the package onto a fresh installation of the Ubuntu Server/Desktop (tested with 18.04 LTS).  The `do_env` variable controls whether the package and its dependencies are installed inside a Python `venv` (yes by default).
+The following script is the prefered method of deploying the package onto a fresh installation of the Ubuntu Server/Desktop (tested with 18.04 LTS).  The `do_env` variable controls whether the package and its dependencies are installed inside a Python `venv` (yes by default).  The script can be downloaded directly as [`setup-ubuntu.sh`](https://github.com/momacs/pram/blob/master/script/setup-ubuntu.sh).
 
 ```
 #!/bin/sh
