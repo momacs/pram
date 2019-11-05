@@ -45,12 +45,18 @@ Front-end:
 
 
 ## Setup
-### Ubuntu (no `venv`)
+### Ubuntu
 
-The following script is the prefered method of deploying the package onto a fresh installation of the Ubuntu Server/Desktop (tested with 18.04 LTS).  Note that this script does not put the package in a `venv`.
+The following script is the prefered method of deploying the package onto a fresh installation of the Ubuntu Server/Desktop (tested with 18.04 LTS).  The `do_env` variable controls whether the package and its dependencies are installed inside a Python `venv` (yes by default).
 
 ```
 #!/bin/sh
+
+do_venv=1
+
+name=pram
+
+[[ -d $name ]] && echo "Directory '$name' already exists." && exit 1
 
 # Update the OS:
 apt update
@@ -76,30 +82,41 @@ apt update
 apt install python-graph-tool python3-graph-tool
 
 # Clone the repo, install Python dependencies, and run a simple PRAM simulation:
-git clone https://github.com/momacs/pram
-cd pram
+if [[ "$do_venv" == "1" ]]; then
+	python3 -m venv $name
+	cd $name
+	source ./bin/activate
+	
+	git init
+	git remote add origin https://github.com/momacs/$name
+	git pull origin master
+else
+	git clone https://github.com/momacs/$name
+	cd $name
+done
+
 pip3 install -r requirements.txt
 cd src/sim/01-simple
 python3 sim.py
 ```
 
-### Python `venv`
+### Python Package Only (`venv`)
 
 The following shell script creates a Python virtual environment (`venv`), activates it, downloads the source code of PRAM into it, and installs all Python dependencies.  It does not however install the system-level dependencies (e.g., [`graph-tool`](https://graph-tool.skewed.de/)).
 
 ```
 #!/bin/sh
 
-prj=pram
+name=pram
 
-[[ -d $prj ]] && echo "Directory '$prj' already exists." && exit 1
+[[ -d $name ]] && echo "Directory '$name' already exists." && exit 1
 
-python3 -m venv $prj
-cd $prj
+python3 -m venv $name
+cd $name
 source ./bin/activate
 
 git init
-git remote add origin https://github.com/momacs/$prj
+git remote add origin https://github.com/momacs/$name
 git pull origin master
 
 [ -f requirements.txt ] && python -m pip install -r requirements.txt
