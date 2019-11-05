@@ -4,7 +4,10 @@ do_venv=1
 
 name=pram
 
-[[ -d $name ]] && echo "Directory '$name' already exists." && exit 1
+if [[ -d $name ]]; then
+    echo "Directory '$name' already exists."
+    exit 1
+fi
 
 # Update the OS:
 apt update
@@ -41,7 +44,7 @@ if [[ "$do_venv" == "1" ]]; then
 else
 	git clone https://github.com/momacs/$name
 	cd $name
-done
+fi
 
 pip3 install -r requirements.txt
 cd src/sim/01-simple
