@@ -9,27 +9,27 @@ if [ -d $name ]; then
 fi
 
 # Update the OS:
-apt update
-apt upgrade
+sudo apt update
+sudo apt upgrade
 
 # Install required packages:
-apt install git gcc build-essential autoconf libtool pkg-config libgmp-dev libcairomm-1.0-dev libffi-dev libsparsehash-dev
-apt install python3-dev python3.6-dev python3-numpy python3-pip python3-cairo python3-cairo-dev python3-cairocffi
-apt install firefox firefox-geckodriver  # for Altair
-apt install aptitude  # for GCAL
-aptitude install libcgal-dev
+sudo apt -y install git gcc build-essential autoconf libtool pkg-config libgmp-dev libcairomm-1.0-dev libffi-dev libsparsehash-dev
+sudo apt -y install python3-dev python3.6-dev python3-numpy python3-pip python3-cairo python3-cairo-dev python3-cairocffi
+sudo apt -y install firefox firefox-geckodriver  # for Altair
+sudo apt -y install aptitude  # for GCAL
+sudo aptitude -y install libcgal-dev
 
 # Install boost:
-apt install libboost1.65-all-dev libboost1.65-dev
+sudo apt -y install libboost1.65-all-dev libboost1.65-dev
 
 # Install graph-tool:
 echo '# graph-tool:'                                                 | sudo tee -a /etc/apt/sources.list
-echo 'deb http://downloads.skewed.de/apt/bionic binoic universe'     | sudo tee -a /etc/apt/sources.list
+echo 'deb http://downloads.skewed.de/apt/bionic bionic universe'     | sudo tee -a /etc/apt/sources.list
 echo 'deb-src http://downloads.skewed.de/apt/bionic bionic universe' | sudo tee -a /etc/apt/sources.list
 
-apt-key adv --keyserver keys.openpgp.org --recv-key 612DEFB798507F25
-apt update
-apt install python-graph-tool python3-graph-tool
+sudo apt-key adv --keyserver keys.openpgp.org --recv-key 612DEFB798507F25
+sudo apt update
+sudo apt -y install python-graph-tool python3-graph-tool
 
 # Clone the repo, install Python dependencies, and run a simple PRAM simulation:
 if [ "$do_venv" == "1" ]; then
