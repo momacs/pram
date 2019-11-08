@@ -41,7 +41,7 @@ class SEQIHRModelDerivatives(ODEDerivatives):
     Model parameters
         beta             - Transmission coefficient
         alpha_n, alpha_q - Rate at which non-quarantined and quarantined individuals become infectious
-        alpha_q, delta_i - Rate at which non-isolated and isolated individuals become recovered
+        delta_n, delta_h - Rate at which non-isolated and isolated individuals become recovered
         mu               - Natural death rate
         chi, phi         - Rate of quarantine and isolation
         rho              - Isolation efficiency [0..1]
@@ -50,7 +50,7 @@ class SEQIHRModelDerivatives(ODEDerivatives):
         alpha_1 = alpha_n
         alpha_2 = alpha_q
         delta_1 = delta_n
-        delta_2 = delta_i
+        delta_2 = delta_h
 
     "(...) some of the drawbacks of the simple model when used to evaluate intervention policies. We argue that the
     main reason for these problems is due to the simplifying assumption of exponential distributions for the
@@ -62,8 +62,8 @@ class SEQIHRModelDerivatives(ODEDerivatives):
     Disease Control.  Bulletin of Mathematical Biology.
     '''
 
-    def __init__(self, beta, alpha_n, alpha_q, delta_n, delta_i, mu, chi, phi, rho):
-        self.params = DotMap(beta=beta, alpha_n=alpha_n, alpha_q=alpha_q, delta_n=delta_n, delta_i=delta_i, mu=mu, chi=chi, phi=phi, rho=rho)
+    def __init__(self, beta, alpha_n, alpha_q, delta_n, delta_h, mu, chi, phi, rho):
+        self.params = DotMap(beta=beta, alpha_n=alpha_n, alpha_q=alpha_q, delta_n=delta_n, delta_h=delta_h, mu=mu, chi=chi, phi=phi, rho=rho)
 
     def get_fn(self):
         p = self.params
@@ -75,8 +75,8 @@ class SEQIHRModelDerivatives(ODEDerivatives):
                 p.beta * S * (I + (1 - p.rho) * H) / N - (p.chi + p.alpha_n + p.mu) * E,  # dE/dt
                 p.chi * E - (p.alpha_q + p.mu) * Q,                                       # dQ/dt
                 p.alpha_n * E - (p.phi + p.delta_n + p.mu) * I,                           # dI/dt
-                p.alpha_q * Q + p.phi * I - (p.delta_i + p.mu) * H,                       # dH/dt
-                p.delta_n * I + p.delta_i * H - p.mu * R                                  # dR/dt
+                p.alpha_q * Q + p.phi * I - (p.delta_h + p.mu) * H,                       # dH/dt
+                p.delta_n * I + p.delta_h * H - p.mu * R                                  # dR/dt
             ]
         return fn
 
@@ -134,11 +134,11 @@ class SIRSModel_ODE(ODESystemMass):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SEQIHRModel_ODE(ODESystemMass):
-    def __init__(self, var, beta, alpha_n, alpha_q, delta_n, delta_i, mu, chi, phi, rho, name='seqihr-model', t=TimeAlways(), i=IterAlways(), dt=0.1, memo=None):
-        super().__init__(SEQIHRModelDerivatives(beta, alpha_n, alpha_q, delta_n, delta_i, mu, chi, phi, rho), [DotMap(attr={ var:v }) for v in 'seqihr'], name, t, i, dt, memo=memo)
+    def __init__(self, var, beta, alpha_n, alpha_q, delta_n, delta_h, mu, chi, phi, rho, name='seqihr-model', t=TimeAlways(), i=IterAlways(), dt=0.1, memo=None):
+        super().__init__(SEQIHRModelDerivatives(beta, alpha_n, alpha_q, delta_n, delta_h, mu, chi, phi, rho), [DotMap(attr={ var:v }) for v in 'seqihr'], name, t, i, dt, memo=memo)
 
-    def set_params(self, beta=None, alpha_n=None, alpha_q=None, delta_n=None, delta_i=None, mu=None, chi=None, phi=None, rho=None):
-        super().set_params(beta=beta, alpha_n=alpha_n, alpha_q=alpha_q, delta_n=delta_n, delta_i=delta_i, mu=mu, chi=chi, phi=phi, rho=rho)
+    def set_params(self, beta=None, alpha_n=None, alpha_q=None, delta_n=None, delta_h=None, mu=None, chi=None, phi=None, rho=None):
+        super().set_params(beta=beta, alpha_n=alpha_n, alpha_q=alpha_q, delta_n=delta_n, delta_h=delta_h, mu=mu, chi=chi, phi=phi, rho=rho)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -154,8 +154,8 @@ class SIRSModel(Model):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SEQIHRModel(Model):
-    def __init__(self, var, beta, alpha_n, alpha_q, delta_n, delta_i, mu, chi, phi, rho, name='seqihr-model', t=TimeAlways(), i=IterAlways(), solver=MCSolver(), memo=None):
+    def __init__(self, var, beta, alpha_n, alpha_q, delta_n, delta_h, mu, chi, phi, rho, name='seqihr-model', t=TimeAlways(), i=IterAlways(), solver=MCSolver(), memo=None):
         if isinstance(solver, ODESolver):
-            self.rule = SEQIHRModel_ODE(var, beta, alpha_n, alpha_q, delta_n, delta_i, mu, chi, phi, rho, name, t, i, solver.dt, memo)
+            self.rule = SEQIHRModel_ODE(var, beta, alpha_n, alpha_q, delta_n, delta_h, mu, chi, phi, rho, name, t, i, solver.dt, memo)
         else:
             raise ModelConstructionError('Incompatible solver')

@@ -66,7 +66,7 @@ class MakeSusceptibleProcess(GammaDistributionProcess):  # extends the GammaDist
 # ----------------------------------------------------------------------------------------------------------------------
 # Simulations:
 
-# if os.path.isfile(fpath_db): os.remove(fpath_db)
+if os.path.isfile(fpath_db): os.remove(fpath_db)
 
 te = TrajectoryEnsemble(fpath_db)
 
@@ -75,9 +75,9 @@ if te.is_db_empty:  # generate simulation data if the trajectory ensemble databa
     te.add_trajectories([
         (Simulation().
             add([
-                SIRSModel('flu', beta=0.10, gamma=0.05,          solver=MCSolver()),                             # model 1
-                SIRSModel('flu', beta=0.50, gamma=U(0.01, 0.15), solver=MCSolver(), i=[5 + TN(0,50, 5,10), 0]),  # model 2
-                MakeSusceptibleProcess(i=[50,0], a=3.0, scale=flu_proc_scale),                                   # model 3
+                SIRSModel('flu', beta=0.10, gamma=0.05,          solver=MCSolver()),                              # model 1
+                SIRSModel('flu', beta=0.50, gamma=U(0.01, 0.15), solver=MCSolver(), i=[5 + TN(0,50, 5,10), 50]),  # model 2
+                MakeSusceptibleProcess(i=[50,0], a=3.0, scale=flu_proc_scale),                                    # model 3
                 Group(m=1000, attr={ 'flu': 's' })
             ])
         ) for flu_proc_scale in U(1,5, 20)  # a 20-trajectory ensemble
@@ -85,5 +85,5 @@ if te.is_db_empty:  # generate simulation data if the trajectory ensemble databa
     te.set_group_names(group_names)
     te.run(120)
 
-te.plot_mass_locus_line     ((1200,300), get_out_fpath('_plot-line.png'), opacity_min=0.2)
-te.plot_mass_locus_line_aggr((1200,300), get_out_fpath('_plot-iqr.png'))
+te.plot_mass_locus_line     ((1200,300), get_out_fpath('plot-line.png'), opacity_min=0.2)
+te.plot_mass_locus_line_aggr((1200,300), get_out_fpath('plot-ci.png'))

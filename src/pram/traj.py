@@ -894,7 +894,7 @@ class TrajectoryEnsemble(object):
 
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_line_aggr(self, size, filepath, iter_range=(-1, -1), band_type='iqr', col_scheme='set1', do_ret_plot=False):
+    def plot_mass_locus_line_aggr(self, size, filepath, iter_range=(-1, -1), band_type='ci', col_scheme='set1', do_ret_plot=False):
         '''
         Ordering the legend of a composite chart
             https://stackoverflow.com/questions/55783286/control-legend-color-and-order-when-joining-two-charts-in-altair

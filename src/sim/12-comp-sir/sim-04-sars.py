@@ -61,15 +61,16 @@ class SARSQuarantineIntervention(Intervention):  # extends the Intervention prim
         self.seqihr_model = seqihr_model
         self.chi = chi
 
+        self.rules.append(self.seqihr_model)
+
     def apply(self, pop, group, iter, t):
         self.seqihr_model.set_params(chi=self.chi)
 
-    def get_inner_models(self):
-        return [self.seqihr_model]
-
 
 # ----------------------------------------------------------------------------------------------------------------------
-if os.path.isfile(fpath_db): os.remove(fpath_db)
+# Simulations:
+
+# if os.path.isfile(fpath_db): os.remove(fpath_db)
 
 te = TrajectoryEnsemble(fpath_db)
 
@@ -79,18 +80,17 @@ if te.is_db_empty:  # generate simulation data if the trajectory ensemble databa
         (Simulation().
             add([
                 SARSQuarantineIntervention(
-                    SEQIHRModel('sars', beta=0.80, alpha_n=0.75, alpha_q=0.40, delta_n=0.01, delta_i=0.03, mu=0.01, chi=0.01, phi=0.20, rho=0.75, solver=ODESolver()),
+                    SEQIHRModel('sars', beta=0.80, alpha_n=0.75, alpha_q=0.40, delta_n=0.01, delta_h=0.03, mu=0.01, chi=0.01, phi=0.20, rho=0.75, solver=ODESolver()),
                     chi=0.99,
                     i=intervention_onset
                 ),
                 Group(m=950, attr={ 'sars': 's' }),
                 Group(m= 50, attr={ 'sars': 'e' })
             ])
-        ) for intervention_onset in TN(30,120, 75,100, 1)  # a 10-trajectory ensemble
+        ) for intervention_onset in TN(30,120, 75,100, 5)  # a 5-trajectory ensemble
     ])
     te.set_group_names(group_names)
     te.run(400)
 
-# Visualize:
-te.plot_mass_locus_line     ((1200,300), get_out_fpath('_plot-line.png'), col_scheme='tableau10', opacity_min=0.2)
-# te.plot_mass_locus_line_aggr((1200,300), get_out_fpath('_plot-iqr.png'),  col_scheme='tableau10')
+te.plot_mass_locus_line     ((1200,300), get_out_fpath('plot-line.png'), col_scheme='tableau10', opacity_min=0.35)
+te.plot_mass_locus_line_aggr((1200,300), get_out_fpath('plot-ci.png'),   col_scheme='tableau10')

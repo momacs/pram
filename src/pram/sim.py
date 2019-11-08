@@ -1085,6 +1085,17 @@ class Simulation(object):
         return self
 
     def add_rule(self, rule):
+        '''
+        Adds a rule to the simulation.  If the rule has any inner rules, all of those are added as well.  An example of
+        an inner rule is a desease transmission model that is being acted upon by another rule, e.g., an intervention
+        rule which therefore contains it.  Such containing relationship is not being enforced by the framework however.
+
+        Rules which have already been added will not be added again.  Consequently, if two copies of a rule should be
+        present within a simulation, two Rule objects should be instantiated.  This prevents any complication stemming
+        from rules being nested within other rules as is the case with the containing relationship mentinoed in the
+        previous paragraph.
+        '''
+
         if len(self.rules) == 0:
             self._inf('Constructing a PRAM')
 
@@ -1092,7 +1103,7 @@ class Simulation(object):
             raise SimulationConstructionError('A rule is being added but groups already exist; rules need be added before groups.')
 
         if isinstance(rule, Rule):
-            self.add_rules(rule.get_inner_models())
+            self.add_rules(rule.get_inner_rules())
             if rule not in self.rules:
                 self.rules.append(rule)
         elif isinstance(rule, Model):

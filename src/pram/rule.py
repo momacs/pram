@@ -125,6 +125,8 @@ class Rule(ABC):
         self._set_t(t)
         self._set_i(i)
 
+        self.rules = []  # the rule's inner rules
+
         self.t_unit_ms = None  # set via set_t_unit() by the simulation every time it runs
         self.t_mul = 0.00      # ^
         self.T = {}
@@ -195,10 +197,8 @@ class Rule(ABC):
     def get_rand_name(name, prefix='__', rand_len=12):
         return f'{prefix}{name}_' + ''.join(random.sample(string.ascii_letters + string.digits, rand_len))
 
-    def get_inner_models(self):
-        ''' Must return an iterable (as implied by the plural "models"). '''
-
-        return []
+    def get_inner_rules(self):
+        return self.rules
 
     def is_applicable(self, group, iter, t):
         ''' Verifies if the rule is applicable to the group at the current iteration and current time. '''
@@ -424,6 +424,8 @@ class DistributionProcess(Process, ABC):
         self.mode = None    # the mode of the distribution (ditto)
         self.p_mult = None  # probability multiplier that scales the distribution to p_max at its mode (ditto)
         self.p = None       # a frozen distribution (ditto)
+
+        self.plot_label = ''
 
         # Iteration offset:
         if isinstance(self.i, IterAlways):
