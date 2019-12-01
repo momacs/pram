@@ -6,7 +6,7 @@ Probabilistic Relational Agent-based Models (PRAMs) is a modeling and simulation
 - More sound (due to being probabilistic)
 - More expressive (due to being relational)
 
-For more information see [https://momacs.github.io/pram/](documentation).
+For more information see [documentation](https://momacs.github.io/pram/).
 
 This software is in the pre-release stage.
 
@@ -99,7 +99,7 @@ python src/sim/01-simple/sim.py
 
 ## References
 
-[https://momacs.github.io/pram/](Documentation)
+[Documentation](https://momacs.github.io/pram/)
 
 Cohen, P.R. & Loboda, T.D. (2019) Probabilistic Relational Agent-Based Models.  _International Conference on Social Computing, Behavioral-Cultural Modeling & Prediction and Behavior Representation in Modeling and Simulation (BRiMS)_, Washington, DC, USA.  [PDF](https://github.com/momacs/pram/blob/master/pub/cohen-2019-brims.pdf)
 
