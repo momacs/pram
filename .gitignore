@@ -49,12 +49,12 @@ doctrees/
 .buildinfo
 
 # LaTeX:
-*.gz
-*.pdf
-*.out
-*.log
-*.aux
-*.tex
+/src/**/*.gz
+/src/**/*.pdf
+/src/**/*.out
+/src/**/*.log
+/src/**/*.aux
+/src/**/*.tex
 
 # R:
 .RData
