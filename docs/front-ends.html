@@ -1,0 +1,170 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Front-Ends &#8212; PyPRAM  documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="pram package" href="pram.html" />
+    <link rel="prev" title="Example Simulations" href="examples.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="front-ends">
+<h1>Front-Ends<a class="headerlink" href="#front-ends" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="automatic-agent-population-generation">
+<h2>Automatic Agent Population Generation<a class="headerlink" href="#automatic-agent-population-generation" title="Permalink to this headline">¶</a></h2>
+<p>The Web app located in the <a class="reference external" href="https://github.com/momacs/pram/tree/master/src/web">src/web</a> directory of the GitHub repo demonstrates how the <code class="docutils literal notranslate"><span class="pre">Simulation</span></code> object can be used asynchronously via a Web user interface. A production-grade server-side logic handles client requests. As shown of the screenshots below, the UI itself is organized into a logical sequence of five sections: Rules, Population, Probes, Simulation, and Output.</p>
+<p>The first figure below shows the results of syntactic rule analysis which discovers two relevant attributes (i.e., <code class="docutils literal notranslate"><span class="pre">income</span></code> and <code class="docutils literal notranslate"><span class="pre">flu</span></code>) and two relevant relations (i.e., <code class="docutils literal notranslate"><span class="pre">home</span></code> and <code class="docutils literal notranslate"><span class="pre">school</span></code>). The second figure shows generating populations from a database. The UI assists the user by suggesting attributes and relations to be used for forming groups by fuzzy-matching the database table column names against the sets of relevant attributes and relations. For example, at least one rule makes use of the relation <code class="docutils literal notranslate"><span class="pre">school</span></code> and the UI suggests to form groups based on the foreign key column <code class="docutils literal notranslate"><span class="pre">school_id</span></code> due to the fuzzy-matching score of the two strings being high enough (<code class="docutils literal notranslate"><span class="pre">0.67</span></code>).</p>
+<div class="figure align-default">
+<img alt="Web UI 01" src="https://raw.githubusercontent.com/momacs/pram/master/media/web-app/flu-ac-04.png" />
+</div>
+<div class="figure align-default">
+<img alt="Web UI 02" src="https://raw.githubusercontent.com/momacs/pram/master/media/web-app/flu-ac-05.png" />
+</div>
+</div>
+<div class="section" id="pramity">
+<h2>PRAMity<a class="headerlink" href="#pramity" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="https://github.com/momacs/pramity">PRAMity</a> (a portmanteau of PRAM and Unity) is a software framework for visualizing PRAM models as 3D real-time simulations.  Pramity uses <a class="reference external" href="https://unity.com">Unity</a> and enables the user to enter the simulation and “play” as one of the agents.  In that way it combines the modeling and simulation framework that is PRAM and serious games.</p>
+<p>PRAMity is:</p>
+<ul class="simple">
+<li><p><strong>Instructive</strong> in that it promotes understanding of the modeling technique by making the user a part of a simulation</p></li>
+<li><p><strong>Constructive</strong> in that it helps to find bugs in model design and simulation code</p></li>
+<li><p><strong>Extractive</strong> in that it enables to obtain data on human decision-making process in context (i.e., human-subject experiments)</p></li>
+<li><p><strong>Pedagogical</strong> in that it can make modeling and simulation more accessible to the future generation of modelers</p></li>
+</ul>
+<div class="figure align-default" id="id3">
+<a class="reference external image-reference" href="https://github.com/momacs/pramity"><img alt="_images/pramity-shadow.png" src="_images/pramity-shadow.png" /></a>
+<p class="caption"><span class="caption-text">A PRAMity “Flu at the mall” simulation running in Unity</span><a class="headerlink" href="#id3" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<div class="section" id="venture-capital-app">
+<h2>Venture Capital App<a class="headerlink" href="#venture-capital-app" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="https://github.com/momacs/pram-vc">Venture Capital app</a> is a decision-support application for a Venture Capitalist interested in investing in startups distributed across different geographical regions.  Under the hood, the VC app uses PRAM to model startups as agents and to model their lifecycle over time.  In that way, the user of the app gets an idea about their exit valuation given (1) the ecosystem parameters and (2) their investment strategy.</p>
+<p>The VC app is an example of how PRAM can be used as a modeling backend.  As such, it demonstrates how future applications might attempt to model the following example aspects:</p>
+<ul class="simple">
+<li><p>Impact of predicted adverse weather patterns in a region</p></li>
+<li><p>Impact of potential political instability in a region</p></li>
+<li><p>Impact on local sustainability (e.g., natural resource reserves)</p></li>
+</ul>
+<div class="figure align-default" id="id4">
+<a class="reference external image-reference" href="https://github.com/momacs/pram-vc"><img alt="_images/vc-app-shadow.png" src="_images/vc-app-shadow.png" /></a>
+<p class="caption"><span class="caption-text">The Venture Capital App’s user interface</span><a class="headerlink" href="#id4" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="index.html">
+    <img class="logo" src="_static/logo.png" alt="Logo"/>
+    
+  </a>
+</p>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=momacs&repo=pram&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="details.html">Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Example Simulations</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Front-Ends</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#automatic-agent-population-generation">Automatic Agent Population Generation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pramity">PRAMity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#venture-capital-app">Venture Capital App</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pram.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="examples.html" title="previous chapter">Example Simulations</a></li>
+      <li>Next: <a href="pram.html" title="next chapter">pram package</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018-2019, momacs.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/front-ends.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

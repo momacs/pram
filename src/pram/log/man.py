@@ -3,13 +3,12 @@ import log
 
 
 class LogMan(object):
-    '''
-    Log manager.
+    """Log manager.
 
     Log manager cummulates logs used throughout the application.  Thanks to that, objects in the application don't need
     to keep track of logs by themselves and can instead use this central repository to record events and information in
     approprioate files.
-    '''
+    """
 
     FILE_EXT = "txt"
     DELIM = "\t"

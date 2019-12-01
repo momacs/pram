@@ -1,0 +1,188 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Introduction &#8212; PyPRAM  documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Details" href="details.html" />
+    <link rel="prev" title="PyPRAM" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+<p>Features of the PRAM framework:</p>
+<ul class="simple">
+<li><p>Models on an agent population level instead of the level of individual agents by grouping functionally equivalent agents into <code class="docutils literal notranslate"><span class="pre">groups</span></code></p></li>
+<li><p>Allows groups of agents to be related to one or more <code class="docutils literal notranslate"><span class="pre">sites</span></code> (e.g., a school the agents attend to or a opinion they share)</p></li>
+<li><p>Lifts the domain (and thus offers lifted inference)</p></li>
+<li><p>Models agent population mass dynamics as mass shift (or transfer) between groups</p></li>
+<li><p>Agent population mass dynamics observes axioms of probability</p></li>
+<li><p>Is equivalent to compartmental models but without imposing the requirement of specifying all compartments beforehand (i.e., groups are created automatically when necessary)</p></li>
+</ul>
+<p>Additional features more specific to the implementation in the PyPRAM package:</p>
+<ul class="simple">
+<li><p>Attempts to integrate and unify other modeling and simulation frameworks (e.g., ABMs, compartmental models, redistribution systems, ordinary-differential equations, Markov chains, etc.)</p></li>
+<li><p>Allows modelers to compose complicated models from smaller parts called <cite>modeling primitives</cite></p></li>
+<li><p>Organizes modeling primitives into a multigraph</p></li>
+<li><p>Inheritance-based hierarchies expressed within the modeling primitives multigraph explicitely encode specialization and generalization</p></li>
+<li><p>Provides systemic diagnostics
+- Mass dynamics visualization
+- Time-frequency analysis
+- Recurrence quantification analysis
+- Etc.</p></li>
+</ul>
+<div class="section" id="dependencies">
+<h2>Dependencies<a class="headerlink" href="#dependencies" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://python.org">Python 3.6</a></p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/xxhash/">xxhash</a></p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/dotmap">dotmap</a></p></li>
+<li><p><a class="reference external" href="http://www.grantjenks.com/docs/sortedcontainers/index.html">sortedcontainers</a></p></li>
+<li><p><a class="reference external" href="https://github.com/python-attrs/attrs">attrs</a></p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/dill/">dill</a></p></li>
+<li><p><a class="reference external" href="https://www.numpy.org">numpy</a></p></li>
+<li><p><a class="reference external" href="https://www.scipy.org">scipy</a></p></li>
+<li><p><a class="reference external" href="https://matplotlib.org">matplotlib</a></p></li>
+<li><p><a class="reference external" href="https://graph-tool.skewed.de">graph-tool</a></p></li>
+<li><p><a class="reference external" href="https://www.cairographics.org/pycairo">pycairo</a> (for <cite>graph-tool</cite>)</p></li>
+<li><p><a class="reference external" href="https://pygobject.readthedocs.io">PyGObject</a> (for <cite>graph-tool</cite>)</p></li>
+<li><p><a class="reference external" href="https://altair-viz.github.io">altair</a></p></li>
+<li><p><a class="reference external" href="https://selenium-python.readthedocs.io">selenium</a> (for saving <cite>altair</cite> graphs)</p></li>
+<li><p><a class="reference external" href="https://github.com/mozilla/geckodriver/releases">Gecko Driver</a> and a recent version of Firefox (for saving <cite>altair</cite> graphs)</p></li>
+<li><p><a class="reference external" href="https://sites.google.com/a/chromium.org/chromedriver">Chrome Driver</a> (a Chrome alternative to the above)</p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/PyRQA">PyRQA</a></p></li>
+<li><p><a class="reference external" href="https://pybind11.readthedocs.io">pybind11</a> (for <cite>PyRQA</cite>)</p></li>
+<li><p><a class="reference external" href="https://documen.tician.de/pyopencl">PyOpenCL</a> (for <cite>PyRQA</cite>)</p></li>
+</ul>
+</div>
+<div class="section" id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<p>The <a class="reference external" href="https://github.com/momacs/pram/blob/master/script/setup-ubuntu.sh">setup-ubuntu.sh</a> script is the preferred method of deploying the package onto a fresh installation of the Ubuntu Server/Desktop (tested with 18.04 LTS) because it alleviates the pain of installing all dependencies manually.  The <code class="docutils literal notranslate"><span class="pre">do_env</span></code> variable controls whether the package and its dependencies are installed inside a Python <code class="docutils literal notranslate"><span class="pre">venv</span></code> (yes by default).  The script can be downloaded and run like so:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>wget https://raw.githubusercontent.com/momacs/pram/master/script/setup-ubuntu.sh
+chmod a+x setup-ubuntu.sh
+./setup-ubuntu.sh
+</pre></div>
+</div>
+</div>
+<div class="section" id="basic-api-usage">
+<h2>Basic API Usage<a class="headerlink" href="#basic-api-usage" title="Permalink to this headline">¶</a></h2>
+<p>…</p>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="index.html">
+    <img class="logo" src="_static/logo.png" alt="Logo"/>
+    
+  </a>
+</p>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=momacs&repo=pram&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#dependencies">Dependencies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#basic-api-usage">Basic API Usage</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="details.html">Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Example Simulations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="front-ends.html">Front-Ends</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pram.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">PyPRAM</a></li>
+      <li>Next: <a href="details.html" title="next chapter">Details</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018-2019, momacs.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/intro.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

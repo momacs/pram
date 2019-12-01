@@ -42,8 +42,8 @@ class TERule(Rule):
     FORK_L = 'fork.l'
     FORK_R = 'fork.r'
 
-    def __init__(self, t=TimeAlways(), p_think=0.5, p_eat=0.5, is_verbose=False, memo=None):
-        super().__init__('think-and-eat', t, memo)
+    def __init__(self, p_think=0.5, p_eat=0.5, is_verbose=False, memo=None):
+        super().__init__('think-and-eat', memo=memo)
 
         self.p_think = p_think
         self.p_eat   = p_eat
@@ -89,7 +89,7 @@ class TERule(Rule):
     def is_applicable(self, group, iter, t):
         return (
             super().is_applicable(group, iter, t) and
-            group.get_size() > 0 and
+            group.get_mass() > 0 and
             group.has_rel(self.FORK_L) and
             group.has_rel(self.FORK_R)
         )
@@ -105,14 +105,12 @@ forks = {
 }
 
 (Simulation().
-    set_timer(HourTimer(0)).
-    set_iter_cnt(20).
     set_rand_seed(rand_seed).
     add_rule(TERule(is_verbose=True)).
-    new_group('p0',  1).set_attr(TERule.ATTR, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f1' ]).set_rel(TERule.FORK_R, forks['f11']).commit().
-    new_group('p2',  1).set_attr(TERule.ATTR, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f4' ]).set_rel(TERule.FORK_R, forks['f1' ]).commit().
-    new_group('p5',  1).set_attr(TERule.ATTR, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f6' ]).set_rel(TERule.FORK_R, forks['f4' ]).commit().
-    new_group('p7',  1).set_attr(TERule.ATTR, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f8' ]).set_rel(TERule.FORK_R, forks['f6' ]).commit().
-    new_group('p10', 1).set_attr(TERule.ATTR, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f11']).set_rel(TERule.FORK_R, forks['f8' ]).commit().
-    run(do_disp_t=True)
+    new_group('p0',  1).set_attr(TERule.ATTR, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f1' ]).set_rel(TERule.FORK_R, forks['f11']).done().
+    new_group('p2',  1).set_attr(TERule.ATTR, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f4' ]).set_rel(TERule.FORK_R, forks['f1' ]).done().
+    new_group('p5',  1).set_attr(TERule.ATTR, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f6' ]).set_rel(TERule.FORK_R, forks['f4' ]).done().
+    new_group('p7',  1).set_attr(TERule.ATTR, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f8' ]).set_rel(TERule.FORK_R, forks['f6' ]).done().
+    new_group('p10', 1).set_attr(TERule.ATTR, TERule.State.THINKING).set_rel(TERule.FORK_L, forks['f11']).set_rel(TERule.FORK_R, forks['f8' ]).done().
+    run(20, do_disp_t=True)
 )

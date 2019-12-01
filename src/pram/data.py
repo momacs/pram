@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+"""Contains data-capturing code.
+
+One purpose of simulating a model is to elucidate the dynamics captured by that model.  In the case of PRAMs, an
+organic example of such dynamics is agent mass dynamics, i.e., the ways in which agent mass moves between groups as a
+result of the application of rules.  PyPRAM's *probes* are the facility the user can deploy to capture the interesting
+aspects of the model's dynamics.  For example, a probe could monitor and persist the sizes of all groups at every step
+of the simulation.
+"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -14,12 +24,29 @@ from .util   import DB
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbePersistanceMode(IntEnum):
+    """Probe persistance mode enum.
+
+    A probe can either append new data or overwrite the existing data.
+    """
+
     APPEND    = 1
     OVERWRITE = 2
 
 
+# ----------------------------------------------------------------------------------------------------------------------
 @attrs(slots=True)
 class ProbePersistanceDBItem(object):
+    """A description of how a probe will interact with a database for the purpose of data persistence.
+
+    Args:
+        name (str): The item's name.
+        ins_qry (str): The SQL INSERT query that is used for persisting data in the database.  This query should be
+            parameterized to expect the value to be persisted.
+        sel_qry (str): The SQL SELECT query that is used for retrieving data from the database (e.g., to generate
+            plots).
+        ins_val (list): The values to be inserted into the database using the INSERT query.
+    """
+
     name    : str  = attrib()
     ins_qry : str  = attrib()  # insert query (used for persisting data in the DB)
     sel_qry : str  = attrib()  # select query (used for retrieving data from the DB, e.g., to generate plots)
@@ -28,36 +55,92 @@ class ProbePersistanceDBItem(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbePersistance(ABC):
+    """Probe persistance base class.
+
+    After being instantiated, probes are registered with an ProbePersistace object.  This design allows a single probe
+    to persist values to multiple databases, files, etc.
+    """
+
     VAR_NAME_KEYWORD = ['id', 'ts', 'i', 't']
 
     @abstractmethod
     def flush(self):
+        """Flushes all buffered values to the persistance layer."""
+
         pass
 
     @abstractmethod
-    def plot(self, probe, series, fpath_fig=None, figsize=(12,4), legend_loc='upper right', dpi=150):
+    def plot(self, probe, series, figpath=None, figsize=(12,4), legend_loc='upper right', dpi=150):
+        """Plots data associated with a probe.
+
+        Args:
+            probe (Probe): The probe.
+            series (dict): Series specification (see examples below).
+            figpath (str, optional): Filepath to save the figure.
+            figsize ((int,int)): Figure size in (w,h) format.
+            legend_loc (str): Legend location (e.g., 'upper right').
+            dpi (int): Resolution.
+
+        Examples::
+
+            p = GroupSizeProbe.by_attr('flu', 'flu', ['s', 'i', 'r'], persistance=ProbePersistanceDB())
+
+            # create a simulation
+
+            series = [
+                { 'var': 'p0', 'lw': 0.75, 'linestyle': '-',  'marker': 'o', 'color': 'red',   'markersize': 0, 'lbl': 'S' },
+                { 'var': 'p1', 'lw': 0.75, 'linestyle': '--', 'marker': '+', 'color': 'blue',  'markersize': 0, 'lbl': 'I' },
+                { 'var': 'p2', 'lw': 0.75, 'linestyle': ':',  'marker': 'x', 'color': 'green', 'markersize': 0, 'lbl': 'R' }
+            ]
+            p.plot(series, figsize=(16,3))
+                # while the probe's plot() method is being called, that method simply comes here
+        """
+
         pass
 
     @abstractmethod
     def get_data(self, probe):
+        """Retrieves data associated with a probe.
+
+        Args:
+            probe (Probe): The probe.
+
+        Returns:
+            A dictionary based on the SQL SELECT query of the probe
+        """
+
         pass
 
     @abstractmethod
     def persist(self):
+        """Stores values to be persisted and persists them in accordance with the flushing frequency set."""
+
         pass
 
     @abstractmethod
     def reg_probe(self, probe):
+        """Registeres a probe.
+
+        Args:
+            probe (Probe): The probe.
+        """
+
         pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbePersistanceFS(ProbePersistance):
-    '''
-    Persists probe results to a filesystem.
-    '''
+    """Filesystem-based probe persistance.
 
-    def __init__(self, path, mode=ProbePersistanceMode.APPEND):
+    Args:
+        fpath (str): Path to the file.
+        mode (int): Persistance mode (see :class:`~pram.data.ProbePersistanceMode` enum).
+
+    Note:
+        This class is a stub and will be fully implemented when it is needed.
+    """
+
+    def __init__(self, fpath, mode=ProbePersistanceMode.APPEND):
         self.path = path
 
         # ...
@@ -68,19 +151,33 @@ class ProbePersistanceFS(ProbePersistance):
     def persist(self):
         pass
 
-    def reg_probe(self, probe):
+    def reg_probe(self, probe, do_overwrite=False):
+        """Registers a probe.
+
+        Args:
+            probe (Probe): The probe.
+            do_overwrite (bool): Flag: Should an already registered probe with the same name be overwriten?
+        """
+
         pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbePersistanceDB(ProbePersistance):
-    '''
-    Persists probe results to a database.
+    """Relational database based probe persistance.
+
+    At this point, the SQLite3 database is used.  More serious RDBMSs will be added later (PostgreSQL being the first
+    of them).
 
     Database inserts are cached and flushed when the buffer fills up.  The buffer size is under the user's control.
     The default size of 16 decreases the time spent persisting data to the database about 15 times.  Higher values
-    can be used to achieve even better results.  The cost of the memory used needs to be considered as well.
-    '''
+    can be used to achieve even better results, but memory utilization cost needs to be considered too.
+
+    Args:
+        fpath (str): Path to the database file (``':memory:'`` for in-memory database which is good for testing).
+        mode (int): Persistance mode (see :class:`~pram.data.ProbePersistanceMode` enum).
+        flush_every (int): Memory-to-database flush frequency.
+    """
 
     FLUSH_EVERY = 16
 
@@ -100,6 +197,8 @@ class ProbePersistanceDB(ProbePersistance):
         self.conn_close()
 
     def conn_close(self):
+        """Closes the database connection."""
+
         if self.conn is None:
             return
 
@@ -108,6 +207,8 @@ class ProbePersistanceDB(ProbePersistance):
         self.conn = None
 
     def conn_open(self):
+        """Opens the database connection."""
+
         if self.conn is not None:
             return
 
@@ -115,7 +216,7 @@ class ProbePersistanceDB(ProbePersistance):
         self.conn.row_factory = sqlite3.Row
 
     def flush(self):
-        ''' Flush all remaining buffered items. '''
+        """Flushes all buffered values to the database."""
 
         with self.conn as c:
             for p in self.probes.values():
@@ -124,10 +225,28 @@ class ProbePersistanceDB(ProbePersistance):
                     p.ins_val = []
 
     def get_data(self, probe):
+        """Retrieves data associated with a probe from the database.
+
+        Args:
+            probe (Probe): The probe.
+
+        Returns:
+            A dictionary based on the SQL SELECT query of the probe
+        """
+
         probe_item = self.probes[DB.str_to_name(probe.name)]
         return [dict(r) for r in self.conn.execute(probe_item.sel_qry).fetchall()]
 
     def persist(self, probe, vals, iter, t):
+        """Stores values to be persisted and persists them in accordance with the flushing frequency set.
+
+        Args:
+            probe (Probe): The probe.
+            vals (Iterable[Any]): An iterable with the values to be stored.
+            iter (int): Simulation iteration.
+            t (int): Simulation time.
+        """
+
         probe_item = self.probes[DB.str_to_name(probe.name)]
 
         if self.flush_every <= 1:
@@ -140,7 +259,32 @@ class ProbePersistanceDB(ProbePersistance):
                     c.executemany(probe_item.ins_qry, probe_item.ins_val)
                 probe_item.ins_val = []
 
-    def plot(self, probe, series, fpath_fig=None, figsize=(12,4), legend_loc='upper right', dpi=150):
+    def plot(self, probe, series, figpath=None, figsize=(12,4), legend_loc='upper right', dpi=150):
+        """Plots data associated with a probe.
+
+        Args:
+            probe (Probe): The probe.
+            series (dict): Series specification (see examples below).
+            figpath (str, optional): Filepath to save the figure.
+            figsize ((int,int)): Figure size in (w,h) format.
+            legend_loc (str): Legend location (e.g., 'upper right').
+            dpi (int): Resolution.
+
+        Examples::
+
+            p = GroupSizeProbe.by_attr('flu', 'flu', ['s', 'i', 'r'], persistance=ProbePersistanceDB())
+
+            # define a simulation
+
+            series = [
+                { 'var': 'p0', 'lw': 0.75, 'linestyle': '-',  'marker': 'o', 'color': 'red',   'markersize': 0, 'lbl': 'S' },
+                { 'var': 'p1', 'lw': 0.75, 'linestyle': '--', 'marker': '+', 'color': 'blue',  'markersize': 0, 'lbl': 'I' },
+                { 'var': 'p2', 'lw': 0.75, 'linestyle': ':',  'marker': 'x', 'color': 'green', 'markersize': 0, 'lbl': 'R' }
+            ]
+            p.plot(series, figsize=(16,3))
+
+        """
+
         probe_item = self.probes[DB.str_to_name(probe.name)]
 
         data = { s['var']:[] for s in series }
@@ -162,14 +306,24 @@ class ProbePersistanceDB(ProbePersistance):
         plt.grid(alpha=0.25, antialiased=True)
         # plt.subplots_adjust(left=0.04, right=0.99, top=0.98, bottom=0.06)
 
-        if fpath_fig is None:
+        if figpath is None:
             plt.show()
         else:
-            fig.savefig(fpath_fig, dpi=dpi)
+            fig.savefig(figpath, dpi=dpi)
 
         return fig
 
     def reg_probe(self, probe, do_overwrite=False):
+        """Registers a probe.
+
+        Args:
+            probe (Probe): The probe.
+            do_overwrite (bool): Flag: Should an already registered probe with the same name be overwriten?
+
+        Throws:
+            ValueError
+        """
+
         name_db = DB.str_to_name(probe.name)
 
         if name_db in self.probes and not do_overwrite:
@@ -201,9 +355,14 @@ class ProbePersistanceDB(ProbePersistance):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbePersistanceMem(ProbePersistanceDB):
-    '''
-    Persists probe results to an in-memory database.
-    '''
+    """Relational in-memory database based probe persistance.
+
+    This class is a very light and elegant specialization of the ProbePersistanceDB class.
+
+    Args:
+        mode (int): Persistance mode (i.e., append or overwrite; use the ProbePersistanceMode enum type).
+        flush_every (int): Memory-to-database flush frequency.
+    """
 
     def __init__(self, mode=ProbePersistanceMode.APPEND, flush_every=ProbePersistanceDB.FLUSH_EVERY):
         super().__init__(':memory:', mode, flush_every)
@@ -211,30 +370,113 @@ class ProbePersistanceMem(ProbePersistanceDB):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbeMsgMode(Flag):
+    """Probe's message mode enum.
+
+    A probe can be designated to send messages to stdout which is useful for testing and debugging.  This class
+    determines how those messages are handled.  The three options are:
+
+        - Ignore (do not cumulate nor display any messages)
+        - Display (Display messages right away)
+        - Cumulate (Store messages in an internal list for future retrieval)
+
+    When testing or debugging a simulation with only one probe, the display mode seems most useful (and it is in fact
+    the default).  However, the simulation output can quickly become unreasable if multiple probes are sending messages
+    to stdout.  The cumulate mode addresses this scenario; messages are stored and can be retrieved at any point with
+    the end of the simulation being one reasonable choice.
+
+    Probe messages are a simpler and chronologically older alternative to probe persistance.
+    """
+
     NONE  = auto()  # ignore the value (i.e., do not display and do not store, unless persistance layer is defined)
     DISP  = auto()  # display messages
     CUMUL = auto()  # hold messages in the buffer
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-Var   = namedtuple('Var',   ['name', 'type'])         # having this declaration inside of the Probe class and subclasses breaks Flask/Celery (@#!%$#)
-Const = namedtuple('Const', ['name', 'type', 'val'])  # ^
+# Having the following two namedtuple declarations inside of the Probe class as subclasses where they belong breaks
+# Flask/Celery.  No matter what I tried I couldn't get this to work so it seems it's a bug... (@#!%$#).  Moreover, the
+# namedtuple type needs to be wrapped in a new class declaration in order for Sphinx (the docs generator) to properly
+# display docstrings.
+#
+#     https://stackoverflow.com/questions/1606436/adding-docstrings-to-namedtuples
 
+class Var(namedtuple('Var', ['name', 'type'])):
+    """Probe's variable.
+
+    A probe can be in charge of storing multiple variables that relate to the state of the simulation as it evolves.  This
+    class shows how such a variable can be defined.
+
+    Args:
+        name (str): The variable's name.  If relational database persistance is used, this name will become the name of a
+            table column.  While PyPRAM escapes special characters, problematic names should be avoided (e.g., those
+            containing spaces or weird characters).
+        type (str): The variable's type.  If relational database persistance is used, this needs to be a valid data types
+            of the RDBMS of choice.
+    """
+
+    pass
+
+class Const(namedtuple('Const', ['name', 'type', 'val'])):
+    """Probe's constant.
+
+    A probe can be in charge of storing multiple constants that relate to the simulation context at large.  Naturally,
+    being constants their values will not change, but it may beneficial to have them as database table columns for later
+    data processing and analysis (e.g., forming a UNION of two or more tables with congruent schemas).  This class shows
+    how such a constant can be defined.
+
+    Args:
+        name (str): The constants's name.  If relational database persistance is used, this name will become the name of a
+            table column.  While PyPRAM escapes special characters, problematic names should be avoided (e.g., those
+            containing spaces or weird characters).
+        type (str): The constants's type.  If relational database persistance is used, this needs to be a valid data types
+            of the RDBMS of choice.
+        val (Any): The variable's value (must match the ``type``, although in case of database persistance the driver
+            or the RDBMS itself may attempt to cast).
+    """
+
+    pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class Probe(ABC):
+    """Probe base class."""
+
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class GroupProbe(Probe, ABC):
-    '''
-    The extending classes need to populate the 'self.vars' list before calling the constructor of this ABC.
-    '''
+    """A probe that monitors any aspect of a PRAM group.
+
+    Args:
+        name (str): Probe's name; probes are identified by names.
+        queries (Iterable[GroupQry]): A GroupQry object selects one of more PRAM groups based on their attributes and
+            relations.  For example, ``GroupQry(attr={ 'flu': 's' }, rel={ Site.AT: Site('home') })`` selects all
+            groupsof agents that are susceptible to flu that are at the particular site called ``home``.
+        qry_tot (GroupQry, optional): Apart from capturing the absolute numbers of agents residing in a group or being
+            moved between groups, a probe also calculates those numbers as proportions; naturally, both of these
+            happen every iteration of the simulation.  To calculate proportions, the total agent population mass needs
+            to be known.  ``qry_tot`` provides that total mass.  It can be a ``GroupQry`` object that selects groups to
+            have their masses summed to form the total mass (e.g., all agents that have the flu irrespective of where
+            they currently are).  Alternatively, if left at the default value of None, the entire population mass will
+            be used as the normalizing factor.
+        consts (Iterable[Const], optional): Constants (see :class:`pram.data.Const` class for details).
+        persistance (ProbePersistance, optional): A ProbePersistance object reference.
+        msg_mode (int): Probe's message mode (see :class:`~pram.data.ProbeMsgMode` enum).
+        pop (GroupPopulation, optional): The group population in question.
+        memo (str, optional): Probe's description.
+
+    Note:
+        All classes extending this class must populate the ``self.vars`` list before calling the constructor of this
+        class.
+
+    Todo:
+        Figure out the relation between the 'self.persistance' and registering probes with multiple ProbePersistance
+        objects.  At this point it looks like due to the interaction of multiple designs the probe can only be
+        associated with one such objects.
+    """
 
     def __init__(self, name, queries, qry_tot=None, consts=None, persistance=None, msg_mode=ProbeMsgMode.DISP, pop=None, memo=None):
-        '''
-        queries: iterable of GroupQry
-        '''
-
         self.name = name
         self.queries = queries
         self.qry_tot = qry_tot
@@ -254,25 +496,129 @@ class GroupProbe(Probe, ABC):
     def __str__(self):
         return 'GroupProbe: {:16}  query-cnt: {:>3}'.format(self.name, len(self.queries))
 
-    def clear(self):
+    @classmethod
+    def by_attr(cls, probe_name, attr_name, attr_values, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
+        """Instantiates the probe by attributes.
+
+        This constructor generates QueryGrp objects automatically for the attribute name and values specified.  It is a
+        convenience method for probes that only use only a single attribute of PRAM groups and do not use relations.
+
+        Args:
+            probe_name (str): Probe's name; probes are identified by names.
+            attr_name (str): The name of the attribute.
+            attr_values (Iterable[str]): The values of the attribute to be monitored.  Sizes of PRAM groups with
+                different values of the attribute in question will not be monitored.
+            qry_tot (GroupQry, optional): See :meth:`~pram.data.GroupProbe.__init__`
+            var_names (Iterable[str], optional): Names which should be assigned to the attribute values.  Those names
+                must correspond to ``attr_values`` in that every element of ``attr_values`` must resolve to **two**
+                elements in ``var_names``.  That is because both the proportion and the absolute number of the agents
+                are recorded by the probe.  In case of database persistance, the variable names will be column names.
+                If left None, default names will be used (i.e., ``p0``, ``p1``, ... for proportions and ``m0``, ``m1``,
+                ... for mass).
+            consts (Iterable[Const], optional): Constants (see :class:`pram.data.Const` class for details).
+            persistance (ProbePersistance, optional): A ProbePersistance object reference.
+            msg_mode (int): Probe's message mode (see :class:`~pram.data.ProbeMsgMode` enum).
+            pop (GroupPopulation, optional): The group population in question.
+            memo (str, optional): Probe's description.
+        """
+
+        return cls(probe_name, [GroupQry(attr={ attr_name: v }) for v in attr_values], qry_tot, var_names, consts, persistance, msg_mode, pop, memo)
+
+    @classmethod
+    def by_rel(cls, probe_name, rel_name, rel_values, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
+        """Instantiates the probe by relations.
+
+        This constructor generates QueryGrp objects automatically for the relation name and values specified.  It is a
+        convenience method for probes that only use only a single relation of PRAM groups and do not use attributes.
+
+        Args:
+            probe_name (str): Probe's name; probes are identified by names.
+            rel_name (str): The name of the relation.
+            rel_values (Iterable[str]): The values of the relation to be monitored.  Sizes of PRAM groups with
+                different values of the relation in question will not be monitored.
+            qry_tot (GroupQry, optional): See :meth:`~pram.data.GroupProbe.__init__`
+            var_names (Iterable[str], optional): Names which should be assigned to the relation values.  Those names
+                must correspond to ``rel_values`` in that every element of ``rel_values`` must resolve to **two**
+                elements in ``var_names``.  That is because both the proportion and the absolute number of the agents
+                are recorded by the probe.  In case of database persistance, the variable names will be column names.
+                If left None, default names will be used (i.e., ``p0``, ``p1``, ... for proportions and ``m0``, ``m1``,
+                ... for mass).
+            consts (Iterable[Const], optional): Constants (see :class:`pram.data.Const` class for details).
+            persistance (ProbePersistance, optional): A ProbePersistance object reference.
+            msg_mode (int): Probe's message mode (see :class:`~pram.data.ProbeMsgMode` enum).
+            pop (GroupPopulation, optional): The group population in question.
+            memo (str, optional): Probe's description.
+        """
+
+        return cls(probe_name, [GroupQry(rel={ rel_name: v }) for v in rel_values], qry_tot, var_names, consts, persistance, msg_mode, pop, memo)
+
+    def clear_msg(self):
+        """Clear any cumulated messages."""
+
         self.msg.clear()
 
-    @abstractmethod
     def get_data(self):
-        pass
+        """Retrieves data associated with the probe.
+
+        For this to work the probe needs to be associated with a ProbePersistance object.
+        """
+
+        if not self.persistance:
+            return print('Data access error: The probe is not associated with a persistance backend')
+
+        return self.persistance.get_data(self)
 
     def get_msg(self, do_join=True):
+        """Retrieve all cumulated messages.
+
+        Args:
+            do_join (bool): Flag: Join the messages with the new-line character?
+
+        Returns:
+            str: The message.
+        """
+
         return '\n'.join(self.msg)
 
-    @abstractmethod
-    def plot(self, series, fpath_fig=None, figsize=(8,8), legend_loc='upper right', dpi=300):
-        pass
+    def plot(self, series, fig_fpath=None, figsize=(8,8), legend_loc='upper right', dpi=300):
+        """Plots data associated with a probe.
+
+        This method calls :meth:`~pram.data.ProbePersistance.plot`.
+        """
+
+        if not self.persistance:
+            return print('Plotting error: The probe is not associated with a persistance backend')
+
+        return self.persistance.plot(self, series, fig_fpath, figsize, legend_loc, dpi)
 
     @abstractmethod
-    def run(self, i,t):
+    def run(self, iter, t):
+        """Runs the probe.
+
+        A probe is run by the :meth:`~pram.sim.Simulation.run` method of the
+        :class:`~pram.sim.Simulation` class as it steps through the simulation.  Probes are
+        run as the last order of business before the simulation advances to the next iteration which is congruent with
+        probe capturing the state of the simulation after it has settled at every iteration.
+
+        Setting both the 'iter' and 't' to 'None' will prevent persistance from being invoked and message cumulation to
+        occur.  It will still allow printint to stdout however.  In fact, this mechanism is used by the
+        :class:`~pram.sim.Simulation` class to print the intial state of the system (as seen by those probes that
+        actually print), that is before the simulation run begins.
+
+        Args:
+            iter (int): The simulation iteration.
+            t (int): The simulation time.
+        """
+
         pass
 
-    def set_consts(self, consts):
+    def set_consts(self, consts=None):
+        """Sets the probe's constants.
+
+        Args:
+            consts (Iterable[Const], optional): The constants (see :class:`pram.data.Const` class for details).
+        """
+
         consts = consts or []
 
         cn_db_used = set()  # to identify duplicates
@@ -290,6 +636,12 @@ class GroupProbe(Probe, ABC):
         self.consts = consts or []
 
     def set_persistance(self, persistance):
+        """Associates the probe with a ProbePersistance object.
+
+        Args:
+            persistance (ProbePersistance): The ProbePersistance object.
+        """
+
         if self.persistance == persistance:
             return
 
@@ -298,6 +650,15 @@ class GroupProbe(Probe, ABC):
             self.persistance.reg_probe(self)
 
     def set_pop(self, pop):
+        """Sets the group population the probe should interact with.
+
+        Currently, a PyPRAM simulation operates on a single instance of the GroupPopulation object.  This may change in
+        the future and this method will associate the probe with one of the group populations.
+
+        Args:
+            pop (GroupPopulation): Group population.
+        """
+
         self.pop = pop
 
 
@@ -305,6 +666,11 @@ class GroupProbe(Probe, ABC):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class GroupAttrProbe(GroupProbe):
+    """A probe that monitors a PRAM group's attribute values.
+
+    See :meth:`~pram.data.GroupProbe.__init__` for more details.
+    """
+
     def __init__(self, name, queries, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
         raise Error('Implementation pending completion.')
 
@@ -337,30 +703,15 @@ class GroupAttrProbe(GroupProbe):
 
         super().__init__(name, queries, qry_tot, consts, persistance, msg_mode, pop, memo)
 
-    @classmethod
-    def by_attr(cls, probe_name, attr_name, attr_values, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
-        ''' Generates QueryGrp objects automatically for the attribute name and values specified. '''
-
-        return cls(probe_name, [GroupQry(attr={ attr_name: v }) for v in attr_values], qry_tot, var_names, consts, persistance, msg_mode, pop, memo)
-
-    @classmethod
-    def by_rel(cls, probe_name, rel_name, rel_values, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
-        ''' Generates QueryGrp objects automatically for the relation name and values specified. '''
-
-        return cls(probe_name, [GroupQry(rel={ rel_name: v }) for v in rel_values], qry_tot, var_names, consts, persistance, msg_mode, pop, memo)
-
-    def get_data(self):
-        pass
-
-    def plot(self, series, fpath_fig=None, figsize=(8,8), legend_loc='upper right', dpi=300):
-        pass
-
     def run(self, iter, t):
-        '''
-        Leaving both 'iter' and 't' at their default of 'None' will prevent persistance from being invokedand message cumulation.  It
-        will still allow print to stdout.  This is used by the sim.Simulation class to print the intial state of the
-        system (as seen by those probes that print) before the simulation run begins.
-        '''
+        """Runs the probe.
+
+        More details in the :meth:`abstract method <pram.data.GroupProbe.run>`.
+
+        Args:
+            iter (int): The simulation iteration.
+            t (int): The simulation time.
+        """
 
         if self.msg_mode != 0 or self.persistance:
             n_tot = sum([g.m for g in self.pop.get_groups(self.qry_tot)])  # TODO: If the total mass never changed, we could memoize this (either here or in GroupPopulation).
@@ -398,6 +749,11 @@ class GroupAttrProbe(GroupProbe):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class GroupSizeProbe(GroupProbe):
+    """A probe that monitors a PRAM group's size.
+
+    See :class:`~pram.data.GroupProbe` for more details.
+    """
+
     def __init__(self, name, queries, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
         if var_names is None:
             self.vars = \
@@ -427,36 +783,15 @@ class GroupSizeProbe(GroupProbe):
 
         super().__init__(name, queries, qry_tot, consts, persistance, msg_mode, pop, memo)
 
-    @classmethod
-    def by_attr(cls, probe_name, attr_name, attr_values, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
-        ''' Generates QueryGrp objects automatically for the attribute name and values specified. '''
-
-        return cls(probe_name, [GroupQry(attr={ attr_name: v }) for v in attr_values], qry_tot, var_names, consts, persistance, msg_mode, pop, memo)
-
-    @classmethod
-    def by_rel(cls, probe_name, rel_name, rel_values, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
-        ''' Generates QueryGrp objects automatically for the relation name and values specified. '''
-
-        return cls(probe_name, [GroupQry(rel={ rel_name: v }) for v in rel_values], qry_tot, var_names, consts, persistance, msg_mode, pop, memo)
-
-    def get_data(self):
-        if not self.persistance:
-            return print('Plotting error: The probe is not associated with a persistance backend')
-
-        return self.persistance.get_data(self)
-
-    def plot(self, series, fpath_fig=None, figsize=(8,8), legend_loc='upper right', dpi=300):
-        if not self.persistance:
-            return print('Plotting error: The probe is not associated with a persistance backend')
-
-        return self.persistance.plot(self, series, fpath_fig, figsize, legend_loc, dpi)
-
     def run(self, iter, t):
-        '''
-        Leaving both 'iter' and 't' at their default of 'None' will prevent persistance from being invokedand message cumulation.  It
-        will still allow print to stdout.  This is used by the sim.Simulation class to print the intial state of the
-        system (as seen by those probes that print) before the simulation run begins.
-        '''
+        """Runs the probe.
+
+        More details in the :meth:`abstract method <pram.data.GroupProbe.run>`.
+
+        Args:
+            iter (int): The simulation iteration.
+            t (int): The simulation time.
+        """
 
         if self.msg_mode != 0 or self.persistance:
             n_tot = sum([g.m for g in self.pop.get_groups(self.qry_tot)])  # TODO: If the total mass never changed, we could memoize this (either here or in GroupPopulation).

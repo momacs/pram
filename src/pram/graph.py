@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+"""Contains graph related code."""
+
+
 import graph_tool.all as gt
 import math
 
@@ -7,8 +11,7 @@ from sortedcontainers import SortedSet
 
 # ----------------------------------------------------------------------------------------------------------------------
 class MassGraph(object):
-    '''
-    A graph of locus and flow of mass.
+    """A graph of locus and flow of mass.
 
     This class holds the entire time-evolution of the group space and the associated mass flow.
 
@@ -17,9 +20,9 @@ class MassGraph(object):
     The only problem with graph-tool is that it is more difficult to install, which is going to be signifiant for
     users, especially the casual ones who just want to get feel for the software.  This makes a conteinerized version
     desirable.
+    """
 
-    --------------------------------------------------------------------------------------------------------------------
-
+    '''
     Good visualization options
         Sankey diagram
             https://www.data-to-viz.com/graph/sankey.html
@@ -33,8 +36,6 @@ class MassGraph(object):
             https://www.data-to-viz.com/graph/arc.html
         Galleries
             https://observablehq.com/@vega
-
-    --------------------------------------------------------------------------------------------------------------------
 
     TODO
         Performance
@@ -128,12 +129,12 @@ class MassGraph(object):
         return self
 
     def plot_mass_flow_time_series(self, scale=(1.00, 1.00), filepath=None, iter_range=(-1, -1), v_prop=False, e_prop=False):
-        '''
+        """
         Because this method plots a time series which can be of arbitrary length, there is no figure size argument.
         Instead, scale factor for the width and height of the figure is expected and defaults to no scaling.  The
         method decided on the figure size automatically, based on the iteration range given and the maximum number of
         groups in any iteration from that range.
-        '''
+        """
 
         # (1) Set iteration range:
         if iter_range[1] == -1:

@@ -13,7 +13,7 @@ from pram.sim    import Simulation
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-sites = {s:Site(s) for s in ['home', 'school-a', 'school-b']}
+sites = { s: Site(s) for s in ['home', 'school-a', 'school-b'] }
 
 probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across sites')
 
@@ -25,12 +25,12 @@ probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), msg
         rule(GoToAndBackTimeAtRule(t_at_attr='t@school')).
         probe(probe_grp_size_site).
         done().
-    new_group(500).
+    new_group(m=500).
         set_rel(Site.AT,  sites['home']).
         set_rel('home',   sites['home']).
         set_rel('school', sites['school-a']).
         done().
-    new_group(500).
+    new_group(m=500).
         set_rel(Site.AT,  sites['home']).
         set_rel('home',   sites['home']).
         set_rel('school', sites['school-b']).
@@ -44,12 +44,12 @@ probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), msg
 #     add_rule(ResetSchoolDayRule(TimePoint(7))).
 #     add_rule(GoToAndBackTimeAtRule(t_at_attr='t@school')).
 #     add_probe(probe_grp_size_site).
-#     new_group(500).
+#     new_group(m=500).
 #         set_rel(Site.AT,  sites['home']).
 #         set_rel('home',   sites['home']).
 #         set_rel('school', sites['school-a']).
 #         done().
-#     new_group(500).
+#     new_group(m=500).
 #         set_rel(Site.AT,  sites['home']).
 #         set_rel('home',   sites['home']).
 #         set_rel('school', sites['school-b']).

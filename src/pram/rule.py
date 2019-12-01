@@ -115,8 +115,8 @@ class Rule(ABC):
         t: Time class object
         '''
 
-        Err.type(t, 't', Time)
-        Err.type(i, 'i', Iter)
+        # Err.type(t, 't', Time, True)
+        # Err.type(i, 'i', Iter, True)
 
         self.name = name
         self.memo = memo
@@ -1224,13 +1224,13 @@ class BirthDeathProcess(PoissonProcess):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class BirthDeathProcess(MarkovProcess):
-    '''
+    """
     A special case of continuous-time Markov process where the state transitions are of only two types: "births", which
     increase the state variable by one and "deaths", which decrease the state by one.
 
     A homogeneous Poisson process is a pure birth process.
 
-    The following infinitesimal generator of the process (\lambda are birth rates and \mu are death rates):
+    The following infinitesimal generator of the process (\lambda are birth rates and \mu are death rates)::
 
         | -l_0           l_0             0             0    0  ... |
         |  m_1  -(l_1 + m_1)           l_1             0    0  ... |
@@ -1239,14 +1239,14 @@ class BirthDeathProcess(MarkovProcess):
         |    .             .             .             .    .  ... |
         |    .             .             .             .    .  ... |
 
-    should be provided as:
+    should be provided as::
 
         [l_0, [l_1, m_1], [l_2, m_2], [l_3, m_3], ..., m_n]
 
-    Sojourn times have exponential p.d.f. $\lambda e^{-\lambda t}$.
+    Sojourn times have exponential p.d.f. :math:`\lambda e^{-\lambda t}`.
+    """
 
-    --------------------------------------------------------------------------------------------------------------------
-
+    '''
     Birth process examples [1]:
     - Radioactive transformations
     - Conversion of fibroge molecules into fibrin molecules follows a birth process (blood clotting)
@@ -1843,8 +1843,8 @@ class GoToRule(Rule):
 
     NAME = 'Goto'
 
-    def __init__(self, t, p, rel_from, rel_to, name_human=None, memo=None):
-        super().__init__('goto', t, name_human, memo)
+    def __init__(self, t, i, p, rel_from, rel_to, name_human=None, memo=None):
+        super().__init__('goto', t, i, name_human, memo)
 
         Err.type(rel_from, 'rel_from', str, True)
         Err.type(rel_to, 'rel_to', str)
@@ -1904,8 +1904,8 @@ class GoToAndBackTimeAtRule(Rule):
     TIME_PDF_TO_DEF   = { 8: 0.5, 12:0.5 }
     TIME_PDF_BACK_DEF = { 1: 0.05, 3: 0.2, 4: 0.25, 5: 0.2, 6: 0.1, 7: 0.1, 8: 0.1 }
 
-    def __init__(self, t=TimeInt(8,16), to='school', back='home', time_pdf_to=None, time_pdf_back=None, t_at_attr='t@', do_force_back=True, name_human=None, memo=None):
-        super().__init__('to-and-back', t, name_human, memo)
+    def __init__(self, t=[8,16], i=None, to='school', back='home', time_pdf_to=None, time_pdf_back=None, t_at_attr='t@', do_force_back=True, name_human=None, memo=None):
+        super().__init__('to-and-back', t, i, name_human, memo)
 
         self.to   = to
         self.back = back
@@ -1956,8 +1956,8 @@ class GoToAndBackTimeAtRule(Rule):
 class ResetRule(Rule):
     NAME = 'Reset'
 
-    def __init__(self, t=TimePoint(5), attr_del=None, attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
-        super().__init__('reset', t, name_human, memo)
+    def __init__(self, t=5, i=None, attr_del=None, attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
+        super().__init__('reset', t, i, name_human, memo)
 
         self.attr_del = attr_del
         self.attr_set = attr_set
@@ -1972,8 +1972,8 @@ class ResetRule(Rule):
 class ResetSchoolDayRule(ResetRule):
     NAME = 'Reset school day'
 
-    def __init__(self, t=TimePoint(5), attr_del=['t-at-school'], attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
-        super().__init__(t, attr_del, attr_set, rel_del, rel_set, name_human, memo)
+    def __init__(self, t=5, i=None, attr_del=['t-at-school'], attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
+        super().__init__(t, i, attr_del, attr_set, rel_del, rel_set, name_human, memo)
         self.name = 'reset-school-day'
 
     def is_applicable(self, group, iter, t):
@@ -1984,8 +1984,8 @@ class ResetSchoolDayRule(ResetRule):
 class ResetWorkDayRule(ResetRule):
     NAME = 'Reset work day'
 
-    def __init__(self, t=TimePoint(5), attr_del=None, attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
-        super().__init__(t, attr_del, attr_set, rel_del, rel_set, name_human, memo)
+    def __init__(self, t=5, i=None, attr_del=None, attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
+        super().__init__(t, i, attr_del, attr_set, rel_del, rel_set, name_human, memo)
         self.name = 'reset-work-day'
 
     def is_applicable(self, group, iter, t):
@@ -1996,8 +1996,8 @@ class ResetWorkDayRule(ResetRule):
 class RuleAnalyzerTestRule(Rule):
     NAME = 'Rule analyzer test'
 
-    def __init__(self, t=TimeInt(8,20), name_human=None, memo=None):
-        super().__init__('progress-flu', t, name_human, memo)
+    def __init__(self, t=[8,20], i=None, name_human=None, memo=None):
+        super().__init__('progress-flu', t, i, name_human, memo)
 
     def an(self, s): return f'b{s}'  # attribute name
     def rn(self, s): return f's{s}'  # relation  name
@@ -2067,8 +2067,8 @@ class SimpleFluProgressRule(Rule):
     ATTRS = { 'flu': [ 's', 'i', 'r' ] }
     NAME = 'Simple flu progression model'
 
-    def __init__(self, t=TimeAlways(), name_human=None, memo=None):
-        super().__init__('flu-progress-simple', t, name_human, memo)
+    def __init__(self, t=None, i=None, name_human=None, memo=None):
+        super().__init__('flu-progress-simple', t, i, name_human, memo)
 
     def apply(self, pop, group, iter, t):
         # Susceptible:

@@ -92,5 +92,9 @@ if te.is_db_empty:  # generate simulation data if the trajectory ensemble databa
     te.set_group_names(group_names)
     te.run(400)
 
-te.plot_mass_locus_line     ((1200,300), get_out_fpath('plot-line.png'), col_scheme='tableau10', opacity_min=0.35)
-te.plot_mass_locus_line_aggr((1200,300), get_out_fpath('plot-ci.png'),   col_scheme='tableau10')
+# te.plot_mass_locus_line     ((1200,300), get_out_fpath('plot-line.png'), col_scheme='tableau10', opacity_min=0.35)
+# te.plot_mass_locus_line_aggr((1200,300), get_out_fpath('plot-ci.png'),   col_scheme='tableau10')
+
+fpath_diag = os.path.join(os.path.dirname(__file__), 'out', 'sim-04.diag')
+fpath_pdf  = os.path.join(os.path.dirname(__file__), 'out', 'sim-04.pdf')
+te.traj[2].sim.gen_diagram(fpath_diag, fpath_pdf)

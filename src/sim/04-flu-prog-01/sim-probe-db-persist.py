@@ -10,7 +10,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
 from pram.sim    import Simulation
-from pram.entity import AttrFluStage, GroupQry, GroupSplitSpec
+from pram.entity import GroupQry, GroupSplitSpec
 from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
 from pram.rule   import Rule, TimeInt
 
@@ -18,8 +18,6 @@ from rules import ProgressFluRule
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-rand_seed = 1928
-
 dpath_cwd = os.path.dirname(__file__)
 fpath_db  = os.path.join(dpath_cwd, f'sim.sqlite3')
 
@@ -29,20 +27,20 @@ if os.path.isfile(fpath_db):
 probe = GroupSizeProbe(
     name='flu',
     queries=[
-        GroupQry(attr={ 'flu-stage': AttrFluStage.NO     }),
-        GroupQry(attr={ 'flu-stage': AttrFluStage.ASYMPT }),
-        GroupQry(attr={ 'flu-stage': AttrFluStage.SYMPT  })
+        GroupQry(attr={ 'flu': 's' }),
+        GroupQry(attr={ 'flu': 'i' }),
+        GroupQry(attr={ 'flu': 'r' })
     ],
     qry_tot=None,
     var_names=['pn', 'pa', 'ps', 'nn', 'na', 'ns'],
     persistance=ProbePersistanceDB(fpath_db)
 )
 
-(Simulation(6,1,16, rand_seed=rand_seed).
+(Simulation().
     add_rule(ProgressFluRule()).
     add_probe(probe).
     new_group('0', 1000).
-        set_attr('flu-stage', AttrFluStage.NO).
-        commit().
-    run()
+        set_attr('flu', 's').
+        done().
+    run(16)
 )

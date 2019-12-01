@@ -1,3 +1,15 @@
+# -*- coding: utf-8 -*-
+"""Contains signal-processing relevant code.
+
+When considered over time, agent mass dynamics and other time series that PyPRAM outputs can be seen as signals.
+Signal processing toolkit can therefore be used to process those signals.  Because PyPRAM currently is a discrete-time
+system (i.e., it only supports iteration over time steps), all signals it outputs are also discrete.  However, with a
+sufficiently small time step size those signals can be a reasonably good approximation of the continuous-time
+data-generating processes.  One example of that are systems of ordinary differential equations (ODEs).  Because ODEs
+need to be numerically integrated (PyPRAM does not support analytical solvers), the time step size typically needs to
+be very small.
+"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -21,24 +33,22 @@ from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Signal(object):
-    '''
-    Time series considered a signal.
-
-    When considered over time, mass dynamics and other time series that PramPy outputs can be seen as signals.  Signal
-    processing toolkit can therefore be used to process those signals.  Because PramPy currently is a discrete-time
-    system (i.e., it only supports iteration over time steps), all signals it outputs are also discrete.  However, with
-    a sufficiently small time step size those signals can be a reasonably good approximation of the continuous-time
-    data-generating processes.  One example of that are systems of ordinary differential equations (ODEs).  Because
-    ODEs need to be numerically integrated (PramPy does not support analytical solvers), the time step size typically
-    needs to be very small.
+    """Multivariate time series as a signal.
 
     A signal is a list of numpy arrays refered to as series.  What every single of those array denotes depends on the
     outside algorithm that creates the signal.  For example, they might (and often will) contain the time series of
     mass locus of a simulation.
-    '''
+
+    Args:
+        series (Signal, numpy.ndarray, optional): Data for one or more series.
+        names (list(str), optional): Names of all the series specified.
+
+    Raises:
+        ValueError
+    """
 
     def __init__(self, series=None, names=None):
-        if series is not None and not isinstance(signal, np.ndarray):
+        if series is not None and not isinstance(Signal, np.ndarray):
             raise ValueError('S needs to be an instance of ndarray.')
 
         self.series = series
@@ -55,6 +65,16 @@ class Signal(object):
             # self.iter_max = max([len(s) for s in self.series])
 
     def add_series(self, s, name=None):
+        """Adds one or more series to the series already stored.
+
+        Args:
+            s (list(float), numpy.ndarray): The series being added.
+            name (str, optional): The name of the series being added.
+
+        Returns:
+            self: For method chaining.
+        """
+
         if self.series is None or len(self.series) == 0:
             self.series = s
             self.names = [name]
@@ -62,8 +82,10 @@ class Signal(object):
             self.series = np.append(self.series, s, axis=0)
             self.names.append(name)
 
-    # S,S,S,I,I,R,R,R,R,R  (3,2,5)
+        return self
 
+    # S,S,S,I,I,R,R,R,R,R  (3,2,5)
+    #
     # def discretize(self, disc_specs, right=False):
     #     '''
     #     If 'disc_spec' is a DiscSpec object, those discretization specs are used for all series.
@@ -78,10 +100,10 @@ class Signal(object):
     #         raise ValueError(f'The number of discretization specs must be either one or be equal to the number of signal series (i.e., {len(self.series)} for the current signal).')
     #
     #     return [np.digitize(self.series[i], disc_specs[i].bins, disc_specs[i].right) for i in len(self.series)]
-
+    #
     # def discretize_ns(self, bins):
     #     return self.discretize(self.get_bins(n, min, max))
-
+    #
     # def make_bins(self, n, min=0.0, max=1.0):
     #     '''
     #     Returns 'n' equally-sized bins on the interval defined. The defaults for 'min' and 'max' reflect the
@@ -94,6 +116,18 @@ class Signal(object):
     #     return self.discretize([min + ((max - min) / float(n)) * i for i in range(n)] + [max])
 
     def plot_autocorr(self, size, filename=None, do_ret_plot=False, dpi=100):
+        """Generated autocorrelation plot.
+
+        Args:
+            size (tuple(int,int)): Figure size in the (w,h) format.
+            filename (string, optional): Filename.
+            do_ret_plot (bool): Flag: Return the figure or self?
+            dpi (int): Resolution.
+
+        Returns:
+            Figure if 'do_ret_plot' is True and self otherwise (for method chaining):
+        """
+
         fig, axes = plt.subplots(len(self.series), 1, figsize=size, sharex=True, dpi=dpi)
         fig.subplots_adjust(hspace=0, wspace=0)
         # plt.suptitle('', fontweight='bold')
@@ -117,6 +151,12 @@ class Signal(object):
         # autocorrelation_plot(s[2], ax=axes[2])
 
     def quantize(self, bitdepth=16):
+        """Quantizes all series in the signal.
+
+        Args:
+            bitdepth (int): Number of bits to use.
+        """
+
         pass
 
 

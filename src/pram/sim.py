@@ -403,7 +403,7 @@ from scipy.stats import gaussian_kde
 from .data        import GroupSizeProbe, Probe
 from .entity      import Agent, Group, GroupQry, Site
 from .pop         import GroupPopulation
-from .rule        import Rule
+from .rule        import Rule, IterAlways, IterPoint, IterInt
 from .util        import Err, FS, Time
 from .model.model import Model
 
@@ -877,6 +877,28 @@ class SimulationDBI(object):
         return self.sim
 
     def gen_groups(self, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, is_verbose=False):
+        """
+        Here is a usage example::
+
+            (Simulation().
+                add().
+                    rule(...).
+                    probe(...).
+                    done().
+                db(os.path.join(os.path.dirname(__file__), 'db', 'allegheny-students.sqlite3')).
+                    gen_groups(
+                        tbl      = 'students',
+                        attr_db  = [],
+                        rel_db   = [GroupDBRelSpec(name='school', col='school_id')],
+                        attr_fix = {},
+                        rel_fix  = { 'home': Site('home') },
+                        rel_at   = 'school'
+                    ).
+                    done().
+                run(5)
+            )
+        """
+
         self.sim.gen_groups_from_db(self.fpath, tbl, attr_db, rel_db, attr_fix, rel_fix, rel_at, limit, is_verbose)
         return self
 
@@ -1036,6 +1058,14 @@ class Simulation(object):
             print(f'[info] {msg}')
 
     def add(self, lst=None):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         if lst:
             for i in lst:
                 if isinstance(i, Group):
@@ -1053,6 +1083,14 @@ class Simulation(object):
             return SimulationAdder(self)
 
     def add_group(self, group):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         # No rules present:
         if len(self.rules) == 0:
             raise SimulationConstructionError('A group is being added but no rules are present; rules need to be added before groups.')
@@ -1070,21 +1108,53 @@ class Simulation(object):
         return self
 
     def add_groups(self, groups):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         for g in groups:
             self.add_group(g)
         return self
 
     def add_probe(self, probe):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.probes.append(probe)
         probe.set_pop(self.pop)
         return self
 
     def add_probes(self, probes):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         for p in probes:
             self.add_probe(p)
         return self
 
     def add_rule(self, rule):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         '''
         Adds a rule to the simulation.  If the rule has any inner rules, all of those are added as well.  An example of
         an inner rule is a desease transmission model that is being acted upon by another rule, e.g., an intervention
@@ -1115,19 +1185,51 @@ class Simulation(object):
         return self
 
     def add_rules(self, rules):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         for r in rules:
             self.add_rule(r)
         return self
 
     def add_site(self, site):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pop.add_site(site)
         return self
 
     def add_sites(self, sites):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pop.add_sites(sites)
         return self
 
     def analyze_rules_static(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         '''
         Analyze rule conditioning prior to running the simulation.  This is done by analyzing the syntax (i.e.,
         abstract syntax trees or ASTs) of rule objects to identify group attributes and relations these rules condition
@@ -1149,6 +1251,14 @@ class Simulation(object):
         return self
 
     def analyze_rules_dynamic(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self._inf('Running dynamic rule analysis')
 
         rd = self.analysis.rule_dynamic
@@ -1168,6 +1278,14 @@ class Simulation(object):
         return self
 
     def analyze_rules_dynamic_old(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         '''
         Analyze rule conditioning after running the simulation.  This is done by processing group attributes and
         relations that the simulation has recorded as accessed by at least one rule.  The evidence of attributes and
@@ -1208,25 +1326,233 @@ class Simulation(object):
         return self
 
     def clear_probes(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.probes.clear()
         return self
 
     def clear_rules(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.rules.clear()
         return self
 
     def commit_group(self, group):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.add_group(group)
         return self
 
     def compact(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pop.compact()
         return self
 
     def db(self, fpath):
         return SimulationDBI(self, fpath)
 
+    def gen_ast(self):
+        '''
+        Code to AST
+            https://greentreesnakes.readthedocs.io
+        AST to code
+            https://astor.readthedocs.io
+        Visualizing
+            https://vpyast.appspot.com
+            https://ucb-sejits.github.io/ctree-docs/ipythontips.html
+        '''
+
+        pass
+
+    def gen_diagram(self, fpath_diag, fpath_pdf):
+        '''
+        Languages
+            DOT
+                https://en.wikipedia.org/wiki/DOT_(graph_description_language)
+        Misc
+            Graphviz
+                Graph Visualization Tools
+                Plots DOTs
+                https://gitlab.com/graphviz/graphviz
+        JavaScript graph editor library
+            List
+                https://modeling-languages.com/javascript-drawing-libraries-diagrams
+            Free
+                Processing
+                    https://p5js.org
+                    https://p5js.org/examples  [links to examples]
+                jGraph / MxGraph
+                    https://github.com/jgraph
+                        https://github.com/jgraph/mxgraph
+                            https://jgraph.github.io/mxgraph/javascript/index.html  [links to examples]
+                        https://github.com/jgraph/drawio
+                DiagramJS
+                    https://github.com/bpmn-io/diagram-js
+                       https://github.com/bpmn-io/diagram-js/tree/master/example
+                draw2d
+                    http://www.draw2d.org/draw2d
+                        http://www.draw2d.org/draw2d_touch/jsdoc_6/#!/example  [good examples library]
+                Cystoscape.js
+                    Graph theory (network) library for visualisation and analysis
+                    https://js.cytoscape.org
+            Commercial
+                GoJS
+                    https://gojs.net
+                        https://gojs.net/latest/samples/basic.html  [good examples library]
+                JointJS
+                    https://www.jointjs.com
+                DHTMLX
+                    https://dhtmlx.com/docs/products/dhtmlxDiagram
+                        https://docs.dhtmlx.com/diagram/samples/06_diagram_editor
+                            https://docs.dhtmlx.com/diagram/samples/06_diagram_editor/01_editor.html
+                            https://docs.dhtmlx.com/diagram/samples/06_diagram_editor/01_editor.html
+        Python
+            List
+                https://code.activestate.com/pypm/search:diagram/
+            Free
+                diagram
+                    Text mode diagrams using UTF-8 characters and fancy colors
+                    https://pypi.org/project/diagram
+                pygraph
+                python-graph
+                    https://github.com/Shoobx/python-graph
+                bdp
+                    bdp (Block Diagram in Python) is a package that translates diagrams described using Python objects to TikZ
+                    https://github.com/bogdanvuk/bdp
+                TikZ and PGF
+                    TikZ and PGF are TeX packages for creating graphics programmatically
+                    http://www.texample.net/tikz/examples/spacetime
+                blockdiag
+                    blockdiag and its family generate diagram images from simple text files
+                    http://blockdiag.com
+                    http://blockdiag.com/en/blockdiag/examples.html  [good examples library]
+                    https://www.jitsejan.com/creating-block-diagram.html
+                graphics.py
+                    http://anh.cs.luc.edu/handsonPythonTutorial/graphics.html
+        D3
+            https://github.com/d3/d3/wiki/Gallery  [good examples library]
+            http://nvd3.org
+            https://www.fullstackpython.com/d3-js.html
+        Python to D3
+            Python NVD3
+                https://github.com/areski/python-nvd3
+            mpld3
+                http://mpld3.github.io/
+        '''
+
+        # blockdiag sim {
+        # diagram = '''
+        #     diagram sim {
+        #         box [shape = box, label = "box"];
+        #         square [shape = square, label = "sq"];
+        #         roundedbox [shape = roundedbox, label = "rbox"];
+        #         circle [shape = circle, label = "circ"];
+        #
+        #         box -> square -> roundedbox -> circle;
+        #
+        #         #pop [shape = actor, label = "pop", stacked, numbered = 1000];
+        #         #db [shape = flowchart.database, label = "DB"];
+        #
+        #         #db -> pop
+        #     }'''
+        #
+        # with open(fpath_diag, 'w') as f:
+        #     f.write(diagram)
+
+        node_w = 128
+        node_h =  40
+        span_w =  64
+        span_h =  40
+        fontsize = 8
+
+        rules = self.rules
+
+        with open(fpath_diag, 'w') as f:
+            f.write( 'diagram sim {')
+            f.write( 'orientation = portrait;')
+            f.write(f'    node_width = {node_w};')
+            f.write(f'    node_height = {node_h};')
+            f.write(f'    default_fontsize = {fontsize};')
+            # f.write(f'    timeline [shape=box, label="", width={node_w * len(rules) + span_w * (len(rules) - 1)}, height=8, color="#000000"];')
+
+            for (i,r) in enumerate(rules):
+                # Rule block:
+                if hasattr(r, 'derivatives'):
+                    num = f', numbered={len(r.derivatives.params)}'
+                else:
+                    num = ''
+
+                f.write(f'        rule-{i} [shape=box, label="{r.__class__.__name__}" {num}];')
+                f.write(f'        t-{i}    [shape=box, label="", height=8, color="#000000"];')
+
+                # Rule-timeline arc:
+                if isinstance(r.i, IterAlways):
+                    i0, i1 = 0,0
+                elif isinstance(r.i, IterPoint):
+                    i0, i1 = r.i.i, r.i.i
+                elif isinstance(r.i, IterInt):
+                    i0, i1 = r.i.i0, r.i.i1
+                f.write(f'        rule-{i} -> t-{i} [label="{i0}"];')
+
+            f.write('}')
+
+        import subprocess
+        subprocess.run(['blockdiag', '-Tpdf', fpath_diag])
+        subprocess.run(['open', fpath_pdf])
+
     def gen_groups_from_db(self, fpath_db, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, is_verbose=False):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+
+        Here is a usage example::
+
+            (Simulation().
+                add().
+                    rule(...).
+                    probe(...).
+                    done().
+                gen_groups_from_db(
+                    fpath_db = os.path.join(os.path.dirname(__file__), 'db', 'allegheny-students.sqlite3')
+                    tbl      = 'students',
+                    attr_db  = [],
+                    rel_db   = [GroupDBRelSpec(name='school', col='school_id')],
+                    attr_fix = {},
+                    rel_fix  = { 'home': Site('home') },
+                    rel_at   = 'school'
+                ).
+                run(5)
+            )
+        """
+
         if not self.analysis.rule_static.are_rules_done:
             self.analyze_rules_static()  # by now we know all rules have been added
 
@@ -1241,6 +1567,14 @@ class Simulation(object):
         return self
 
     def gen_groups_from_db_old(self, fpath_db, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0, fpath=None, is_verbose=False):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         if not self.analysis.rule_static.are_rules_done:
             self.analyze_rules_static()  # by now we know all rules have been added
 
@@ -1262,6 +1596,14 @@ class Simulation(object):
 
     @staticmethod
     def gen_sites_from_db(fpath_db, fn_gen=None, fpath=None, is_verbose=False, pragma_live_info=False, pragma_live_info_ts=False):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         if pragma_live_info:
             if pragma_live_info_ts:
                 print(f'[{datetime.datetime.now()}: info] Generating sites from the database ({fpath_db})')
@@ -1271,6 +1613,14 @@ class Simulation(object):
         return FS.load_or_gen(fpath, lambda: fn_gen(fpath_db), 'sites', is_verbose)
 
     def gen_sites_from_db_new(self, fpath_db, tbl, name_col, rel_name=Site.AT, attr=[], limit=0):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self._inf(f'Generating sites from a database ({fpath_db})')
 
         self.add_sites(Site.gen_from_db(fpath_db, tbl, name_col, rel_name, attr, limit))
@@ -1329,6 +1679,14 @@ class Simulation(object):
         return self.pragma.rule_analysis_for_db_gen
 
     def get_state(self, do_camelize=True):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         return {
             'sim': {
                 'runCnt': self.run_cnt,
@@ -1386,6 +1744,14 @@ class Simulation(object):
 
     @staticmethod
     def _load(fpath, fn):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         with fn(fpath, 'rb') as f:
             gc.disable()
             sim = pickle.load(f)
@@ -1394,17 +1760,41 @@ class Simulation(object):
 
     @staticmethod
     def load(fpath):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         return Simulation._unpickle(fpath, open)
 
     @staticmethod
     def load_bz2(fpath):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         return Simulation._unpickle(fpath, bz2.BZ2File)
 
     @staticmethod
     def load_gz(fpath):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         return Simulation._unpickle(fpath, gzip.GzipFile)
 
-    def new_group(self, m=0.0, name=None):
+    def new_group(self, name=None, m=0.0):
         # return Group(name or self.pop.get_next_group_name(), n, callee=self)
         return Group(name, m, callee=self)
 
@@ -1412,6 +1802,14 @@ class Simulation(object):
         return SimulationPlotter(self)
 
     def plot_group_size(self, do_log=False, fpath=None, title='Distribution of Group Size', nx=250):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         '''
         nx - Number of x-axis points
         '''
@@ -1445,6 +1843,14 @@ class Simulation(object):
             return fig
 
     def plot_site_size(self, do_log=False, fpath=None, title='Distribution of Site Size', nx=250):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         '''
         nx - Number of x-axis points
         '''
@@ -1477,14 +1883,38 @@ class Simulation(object):
             return fig
 
     def rem_probe(self, probe):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.probes.discard(probe)
         return self
 
     def rem_rule(self, rule):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.rules.discard(rule)
         return self
 
     def reset_cb(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.cb = DotMap(
             after_iter  = None,
             before_iter = None
@@ -1492,6 +1922,14 @@ class Simulation(object):
         return self
 
     def reset_pop(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.run_cnt = 0
         self.is_setup_done = False
         self.pop = GroupPopulation()
@@ -1499,6 +1937,14 @@ class Simulation(object):
         return self
 
     def reset_pragmas(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma = DotMap(
             analyze = True,                  # flag: analyze the simulation and suggest improvements?
             autocompact = False,             # flag: remove empty groups after every iteration?
@@ -1515,15 +1961,39 @@ class Simulation(object):
         return self
 
     def reset_probes(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.probes = []
         return self
 
     def reset_rules(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.rules = []
         self.analysis.rule_static.reset()
         return self
 
     def run(self, iter_or_dur=1, do_disp_t=False):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         '''
         One by-product of running the simulation is that the simulation stores all group attributes and relations that
         are conditioned on by at least one rule.  After the run is over, a set of unused attributes and relations is
@@ -1694,14 +2164,38 @@ class Simulation(object):
             pickle.dump(self, f)
 
     def save(self, fpath):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self._pickle(fpath, open)
         return self
 
     def save_bz2(self, fpath):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self._pickle(fpath, bz2.BZ2File)
         return self
 
     def save_gz(self, fpath):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self._pickle(fpath, gzip.GzipFile)
         return self
 
@@ -1709,18 +2203,50 @@ class Simulation(object):
         return SimulationSetter(self)
 
     def set_cb_after_iter(self, fn):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.cb.after_iter = fn
         return self
 
     def set_cb_before_iter(self, fn):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.cb.before_iter = fn
         return self
 
     def set_fn_group_setup(self, fn):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.fn.group_setup = fn
         return self
 
     def set_pragma(self, name, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         fn = {
             'analyze'                  : self.set_pragma_analyze,
             'autocompact'              : self.set_pragma_autocompact,
@@ -1742,60 +2268,172 @@ class Simulation(object):
         return self
 
     def set_pragma_analyze(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma.analyze = value
         return self
 
     def set_pragma_autocompact(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma.autocompact = value
         return self
 
     def set_pragma_autoprune_groups(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma.autoprune_groups = value
         return self
 
     def set_pragma_autostop(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma.autostop = value
         return self
 
     def set_pragma_autostop_n(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma.autostop_n = value
         return self
 
     def set_pragma_autostop_p(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma.autostop_p = value
         return self
 
     def set_pragma_autostop_t(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma.autostop_t = value
         return self
 
     def set_pragma_live_info(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma.live_info = value
         return self
 
     def set_pragma_live_info_ts(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma.live_info_ts = value
         return self
 
     def set_pragma_probe_capture_init(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma.probe_capture_init = value
         return self
 
     def set_pragma_rule_analysis_for_db_gen(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.pragma.rule_analysis_for_db_gen = value
         return self
 
     def set_iter_cnt(self, iter_cnt):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.iter_cnt = iter_cnt
         return self
 
     def set_dur(self, dur):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.dur = dur
         if self.timer:
             self.timer.set_dur(dur)
         return self
 
     def set_rand_seed(self, rand_seed):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.rand_seed = rand_seed
         if self.rand_seed is not None:
             random.seed(self.rand_seed)
@@ -1803,12 +2441,28 @@ class Simulation(object):
         return self
 
     def show_rule_analysis(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         self.show_static_rule_analysis()
         self.show_dynamic_rule_analysis()
 
         return self
 
     def show_rule_analysis_dynamic(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         rd = self.analysis.rule_dynamic
 
         print( 'Most recent simulation run')
@@ -1825,6 +2479,14 @@ class Simulation(object):
         return self
 
     def show_rule_analysis_static(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         ra = self.analysis.rule_static
 
         print( 'Rule analyzer')
@@ -1841,6 +2503,14 @@ class Simulation(object):
         return self
 
     def summary(self, do_header=True, n_groups=8, n_sites=8, n_rules=8, n_probes=8, end_line_cnt=(0,0)):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
         '''
         Prints the simulation summary.  The summary can be printed at any stage of a simulation (i.e., including at
         the very beginning and end) and parts of the summary can be shown and hidden and have their length specified.

@@ -1,0 +1,341 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Details &#8212; PyPRAM  documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Example Simulations" href="examples.html" />
+    <link rel="prev" title="Introduction" href="intro.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="details">
+<h1>Details<a class="headerlink" href="#details" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="modeling-levels">
+<h2>Modeling Levels<a class="headerlink" href="#modeling-levels" title="Permalink to this headline">¶</a></h2>
+<p>PRAM supports modeling on three levels of abstraction: Domain, class, and rule.  Apart from being flexible, this design choice delivers expressive brevity in that it allows the modeler to invoke models in a space- and time-efficient manner.  In what follows, we briefly describe an example model and then demonstrate how that model can be implemented on each of the three level.</p>
+<div class="section" id="the-sirs-model">
+<h3>The SIRS Model<a class="headerlink" href="#the-sirs-model" title="Permalink to this headline">¶</a></h3>
+<p>The SIR epidemiological model <a class="footnote-reference brackets" href="#id3" id="id1">1</a> will help us illustrate the different modeling levels.  In that model, population is compartmentalized into susceptible (S), infectious (I), and recovered (R).  As shown on the image below, an infectious disease is transmitted between susceptible hosts with the rate β who eventually recover with rate γ.  Because getting a disease does not need to result in life-long immunity to it, the model can be augmented by allowing recovered hosts to become susceptible again with rate α (which results in the SIRS model).</p>
+<div class="figure align-center" id="id5">
+<img alt="https://raw.githubusercontent.com/momacs/pram/master/media/modeling-levels/sirs-model.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/modeling-levels/sirs-model.png" />
+<p class="caption"><span class="caption-text">The SIRS model</span><a class="headerlink" href="#id5" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<div class="section" id="the-domain-level">
+<h3>The Domain Level<a class="headerlink" href="#the-domain-level" title="Permalink to this headline">¶</a></h3>
+<p>The domain level allows the modeler to express their models on the level of their research area.  For example, being familiar with the different models of infectious diseases, it would be natural for an epidemiologist to invoke a model like the SIRS directly.  Here is a Python example of just that:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SIRSModel</span><span class="p">(</span><span class="s1">&#39;flu&#39;</span><span class="p">,</span> <span class="n">β</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">γ</span><span class="o">=</span><span class="mf">0.50</span><span class="p">,</span> <span class="n">α</span><span class="o">=</span><span class="mf">0.10</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="the-class-level">
+<h3>The Class Level<a class="headerlink" href="#the-class-level" title="Permalink to this headline">¶</a></h3>
+<p>A modeler can also work on the class-of-models level.  For example, an epidemiologist may know that the SIRS model can be implemented as a time-invariant Markov chain.  Here is an example of how that can be coded in the <code class="docutils literal notranslate"><span class="pre">PyPRAM</span></code> package using the <code class="docutils literal notranslate"><span class="pre">TimeInvMarkovChain</span></code> rule:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>β, γ, α = 0.05, 0.50, 0.10
+transition_matrix = {
+    &#39;s&#39;: [1 - β,     β,  0.00],
+    &#39;i&#39;: [ 0.00, 1 - γ,     γ],
+    &#39;r&#39;: [    α,  0.00, 1 – α]
+}
+TimeInvMarkovChain(&#39;flu&#39;, transition_matrix)
+</pre></div>
+</div>
+</div>
+<div class="section" id="the-rule-level">
+<h3>The Rule Level<a class="headerlink" href="#the-rule-level" title="Permalink to this headline">¶</a></h3>
+<p>Finally, a modeler may choose to descend to the lowest level and implement the dynamics of their model directly.  This is beneficial if what they are trying to express diverges from the set of modeling classes <code class="docutils literal notranslate"><span class="pre">PyPRAM</span></code> provides (or to encode a particular sort of interaction between different models).  Extending an existing class (e.g., the <code class="docutils literal notranslate"><span class="pre">TimeInvMarkovChain</span></code>) is an example of modeling on the rule level as well even if minimal portions of the model dynamics are overridden.  Here is a pseudo-code for the (slightly extended) SIRS model:</p>
+<div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="go">rule_flu_progression():</span>
+<span class="go">    if group.feature.flu == &#39;s&#39;:</span>
+<span class="go">        p_inf = n@_{feature.flu == &#39;i&#39;} / n@    # n@ - count at the group&#39;s location</span>
+<span class="go">        dm     p_inf -&gt; F:flu = &#39;i&#39;, F:mood = &#39;annoyed&#39;</span>
+<span class="go">        nc 1 - p_inf</span>
+<span class="go">    if group.feature.flu == &#39;i&#39;:</span>
+<span class="go">        dm 0.2 -&gt; F:flu = &#39;r&#39;, F:mood = &#39;happy&#39;</span>
+<span class="go">        dm 0.5 -&gt; F:flu = &#39;i&#39;, F:mood = &#39;bored&#39;</span>
+<span class="go">        dm 0.3 -&gt; F:flu = &#39;i&#39;, F:mood = &#39;annoyed&#39;</span>
+<span class="go">    if group.feature.flu == &#39;r&#39;:</span>
+<span class="go">        dm 0.1 -&gt; F:flu = &#39;s&#39;    # dm - distribute mass</span>
+<span class="go">        nc 0.9                   # nc - no change</span>
+
+<span class="go">rule_flu_location():</span>
+<span class="go">    if group.feature.flu == &#39;i&#39;:</span>
+<span class="go">        if group.feature.income == &#39;l&#39;:</span>
+<span class="go">            dm 0.1 -&gt; R:@ = group.rel.home</span>
+<span class="go">            nc 0.9</span>
+<span class="go">        if group.feature.income == &#39;m&#39;:</span>
+<span class="go">            dm 0.6 -&gt; R:@ = group.rel.home</span>
+<span class="go">            nc 0.4</span>
+<span class="go">    if group.feature.flu == &#39;r&#39;:</span>
+<span class="go">      dm 0.8 -&gt; R:@ = group.rel.school</span>
+<span class="go">      nc 0.2</span>
+</pre></div>
+</div>
+<p>This pseudo-code is based on a Python-like notation we have been working on to help to expose the internal workings of a model without resorting to often unnecessarily verbose Python source code.</p>
+</div>
+</div>
+<div class="section" id="ordinary-differential-equations">
+<h2>Ordinary Differential Equations<a class="headerlink" href="#ordinary-differential-equations" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="mass-space">
+<h3>Mass Space<a class="headerlink" href="#mass-space" title="Permalink to this headline">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">PyPRAM</span></code> supports simulating systems of ordinary differential equations (ODEs) operating on three types of spaces.  First, systems of ODEs can be used as mass conversion operators.  For example, the image below shows the conversion of mass for two substances, A and B, described by the exponential decay equation (i.e., <span class="math notranslate nohighlight">\(dN/dt = -\lambda N\)</span>).  The decay constants for the two substances are <span class="math notranslate nohighlight">\(\lambda_A = 1\)</span> and <span class="math notranslate nohighlight">\(\lambda_B = 0.05\)</span>.</p>
+<div class="figure align-default" id="id6">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/decay.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/decay.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/decay.png" /></a>
+<p class="caption"><span class="caption-text">Exponential decay of two substances</span><a class="headerlink" href="#id6" title="Permalink to this image">¶</a></p>
+</div>
+<p>As another example, the time series below shows the result of simulating a system of ODEs describing the SIR model.</p>
+<div class="figure align-default" id="id7">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/sir.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/sir.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/sir.png" /></a>
+<p class="caption"><span class="caption-text">The SIR model</span><a class="headerlink" href="#id7" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<div class="section" id="group-space">
+<h3>Group Space<a class="headerlink" href="#group-space" title="Permalink to this headline">¶</a></h3>
+<p>The second space which can be affected by a system of ODEs is given by groups.  Because groups are defined by the values of their attributes and relations, this results in mass conversion (or flow) between groups, but the machanism by which this occurs is different than when the ODEs operate on the mass space.</p>
+<p>The time series below shows the result of simulating the Lotka-Volterra population dynamics model.  That model expresses the cyclic relationship between the size of prey population that grows via reproduction and the size of predator population which grows by consuming the prey.</p>
+<div class="figure align-default" id="id8">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/lv.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/lv.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/lv.png" /></a>
+<p class="caption"><span class="caption-text">The Lotka-Volterra model</span><a class="headerlink" href="#id8" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<div class="section" id="rule-space">
+<h3>Rule Space<a class="headerlink" href="#rule-space" title="Permalink to this headline">¶</a></h3>
+<p>Finally, the numeric integrator for a system of ODEs can be kept internal to the PRAM rule.  In that case, it does not interact with the simulation context directly.  Nevertheless, the results of the integration are available to all other rules.  For example, the image below shows the phase plot of atmospheric convection modeled with three ODEs that form the Lorenz system.  The solution to this particular initial value problem is the Lorenz attractor.</p>
+<div class="figure align-default" id="id9">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/lorenz.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/lorenz.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/sim-odes/lorenz.png" /></a>
+<p class="caption"><span class="caption-text">The Lorenz system</span><a class="headerlink" href="#id9" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+</div>
+<div class="section" id="composite-simulations">
+<h2>Composite Simulations<a class="headerlink" href="#composite-simulations" title="Permalink to this headline">¶</a></h2>
+<p>One of the goals of <code class="docutils literal notranslate"><span class="pre">PyPRAM</span></code> is to elucidate the interactions between complex systems.  The package hopes to do that via composite simulations, i.e., simulations composed of different models which are allowed to work independently and interact by simultaneously changing the shared simulation state space.</p>
+<div class="section" id="the-sir-model-with-a-flu-spike-event">
+<h3>The SIR Model with a Flu-Spike Event<a class="headerlink" href="#the-sir-model-with-a-flu-spike-event" title="Permalink to this headline">¶</a></h3>
+<p>The time series below is a result of a simulation combining the SIR model with an event (i.e., a time-point perturbation).  That event converts a large proportion (specifically, 80%) of the recovered agents back into susceptible.</p>
+<div class="figure align-default" id="id10">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/sir-evt.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/sir-evt.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/sir-evt.png" /></a>
+<p class="caption"><span class="caption-text">The SIR model with an event</span><a class="headerlink" href="#id10" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<div class="section" id="the-sir-model-with-a-flu-spike-process">
+<h3>The SIR Model with a Flu-Spike Process<a class="headerlink" href="#the-sir-model-with-a-flu-spike-process" title="Permalink to this headline">¶</a></h3>
+<p>A more interesting and realistic scenario might involve not an event but a process (i.e, a time-span perturbation).  For example, the time series below shows the intensity of a process described by the scaled gamma distribution.</p>
+<div class="figure align-default" id="id11">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/gamma.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/gamma.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/gamma.png" /></a>
+<p class="caption"><span class="caption-text">The gamma process</span><a class="headerlink" href="#id11" title="Permalink to this image">¶</a></p>
+</div>
+<p>When this gamma process is combined with the SIR model, the PRAM simulation produces a time series shown on the image below.  Iterations 1-999 are dominated by the SIR model which converts mass from S to R via I (i.e., susceptible to recovered via infectious).  However, from that point on (i.e., for iterations of 1000-3000), additionally to that model, the gamma process shown above converts a portion of the recovered agents back into susceptible.  As shown on the plot below, the interplay of the two PRAM rules (with the SIR model dynamics being encoded by a system of ODEs) produces an interesting effect of the infection level in the population being stretched in time plausibly resulting in a model of a long-term epidemic.</p>
+<div class="figure align-default" id="id12">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/sir-gamma-proc.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/sir-gamma-proc.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/sir-gamma-proc.png" /></a>
+<p class="caption"><span class="caption-text">The SIR model with a gamma process</span><a class="headerlink" href="#id12" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<div class="section" id="the-lotka-volterra-model-with-a-food-restriction-process">
+<h3>The Lotka-Volterra Model with a Food Restriction Process<a class="headerlink" href="#the-lotka-volterra-model-with-a-food-restriction-process" title="Permalink to this headline">¶</a></h3>
+<p>The Lotka-Volterra model of population dynamics contains four parameters.  When one of them, the prey reproduction rate parameter, is affected by a linear process that decreases it slowly but surely, the following picture emerges.</p>
+<div class="figure align-default" id="id13">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/lv-lin-proc.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/lv-lin-proc.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/sim-model-composition/lv-lin-proc.png" /></a>
+<p class="caption"><span class="caption-text">The Lotka-Volterra model with a linear process</span><a class="headerlink" href="#id13" title="Permalink to this image">¶</a></p>
+</div>
+<p>By decreasing the reproductive rate of prey, that linear process models increasingly hostile natural environment.  The process does not directly disturb the sizes of the two populations and affects the population dynamics indirectly (plausibly by restricting the prey food sources).  While using such a simple process is perfect for expositionary purposes, a more realistic model would involve breaking the linear process down into sub-processes, each corresponding to the dynamics of an asymptotically barren ecosystem.</p>
+<p>Even though the process changes the prey reproductive parameter in very small decrements, it nevertheless leads to the eventual extinction of the predator population (due to insufficient size of the prey population) and then the prey population itself.  If we assume that the simulation parameters are biologically and ecologically valid, this simulation predicts the predator species to go extinct in 80 years and the prey population to follow in another 50 years.</p>
+</div>
+</div>
+<div class="section" id="mass-dynamics">
+<h2>Mass Dynamics<a class="headerlink" href="#mass-dynamics" title="Permalink to this headline">¶</a></h2>
+<p>In the context of a PRAM simulation, mass dynamics can be defined in at least three related but distinct ways.  First, we could understand it as mass locus (<span class="math notranslate nohighlight">\(m\)</span>); such conceptualization would allows us to answer the question “Where is mass?”  Second, we could define it as mass flow (i.e., the first derivative of mass locus, <span class="math notranslate nohighlight">\(dm/dt\)</span>) which would permit answers to the question “How did it get there?”  Finally, we could talk of the mass flux (or rate of mass flow, i.e., first derivative of mass transfer and the second derivative of mass locus, <span class="math notranslate nohighlight">\(d^2m/dt\)</span>).  The rate answers the question “How quickly did it move?”</p>
+<div class="section" id="mass-spaces">
+<h3>Mass Spaces<a class="headerlink" href="#mass-spaces" title="Permalink to this headline">¶</a></h3>
+<p>Mass dynamics in PRAMs can be considered in the <em>group space</em> or the <em>probe space</em>.  The group mass space is a partition defined by group attributes and relations and thus contains all the groups in a simulation (for that reason, the name <em>simulation mass space</em> would be adequate as well).  The probe mass space on the other hand is typically smaller (i.e., it has fewer dimensions) because the mass distributed among the groups is typically aggregated by probes.  For example, while the SIR model can be invoked in a simulation containing many agents attending many schools, a probe defined by the user will reveal their interest to be on a high level of, e.g., “size of populations of infected students at low vs medium income schools over time.”</p>
+</div>
+<div class="section" id="mass-locus">
+<h3>Mass Locus<a class="headerlink" href="#mass-locus" title="Permalink to this headline">¶</a></h3>
+<p>Below are a few examples of how mass locus can be visualized using steamgraphs.  First, we have the SIR model which was described earlier.</p>
+<div class="figure align-default" id="id14">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-01-sir.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-01-sir.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-01-sir.png" /></a>
+<p class="caption"><span class="caption-text">Streamgraph for the SIR model</span><a class="headerlink" href="#id14" title="Permalink to this image">¶</a></p>
+</div>
+<p>Next, we have a simulation of the SIR model composed with a gamma process which at iteration 1000 starts to convert recovered agents back into susceptible.  That gamma process quickly overpowers the SIR model’s attempts to convert agents into recovered (via infectious) but then eases off and eventually play no role.</p>
+<div class="figure align-default" id="id15">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-03-sir-gamma.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-03-sir-gamma.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-03-sir-gamma.png" /></a>
+<p class="caption"><span class="caption-text">Streamgraph for the SIR model and a gamma process</span><a class="headerlink" href="#id15" title="Permalink to this image">¶</a></p>
+</div>
+<p>Next, we have the segregation model <a class="footnote-reference brackets" href="#id4" id="id2">2</a> in which mass dynamics is the result of the agents’ motivation to be close to other similar agents (e.g., blue agents want to be in proximity of other blue agents) and far away from dissimilar agents (e.g., blue agents do not want to congregate near red agents).</p>
+<div class="figure align-default" id="id16">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-04-segregation.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-04-segregation.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-04-segregation.png" /></a>
+<p class="caption"><span class="caption-text">Streamgraph for the segregation model</span><a class="headerlink" href="#id16" title="Permalink to this image">¶</a></p>
+</div>
+<p>Finally, we have a simulation of the SIR model at eight different schools.  The SIR models at each of those schools are slightly different in that the transmission probability depends on the size of the school, i.e., the probability of a student to become infected is proportional to the number of infectious students around him.  In that way, larger schools are more likely to be afflicted by an epidemic.</p>
+<div class="figure align-default" id="id17">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-05-schools.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-05-schools.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/streamgraph-05-schools.png" /></a>
+<p class="caption"><span class="caption-text">Streamgraph for the eight-schools simulation</span><a class="headerlink" href="#id17" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<div class="section" id="mass-flow">
+<h3>Mass Flow<a class="headerlink" href="#mass-flow" title="Permalink to this headline">¶</a></h3>
+<p>Below is an example of visualization of mass flow in the SIR model that has been run for seven iterations.</p>
+<div class="figure align-default">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/states-01-sir-7i.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/states-01-sir-7i.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/mass-dynamics/states-01-sir-7i.png" /></a>
+</div>
+</div>
+</div>
+<div class="section" id="trajectories-and-trajectory-ensembles">
+<h2>Trajectories and Trajectory Ensembles<a class="headerlink" href="#trajectories-and-trajectory-ensembles" title="Permalink to this headline">¶</a></h2>
+<p>A PRAM simulation need not to be deterministic.  In fact, simulations imbued with stochasticity are likely the more interesting kind.  In order to properly account for a stochastic nature of those simulations, the software enables execution of multiple independent simulations.  The trace of those simulation runs yields an ensemble distribution which can then be inspected statistically for patterns (e.g., the expected number of years until underground water wells dry up in a region given water utilization strategies S1 versus S2 or the worst-case scenario under a set of utilization strategies).  Because the states of individual simulations can be conceived as sequential interacting samples of the system state, this method belongs to the mean field particle class.  While beginning with a set of user-defined or random initial states (or a combination thereof) is the simplest solution, a more elaborate initial state selection could be employed as well.</p>
+<div class="section" id="example-the-sirs-model-beta-perturbation">
+<h3>Example: The SIRS Model + Beta Perturbation<a class="headerlink" href="#example-the-sirs-model-beta-perturbation" title="Permalink to this headline">¶</a></h3>
+<p>Let us illustrate this idea with a simulation of two interacting models.  The first model is the SIRS model.  The second model is a stochastic process that at every simulation step converts a small portion of the recovered agents back into susceptible.  That random conversion probability is a random draw from the <span class="math notranslate nohighlight">\(\text{Beta}(2,25)\)</span> distribution.  Below is the histogram of 100,000 such draws.</p>
+<div class="figure align-default" id="id18">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/traj/beta.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/traj/beta.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/traj/beta.png" /></a>
+<p class="caption"><span class="caption-text">Beta distribution</span><a class="headerlink" href="#id18" title="Permalink to this image">¶</a></p>
+</div>
+<p>While the result of these two models interacting is fairly easy to anticipate, this may not be the case for larger systems of models.  Below is a line plot of 10 randomly selected trajectories of this ensemble.  Note that the actual data is not smooth; the plot represents splines fitted to each of the three series within each of the 10 trajectories.</p>
+<div class="figure align-default">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-01-sirs-beta-line-01-10t.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-01-sirs-beta-line-01-10t.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-01-sirs-beta-line-01-10t.png" /></a>
+</div>
+<p>This is how a 100 samples would look like.</p>
+<div class="figure align-default">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-02-sirs-beta-line-02-100t.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-02-sirs-beta-line-02-100t.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-02-sirs-beta-line-02-100t.png" /></a>
+</div>
+</div>
+<div class="section" id="example-the-sirs-model-beta-perturbation-gamma-process">
+<h3>Example: The SIRS Model + Beta Perturbation + Gamma Process<a class="headerlink" href="#example-the-sirs-model-beta-perturbation-gamma-process" title="Permalink to this headline">¶</a></h3>
+<p>In this example, we will investigate a simulation consisting of the same SIRS model and a beta perturbation but this time there will also be a gamma process which, like before, converts an increasingly large number of recovered agents into the susceptible ones only to ease off and eventually cease to affect the simulation altogether.  Below is mass dynamics for an ensemble of 10 trajectories.</p>
+<div class="figure align-default">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-06-sir-gamma-beta-line-02-10t-2ki.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-06-sir-gamma-beta-line-02-10t-2ki.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-06-sir-gamma-beta-line-02-10t-2ki.png" /></a>
+</div>
+<p>Because directly plotting large number of individual trajectories may not produce a clear image, trajectories can be aggregated over.  One example of such aggregation is shown below.  Here, the mean and the interquartile range (IQR) for each of the three groups (i.e., S, I, and R) is shown instead of the individual series.</p>
+<div class="figure align-default">
+<a class="reference external image-reference" href="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-07-sir-gamma-beta-line-aggr-10t-2ki.png"><img alt="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-07-sir-gamma-beta-line-aggr-10t-2ki.png" src="https://raw.githubusercontent.com/momacs/pram/master/media/traj/ensemble-07-sir-gamma-beta-line-aggr-10t-2ki.png" /></a>
+</div>
+<p class="rubric">References</p>
+<dl class="footnote brackets">
+<dt class="label" id="id3"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Kermack, W.O &amp; McKendrick, A.G. (1927) A Contribution to the Mathematical Theory of Epidemics. <em>Proceedings of the Royal Society A, 115(772)</em>, 700-721.</p>
+</dd>
+<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>Schelling, T.C. (1969) Models of Segregation. <em>The American Economic Review, 59(2)</em>, 488-493.</p>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="index.html">
+    <img class="logo" src="_static/logo.png" alt="Logo"/>
+    
+  </a>
+</p>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=momacs&repo=pram&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Details</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#modeling-levels">Modeling Levels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ordinary-differential-equations">Ordinary Differential Equations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#composite-simulations">Composite Simulations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mass-dynamics">Mass Dynamics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#trajectories-and-trajectory-ensembles">Trajectories and Trajectory Ensembles</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Example Simulations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="front-ends.html">Front-Ends</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pram.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="intro.html" title="previous chapter">Introduction</a></li>
+      <li>Next: <a href="examples.html" title="next chapter">Example Simulations</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018-2019, momacs.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/details.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

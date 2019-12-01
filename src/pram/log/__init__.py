@@ -1,2 +1,2 @@
-from log.log import Log
-from log.man import LogMan
+from log import Log
+from man import LogMan

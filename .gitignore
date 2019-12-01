@@ -1,9 +1,15 @@
+# https://www.atlassian.com/git/tutorials/saving-changes/gitignore
+
+# Local:
 /_backup
 /assets
 /bin
 /data
+/docs-build
+/docs-src
 /include
 /lib
+/logic
 /notebooks
 /out
 /res
@@ -13,21 +19,35 @@
 /tmp-rt
 /todo
 /work
+/commit.txt
 /is-root
 /mk-src-backup
 /pip-selfcheck.json
 /pyvenv.cfg
+/setup.cfg
+/todo.txt
 
+# Python:
 *.pyc
 __pycache__/
 /dist/
 /*.egg-info
 
-*.pickle.gz
-*.pickle
-*.sqlite3
-*.png
+# Binary files:
+/src/**/*.pickle.gz
+/src/**/*.pickle
+/src/**/*.sqlite3
+/src/**/*.png
 
+# Dev:
+/src/dev
+/src/tmp
+
+# Sphinx docs:
+doctrees/
+.buildinfo
+
+# LaTeX:
 *.gz
 *.pdf
 *.out
@@ -35,9 +55,11 @@ __pycache__/
 *.aux
 *.tex
 
+# R:
 .RData
 .Rhistory
 
+ # MacOS:
 .DS_Store
 .DS_Store?
 ._*

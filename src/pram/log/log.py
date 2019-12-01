@@ -10,13 +10,12 @@ from util import Str, Time
 
 
 class Log(object):
-    '''
-    A log.
+    """A log.
 
     A single log manages opening and closing of the destination file, adding headers, and adding records. It also
     handles timestamping of all records.  Note that a record timestamp denotes the time of adding that record to the
     log file, not the time related to the message itself.
-    '''
+    """
 
     DEBUG_LVL = 1
 

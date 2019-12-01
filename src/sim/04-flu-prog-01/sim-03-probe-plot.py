@@ -8,10 +8,10 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
-from pram.data   import ProbePersistanceDB, GroupSizeProbe
-from pram.entity import Group
-from pram.rule   import SIRSModel
-from pram.sim    import Simulation
+from pram.data      import ProbePersistanceDB, GroupSizeProbe
+from pram.entity    import Group
+from pram.model.epi import SIRSModel
+from pram.sim       import Simulation
 
 
 # ----------------------------------------------------------------------------------------------------------------------

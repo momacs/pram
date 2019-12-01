@@ -142,9 +142,9 @@ class Trajectory(object):
         plot = self.ens.plot_mass_locus_fft(self, size, filepath, iter_range, sampling_rate, do_sort, do_ret_plot)
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), do_ret_plot=False):
+    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), stroke_w=1, col_scheme='set1', do_ret_plot=False):
         self._check_ens()
-        plot = self.ens.plot_mass_locus_line(size, filepath, iter_range, self, 0, do_ret_plot)
+        plot = self.ens.plot_mass_locus_line(size, filepath, iter_range, self, 0, 1, stroke_w, col_scheme, do_ret_plot)
         return plot if do_ret_plot else self
 
     def plot_mass_locus_recurrence(self, size, filepath, iter_range=(-1, -1), neighbourhood=FixedRadius(), embedding_dimension=1, time_delay=2, do_ret_plot=False):
@@ -811,7 +811,7 @@ class TrajectoryEnsemble(object):
 
         return fig if do_ret_plot else self
 
-    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), traj=None, nsamples=0, opacity_min=0.1, col_scheme='set1', do_ret_plot=False):
+    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), traj=None, nsamples=0, opacity_min=0.1, stroke_w=1, col_scheme='set1', do_ret_plot=False):
         '''
         If 'traj' is not None, only that trajectory is plotted.  Otherwise, 'nsample' determines the number of
         trajectories plotted.  Specifically, if smaller than or equal to zero, all trajectories are plotted; otherwise,
@@ -865,7 +865,7 @@ class TrajectoryEnsemble(object):
                 alt.Chart(
                     alt.Data(values=data)
                 ).mark_line(
-                    strokeWidth=1, opacity=opacity, interpolate='basis', tension=1  # basis, basis-closed, cardinal, cardinal-closed, bundle(tension)
+                    strokeWidth=stroke_w, opacity=opacity, interpolate='basis', tension=1  # basis, basis-closed, cardinal, cardinal-closed, bundle(tension)
                 ).encode(
                     alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
                     alt.Y('m:Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
@@ -894,7 +894,7 @@ class TrajectoryEnsemble(object):
 
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_line_aggr(self, size, filepath, iter_range=(-1, -1), band_type='ci', col_scheme='set1', do_ret_plot=False):
+    def plot_mass_locus_line_aggr(self, size, filepath, iter_range=(-1, -1), band_type='ci', stroke_w=1, col_scheme='set1', do_ret_plot=False):
         '''
         Ordering the legend of a composite chart
             https://stackoverflow.com/questions/55783286/control-legend-color-and-order-when-joining-two-charts-in-altair
@@ -928,7 +928,7 @@ class TrajectoryEnsemble(object):
         # (3.2) Plot iterations:
         plot_line = alt.Chart(
             ).mark_line(
-                strokeWidth=1, interpolate='basis'#, tension=1  # basis, basis-closed, cardinal, cardinal-closed, bundle(tension)
+                strokeWidth=stroke_w, interpolate='basis'#, tension=1  # basis, basis-closed, cardinal, cardinal-closed, bundle(tension)
             ).encode(
                 alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
                 alt.Y('mean(m):Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
@@ -1153,6 +1153,12 @@ class TrajectoryEnsemble(object):
         return self
 
     def run(self, iter_or_dur=1, do_memoize_group_ids=False):
+        '''
+        Parallelization
+            https://docs.python.org/2/library/multiprocessing.html
+            https://pyfora.readthedocs.io
+        '''
+
         if iter_or_dur < 1:
             return
 
