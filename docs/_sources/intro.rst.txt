@@ -1,0 +1,66 @@
+************
+Introduction
+************
+
+Features of the PRAM framework:
+
+- Models on an agent population level instead of the level of individual agents by grouping functionally equivalent agents into ``groups``
+- Allows groups of agents to be related to one or more ``sites`` (e.g., a school the agents attend to or a opinion they share)
+- Lifts the domain (and thus offers lifted inference)
+- Models agent population mass dynamics as mass shift (or transfer) between groups
+- Agent population mass dynamics observes axioms of probability
+- Is equivalent to compartmental models but without imposing the requirement of specifying all compartments beforehand (i.e., groups are created automatically when necessary)
+
+Additional features more specific to the implementation in the PyPRAM package:
+
+- Attempts to integrate and unify other modeling and simulation frameworks (e.g., ABMs, compartmental models, redistribution systems, ordinary-differential equations, Markov chains, etc.)
+- Allows modelers to compose complicated models from smaller parts called `modeling primitives`
+- Organizes modeling primitives into a multigraph
+- Inheritance-based hierarchies expressed within the modeling primitives multigraph explicitely encode specialization and generalization
+- Provides systemic diagnostics
+  - Mass dynamics visualization
+  - Time-frequency analysis
+  - Recurrence quantification analysis
+  - Etc.
+
+
+Dependencies
+============
+
+- `Python 3.6 <https://python.org>`_
+- `xxhash <https://pypi.org/project/xxhash/>`_
+- `dotmap <https://pypi.org/project/dotmap>`_
+- `sortedcontainers <http://www.grantjenks.com/docs/sortedcontainers/index.html>`_
+- `attrs <https://github.com/python-attrs/attrs>`_
+- `dill <https://pypi.org/project/dill/>`_
+- `numpy <https://www.numpy.org>`_
+- `scipy <https://www.scipy.org>`_
+- `matplotlib <https://matplotlib.org>`_
+- `graph-tool <https://graph-tool.skewed.de>`_
+- `pycairo <https://www.cairographics.org/pycairo>`_ (for `graph-tool`)
+- `PyGObject <https://pygobject.readthedocs.io>`_ (for `graph-tool`)
+- `altair <https://altair-viz.github.io>`_
+- `selenium <https://selenium-python.readthedocs.io>`_ (for saving `altair` graphs)
+- `Gecko Driver <https://github.com/mozilla/geckodriver/releases>`_ and a recent version of Firefox (for saving `altair` graphs)
+- `Chrome Driver <https://sites.google.com/a/chromium.org/chromedriver>`_ (a Chrome alternative to the above)
+- `PyRQA <https://pypi.org/project/PyRQA>`_
+- `pybind11 <https://pybind11.readthedocs.io>`_ (for `PyRQA`)
+- `PyOpenCL <https://documen.tician.de/pyopencl>`_ (for `PyRQA`)
+
+
+Installation
+============
+
+The `setup-ubuntu.sh <https://github.com/momacs/pram/blob/master/script/setup-ubuntu.sh>`_ script is the preferred method of deploying the package onto a fresh installation of the Ubuntu Server/Desktop (tested with 18.04 LTS) because it alleviates the pain of installing all dependencies manually.  The ``do_env`` variable controls whether the package and its dependencies are installed inside a Python ``venv`` (yes by default).  The script can be downloaded and run like so:
+
+.. code-block:: sh
+
+   wget https://raw.githubusercontent.com/momacs/pram/master/script/setup-ubuntu.sh
+   chmod a+x setup-ubuntu.sh
+   ./setup-ubuntu.sh
+
+
+Basic API Usage
+===============
+
+...

@@ -1,0 +1,102 @@
+pram package
+============
+
+Subpackages
+-----------
+
+.. toctree::
+
+   pram.log
+   pram.model
+
+Submodules
+----------
+
+pram.data module
+----------------
+
+.. automodule:: pram.data
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pram.entity module
+------------------
+
+.. automodule:: pram.entity
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pram.event module
+-----------------
+
+.. automodule:: pram.event
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pram.graph module
+-----------------
+
+.. automodule:: pram.graph
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pram.pop module
+---------------
+
+.. automodule:: pram.pop
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pram.rule module
+----------------
+
+.. automodule:: pram.rule
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pram.signal module
+------------------
+
+.. automodule:: pram.signal
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pram.sim module
+---------------
+
+.. automodule:: pram.sim
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pram.traj module
+----------------
+
+.. automodule:: pram.traj
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pram.util module
+----------------
+
+.. automodule:: pram.util
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+Module contents
+---------------
+
+.. automodule:: pram
+   :members:
+   :undoc-members:
+   :show-inheritance:
