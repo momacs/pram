@@ -44,6 +44,7 @@ __pycache__/
 /src/tmp
 
 # Sphinx docs:
+docs/_sources
 doctrees/
 .buildinfo
 
