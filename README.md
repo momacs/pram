@@ -55,11 +55,24 @@ Front-end:
 ## Setup
 ### Ubuntu
 
-The [`setup-ubuntu.sh`](https://github.com/momacs/pram/blob/master/script/setup-ubuntu.sh) script is the prefered method of deploying the package onto a fresh installation of the Ubuntu Server/Desktop (tested with 18.04 LTS).  The `do_env` variable controls whether the package and its dependencies are installed inside a Python `venv` (yes by default).  The script can be downloaded and run like so:
+The [`setup-ubuntu.sh`](https://github.com/momacs/pram/blob/master/script/setup-ubuntu.sh) script is the preferred method of deploying the package onto a fresh installation of the Ubuntu Server/Desktop (tested with 18.04 LTS).  The `do_env` variable controls whether the package and its dependencies are installed inside a Python `venv` (yes by default).  The script can be downloaded and run like so using `wget`:
+
+```
+sh -c "$(wget https://raw.githubusercontent.com/momacs/pram/master/script/setup-ubuntu.sh -O -)"
+```
+
+or using `curl`:
+
+```
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/momacs/pram/master/script/setup-ubuntu.sh)"
+```
+
+To download the script for inspection and editing before executing, do:
 
 ``` sh
 wget https://raw.githubusercontent.com/momacs/pram/master/script/setup-ubuntu.sh
-chmod a+x setup-ubuntu.sh
+emacs -nw ./setup-ubuntu.sh
+chmod a+x ./setup-ubuntu.sh
 ./setup-ubuntu.sh
 ```
 
