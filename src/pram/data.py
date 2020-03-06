@@ -238,7 +238,7 @@ class ProbePersistanceDB(ProbePersistance):
         return [dict(r) for r in self.conn.execute(probe_item.sel_qry).fetchall()]
 
     def persist(self, probe, vals, iter, t):
-        """Stores values to be persisted and persists them in accordance with the flushing frequency set.
+        """Stores values to be persisted and persists them in accordance with the flushing frequency.
 
         Args:
             probe (Probe): The probe.
@@ -259,7 +259,7 @@ class ProbePersistanceDB(ProbePersistance):
                     c.executemany(probe_item.ins_qry, probe_item.ins_val)
                 probe_item.ins_val = []
 
-    def plot(self, probe, series, figpath=None, figsize=(12,4), legend_loc='upper right', dpi=150):
+    def plot(self, probe, series, ylabel, figpath=None, figsize=(12,4), legend_loc='upper right', dpi=150):
         """Plots data associated with a probe.
 
         Args:
@@ -302,7 +302,7 @@ class ProbePersistanceDB(ProbePersistance):
             plt.plot(data['i'], data[s['var']], lw=s['lw'], linestyle=s['linestyle'], marker=s['marker'], color=s['color'], markersize=s['markersize'], mfc='none', antialiased=True)
         plt.legend([s['lbl'] for s in series], loc=legend_loc)
         plt.xlabel('Iteration')
-        plt.ylabel('Probability')
+        plt.ylabel(ylabel)
         plt.grid(alpha=0.25, antialiased=True)
         # plt.subplots_adjust(left=0.04, right=0.99, top=0.98, bottom=0.06)
 
@@ -443,9 +443,23 @@ class Probe(ABC):
 
     def __init__(self, name, persistance=None, pop=None, memo=None):
         self.name = name
+        self.consts = []
         self.persistance = None
         self.pop = pop  # pointer to the population (can be set elsewhere too)
         self.memo = memo
+
+        self.set_persistance(persistance)
+
+    def plot(self, series, ylabel, fig_fpath=None, figsize=(8,8), legend_loc='upper right', dpi=300):
+        """Plots data associated with a probe.
+
+        This method calls :meth:`~pram.data.ProbePersistance.plot`.
+        """
+
+        if not self.persistance:
+            return print('Plotting error: The probe is not associated with a persistance backend')
+
+        return self.persistance.plot(self, series, ylabel, fig_fpath, figsize, legend_loc, dpi)
 
     @abstractmethod
     def run(self, iter, t):
@@ -475,7 +489,7 @@ class Probe(ABC):
             persistance (ProbePersistance): The ProbePersistance object.
         """
 
-        if self.persistance == persistance:
+        if persistance is None or self.persistance == persistance:
             return
 
         self.persistance = persistance
@@ -532,7 +546,7 @@ class GroupProbe(Probe, ABC):
 
         self.queries = queries
         self.qry_tot = qry_tot
-        self.consts = None
+        self.consts = []
         self.msg_mode = msg_mode
         self.msg = []  # used to cumulate messages (only when 'msg_mode & ProbeMsgMode == True')
 
@@ -638,7 +652,7 @@ class GroupProbe(Probe, ABC):
         if not self.persistance:
             return print('Plotting error: The probe is not associated with a persistance backend')
 
-        return self.persistance.plot(self, series, fig_fpath, figsize, legend_loc, dpi)
+        return self.persistance.plot(self, series, 'Probability', fig_fpath, figsize, legend_loc, dpi)
 
     def set_consts(self, consts=None):
         """Sets the probe's constants.
@@ -711,7 +725,7 @@ class GroupSizeProbe(GroupProbe):
             vn_db_used = set()  # to identify duplicates
             for vn in var_names:
                 if vn in ProbePersistance.VAR_NAME_KEYWORD:
-                    raise ValueError(f"The following variable names are restricted: {ProbePersistance.VAR_NAME_KEYWORD}")
+                    raise ValueError(f"The following variable names are restrictxxed: {ProbePersistance.VAR_NAME_KEYWORD}")
 
                 # vn_db = DB.str_to_name(vn)  # commented out because plotting method was expecting quoted values
                 vn_db = vn
