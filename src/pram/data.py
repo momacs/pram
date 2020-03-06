@@ -441,7 +441,58 @@ class Const(namedtuple('Const', ['name', 'type', 'val'])):
 class Probe(ABC):
     """Probe base class."""
 
-    pass
+    def __init__(self, name, persistance=None, pop=None, memo=None):
+        self.name = name
+        self.persistance = None
+        self.pop = pop  # pointer to the population (can be set elsewhere too)
+        self.memo = memo
+
+    @abstractmethod
+    def run(self, iter, t):
+        """Runs the probe.
+
+        A probe is run by the :meth:`~pram.sim.Simulation.run` method of the
+        :class:`~pram.sim.Simulation` class as it steps through the simulation.  Probes are
+        run as the last order of business before the simulation advances to the next iteration which is congruent with
+        probe capturing the state of the simulation after it has settled at every iteration.
+
+        Setting both the 'iter' and 't' to 'None' will prevent persistance from being invoked and message cumulation to
+        occur.  It will still allow printint to stdout however.  In fact, this mechanism is used by the
+        :class:`~pram.sim.Simulation` class to print the intial state of the system (as seen by those probes that
+        actually print), that is before the simulation run begins.
+
+        Args:
+            iter (int): The simulation iteration.
+            t (int): The simulation time.
+        """
+
+        pass
+
+    def set_persistance(self, persistance):
+        """Associates the probe with a ProbePersistance object.
+
+        Args:
+            persistance (ProbePersistance): The ProbePersistance object.
+        """
+
+        if self.persistance == persistance:
+            return
+
+        self.persistance = persistance
+        if self.persistance is not None:
+            self.persistance.reg_probe(self)
+
+    def set_pop(self, pop):
+        """Sets the group population the probe should interact with.
+
+        Currently, a PyPRAM simulation operates on a single instance of the GroupPopulation object.  This may change in
+        the future and this method will associate the probe with one of the group populations.
+
+        Args:
+            pop (GroupPopulation): Group population.
+        """
+
+        self.pop = pop
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -477,14 +528,12 @@ class GroupProbe(Probe, ABC):
     """
 
     def __init__(self, name, queries, qry_tot=None, consts=None, persistance=None, msg_mode=ProbeMsgMode.DISP, pop=None, memo=None):
-        self.name = name
+        super().__init__(name, persistance, pop, memo)
+
         self.queries = queries
         self.qry_tot = qry_tot
         self.consts = None
-        self.persistance = None
         self.msg_mode = msg_mode
-        self.pop = pop  # pointer to the population (can be set elsewhere too)
-        self.memo = memo
         self.msg = []  # used to cumulate messages (only when 'msg_mode & ProbeMsgMode == True')
 
         self.set_consts(consts)
@@ -591,27 +640,6 @@ class GroupProbe(Probe, ABC):
 
         return self.persistance.plot(self, series, fig_fpath, figsize, legend_loc, dpi)
 
-    @abstractmethod
-    def run(self, iter, t):
-        """Runs the probe.
-
-        A probe is run by the :meth:`~pram.sim.Simulation.run` method of the
-        :class:`~pram.sim.Simulation` class as it steps through the simulation.  Probes are
-        run as the last order of business before the simulation advances to the next iteration which is congruent with
-        probe capturing the state of the simulation after it has settled at every iteration.
-
-        Setting both the 'iter' and 't' to 'None' will prevent persistance from being invoked and message cumulation to
-        occur.  It will still allow printint to stdout however.  In fact, this mechanism is used by the
-        :class:`~pram.sim.Simulation` class to print the intial state of the system (as seen by those probes that
-        actually print), that is before the simulation run begins.
-
-        Args:
-            iter (int): The simulation iteration.
-            t (int): The simulation time.
-        """
-
-        pass
-
     def set_consts(self, consts=None):
         """Sets the probe's constants.
 
@@ -635,34 +663,6 @@ class GroupProbe(Probe, ABC):
 
         self.consts = consts or []
 
-    def set_persistance(self, persistance):
-        """Associates the probe with a ProbePersistance object.
-
-        Args:
-            persistance (ProbePersistance): The ProbePersistance object.
-        """
-
-        if self.persistance == persistance:
-            return
-
-        self.persistance = persistance
-        if self.persistance is not None:
-            self.persistance.reg_probe(self)
-
-    def set_pop(self, pop):
-        """Sets the group population the probe should interact with.
-
-        Currently, a PyPRAM simulation operates on a single instance of the GroupPopulation object.  This may change in
-        the future and this method will associate the probe with one of the group populations.
-
-        Args:
-            pop (GroupPopulation): Group population.
-        """
-
-        self.pop = pop
-
-
-
 
 # ----------------------------------------------------------------------------------------------------------------------
 class GroupAttrProbe(GroupProbe):
@@ -674,35 +674,6 @@ class GroupAttrProbe(GroupProbe):
     def __init__(self, name, queries, qry_tot=None, var_names=None, consts=None, persistance=None, msg_mode=0, pop=None, memo=None):
         raise Error('Implementation pending completion.')
 
-        self.stats = [np.mean, np.std, np.median, np.min, np.max]
-
-        if var_names is None:
-            self.vars = \
-                [Var(f'p{i}', 'float') for i in range(len(queries))] + \
-                [Var(f'm{i}', 'float') for i in range(len(queries))]
-                # proportions and numbers
-            # self.vars = [GroupProbe.Var(f'v{i}', 'float') for i in range(len(queries))]
-        else:
-            if len(var_names) != (len(queries) * 2):
-                raise ValueError(f'Incorrect number of variable names: {len(var_names)} supplied, {len(queries) * 2} expected (i.e., {len(queries)} for proportions and numbers each).')
-            # if len(var_names) != len(queries):
-            #     raise ValueError(f'Incorrect number of variable names: {len(var_names)} supplied, {len(queries)} expected.')
-
-            vn_db_used = set()  # to identify duplicates
-            for vn in var_names:
-                if vn in ProbePersistance.VAR_NAME_KEYWORD:
-                    raise ValueError(f"The following variable names are restricted: {ProbePersistance.VAR_NAME_KEYWORD}")
-
-                # vn_db = DB.str_to_name(vn)  # commented out because plotting method was expecting quoted values
-                vn_db = vn
-                if vn_db in vn_db_used:
-                    raise ValueError(f"Variable name error: Name '{vn}' translates into a database name '{vn_db}' which already exists.")
-
-                vn_db_used.add(vn_db)
-                self.vars.append(Var(vn_db, 'float'))
-
-        super().__init__(name, queries, qry_tot, consts, persistance, msg_mode, pop, memo)
-
     def run(self, iter, t):
         """Runs the probe.
 
@@ -713,38 +684,7 @@ class GroupAttrProbe(GroupProbe):
             t (int): The simulation time.
         """
 
-        if self.msg_mode != 0 or self.persistance:
-            n_tot = sum([g.m for g in self.pop.get_groups(self.qry_tot)])  # TODO: If the total mass never changed, we could memoize this (either here or in GroupPopulation).
-            n_qry = [sum([g.m for g in self.pop.get_groups(q)]) for q in self.queries]
-
-        # Message:
-        if self.msg_mode != 0:
-            msg = []
-            if n_tot > 0:
-                msg.append('{:2}  {}: ('.format(t if not t is None else '.', self.name))
-                for n in n_qry:
-                    msg.append('{:.2f} '.format(abs(round(n / n_tot, 2))))  # abs solves -0.00, likely due to rounding and string conversion
-                msg.append(')   (')
-                for n in n_qry:
-                    msg.append('{:>7} '.format(abs(round(n, 1))))  # abs solves -0.00, likely due to rounding and string conversion
-                msg.append(')   [{}]'.format(round(n_tot, 1)))
-            else:
-                msg.append('{:2}  {}: ---'.format(t if not t is None else '.', self.name))
-
-            if self.msg_mode & ProbeMsgMode.DISP:
-                print(''.join(msg))
-            if self.msg_mode & ProbeMsgMode.CUMUL:
-                self.msg.append(''.join(msg))
-
-        # Persistance:
-        if self.persistance and not iter is None:
-            vals_p = []
-            vals_n = []
-            for n in n_qry:
-                vals_p.append(n / n_tot)
-                vals_n.append(n)
-
-            self.persistance.persist(self, vals_p + vals_n, iter, t)
+        pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------

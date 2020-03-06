@@ -11,7 +11,7 @@ import random
 import string
 
 from abc             import abstractmethod, ABC
-from attr            import attrs, attrib
+from attr            import attrs, attrib, converters
 from dotmap          import DotMap
 from enum            import IntEnum
 from scipy.stats     import gamma, lognorm, norm, poisson, rv_discrete
@@ -26,6 +26,32 @@ from .util   import Err, Time as TimeU
 # print(list(A))
 # b = [member.value for name, member in A.__members__.items()]
 # print(b)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+@attrs(slots=True)
+class Iter(ABC): pass
+
+
+@attrs(slots=True)
+class IterAlways(Iter):
+    pass
+
+
+@attrs(slots=True)
+class IterPoint(Iter):
+    i: float = attrib(default=0, converter=int)
+
+
+@attrs(slots=True)
+class IterInt(Iter):
+    i0: int = attrib(default=  0, converter=int)
+    i1: int = attrib(default=100, converter=int)
+
+
+@attrs(slots=True)
+class IterSet(Iter):
+    i: set = attrib(factory=set, converter=converters.default_if_none(factory=set))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -49,25 +75,9 @@ class TimeInt(Time):
     t1: float = attrib(default=24.00, converter=float)
 
 
-# ----------------------------------------------------------------------------------------------------------------------
 @attrs(slots=True)
-class Iter(ABC): pass
-
-
-@attrs(slots=True)
-class IterAlways(Iter):
-    pass
-
-
-@attrs(slots=True)
-class IterPoint(Iter):
-    i: float = attrib(default=0, converter=int)
-
-
-@attrs(slots=True)
-class IterInt(Iter):
-    i0: int = attrib(default=  0, converter=int)
-    i1: int = attrib(default=100, converter=int)
+class TimeSet(Time):
+    t: set = attrib(factory=set, converter=converters.default_if_none(factory=set))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -110,7 +120,7 @@ class Rule(ABC):
     pop = None
     compile_spec = None
 
-    def __init__(self, name='rule', t=TimeAlways(), i=IterAlways(), name_human=None, memo=None):
+    def __init__(self, name='rule', t=TimeAlways(), i=IterAlways(), group_qry=None, name_human=None, memo=None):
         '''
         t: Time class object
         '''
@@ -119,6 +129,7 @@ class Rule(ABC):
         # Err.type(i, 'i', Iter, True)
 
         self.name = name
+        self.group_qry = group_qry
         self.memo = memo
         self.name_human = name_human or name
 
@@ -163,6 +174,8 @@ class Rule(ABC):
             self.i = IterPoint(round(i))
         elif (ii(i, list) or ii(i, tuple) or ii(i, np.ndarray)) and len(i) == 2 and (ii(i[0], int) or ii(i[0], float)) and (ii(i[1], int) or ii(i[1], float)):
             self.i = IterInt(round(max(0, i[0])), round(max(0, i[1])))  # 0 is the smallest sensible number; integers only
+        elif ii(i, Iterable) and not ii(i, str) and len(i) > 2:
+            self.i = IterSet(set(i))
         else:
             raise ValueError("Wrong type of the argument 'i' specified.")
 
@@ -178,6 +191,8 @@ class Rule(ABC):
             self.t = TimePoint(round(t))
         elif (ii(t, list) or ii(t, tuple)) and len(t) == 2 and (ii(t[0], int) or ii(t[0], float)) and (ii(t[1], int) or ii(t[1], float)):
             self.t = TimeInt(round(max(0, t[0])), round(max(0, t[1])))  # 0 is the smallest sensible number; integers only
+        elif ii(t, Iterable) and not ii(t, str) and len(t) > 2:
+            self.t = TimeSet(set(t))
         else:
             raise ValueError("Wrong type of the argument 't' specified.")
 
@@ -203,6 +218,7 @@ class Rule(ABC):
     def is_applicable(self, group, iter, t):
         ''' Verifies if the rule is applicable to the group at the current iteration and current time. '''
 
+        # Iteration:
         is_i_ok = True
         if isinstance(self.i, IterAlways):
             is_i_ok = is_i_ok and True
@@ -212,9 +228,12 @@ class Rule(ABC):
             # is_i_ok = is_i_ok and self.i.i0 <= iter <= self.i.i1
             is_i_ok = is_i_ok and self.i.i0 <= iter
             is_i_ok = is_i_ok and (iter <= self.i.i1 or self.i.i1 <= 0)
+        elif isinstance(self.i, IterSet):
+            is_i_ok = is_i_ok and iter in self.i.i
         else:
             raise TypeError("Type '{}' used for specifying rule iteration not yet implemented (Rule.is_applicable).".format(type(self.i).__name__))
 
+        # Time:
         is_t_ok = True
         if isinstance(self.t, TimeAlways):
             is_t_ok = is_t_ok and True
@@ -222,10 +241,15 @@ class Rule(ABC):
             is_t_ok = is_t_ok and self.t.t == t
         elif isinstance(self.t, TimeInt):
             is_t_ok = is_t_ok and self.t.t0 <= t <= self.t.t1
+        elif isinstance(self.t, TimeSet):
+            is_t_ok = is_t_ok and t in self.i.t
         else:
             raise TypeError("Type '{}' used for specifying rule timing not yet implemented (Rule.is_applicable).".format(type(self.t).__name__))
 
-        return is_i_ok and is_t_ok
+        # Group:
+        is_group_ok = True if self.group_qry is None else group.matches_qry(self.group_qry)
+
+        return is_i_ok and is_t_ok and is_group_ok
 
     def set_params(self):
         pass
@@ -270,8 +294,8 @@ class Noop(Rule):
     in order for groups to be added.
     '''
 
-    def __init__(self, name='noop', t=TimeAlways()):
-        super().__init__(name, t)
+    def __init__(self, name='noop'):
+        super().__init__(name)
 
     def apply(self, pop, group, iter, t):
         return None

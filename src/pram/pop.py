@@ -275,6 +275,28 @@ class GroupPopulation(object):
         self.groups = { k:v for k,v in self.groups.items() if v.m > 0 }
         return self
 
+    def do_post_iter(self):
+        """Performs all post-iteration routines (i.e., current iter cleanup and next iter prep).
+
+        Routines performed:
+
+        (1) Remove NIL groups.
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        # (1) Remove NIL groups (no dict comprehension because we want to edit the existing dict in-place):
+        del_keys = []
+        for (k,v) in self.groups.items():
+            if v.is_nil():
+                self.mass -= v.m
+                del_keys.append(k)
+        for _ in del_keys:
+            del self.groups[k]
+
+        return self
+
     def freeze(self):
         """Freeze the population.
 

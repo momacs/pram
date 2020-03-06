@@ -2010,7 +2010,7 @@ class Simulation(object):
             print('No groups are present\nExiting')
             return self
 
-        self.pop.freeze()  # need to freeze the population to prevent splitting to count as new group counts
+        self.pop.freeze()  # masses of groups cannot be changed directly but only via the group-splitting mechanism
 
         # Decode iterations/duration:
         self._inf('Setting simulation duration')
@@ -2090,6 +2090,9 @@ class Simulation(object):
             # Run probes:
             for p in self.probes:
                 p.run(self.timer.get_i(), self.timer.get_t())
+
+            # Cleanup the population:
+            self.pop.do_post_iter()
 
             # Advance timer:
             self.timer.step()

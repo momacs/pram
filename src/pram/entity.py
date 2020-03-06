@@ -555,11 +555,16 @@ class GroupQry(object):
             callables which take one argument, the group.  Assuming the group argument is ``g``, the callables can then
             access the group's attributes and relations respectively as ``g.attr`` and ``g.rel``.  See the typical
             usage examples above.
+        full (bool): Flag: Does the match need to be full?  To satisfy a full match, a group's attributes and relations
+            need to fully match the query.  Because PRAM cannot have two groups with the same attributes and relations,
+            it follows that a full match can either return one group on no groups (if no match exists).  A partial
+            match requires that a group's attributes _contain_ the query's attributes (and same for relations).
     """
 
     attr : dict = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
     rel  : dict = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
     cond : list = attrib(factory=list, converter=converters.default_if_none(factory=list))
+    full : bool = attrib(default=False)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -667,6 +672,8 @@ class Group(Entity):
     """
 
     __slots__ = ('name', 'm', 'attr', 'rel', 'is_frozen', 'hash', 'callee')
+
+    NIL = { '__nil__': True }  # all groups with this attribute are removed at the end of every iteration
 
     attr_used = None  # a set of attribute that has been conditioned on by at least one rule
     rel_used  = None  # ^ for relations
@@ -1388,6 +1395,33 @@ class Group(Entity):
         """See :meth:`~pram.entity.Group.has_rel` method."""
 
         return self.has_rel(qry, are_sites)
+
+    def is_nil(self):
+        """Checks if the group is a NIL group (i.e., it should be removed from the simulation).
+
+        Returns:
+            bool: True for NIL group; False otherwise.
+        """
+
+        return self.ha(Group.NIL)
+
+    def matches_qry(self, qry):
+        """Checks if the group matches the group query specified.
+
+        Args:
+            qry (GroupQry): The query.
+
+        Returns:
+            bool: True if the group matches the query; False otherwise.
+        """
+
+        if qry.full:
+            return (qry.attr.items() == self.attr.items()) and (qry.rel.items() == self.rel.items()) and all([fn(self) for fn in qry.cond])
+        else:
+            return (
+                qry is None or
+                ((qry.attr.items() <= self.attr.items()) and (qry.rel.items() <= self.rel.items()) and all([fn(self) for fn in qry.cond]))
+            )
 
     def set_attr(self, name, value, do_force=True):
         """Sets a group's attribute.
