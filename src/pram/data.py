@@ -259,12 +259,13 @@ class ProbePersistanceDB(ProbePersistance):
                     c.executemany(probe_item.ins_qry, probe_item.ins_val)
                 probe_item.ins_val = []
 
-    def plot(self, probe, series, ylabel, figpath=None, figsize=(12,4), legend_loc='upper right', dpi=150):
+    def plot(self, probe, series, ylabel, xlabel='Iteration', figpath=None, figsize=(12,4), legend_loc='upper right', dpi=150, subplot_l=0.08, subplot_r=0.98, subplot_t=0.95, subplot_b=0.25):
         """Plots data associated with a probe.
 
         Args:
             probe (Probe): The probe.
             series (dict): Series specification (see examples below).
+            ylabel (str): Label of the Y axis.
             figpath (str, optional): Filepath to save the figure.
             figsize ((int,int)): Figure size in (w,h) format.
             legend_loc (str): Legend location (e.g., 'upper right').
@@ -301,12 +302,18 @@ class ProbePersistanceDB(ProbePersistance):
         for s in series:
             plt.plot(data['i'], data[s['var']], lw=s['lw'], linestyle=s['linestyle'], marker=s['marker'], color=s['color'], markersize=s['markersize'], mfc='none', antialiased=True)
         plt.legend([s['lbl'] for s in series], loc=legend_loc)
-        plt.xlabel('Iteration')
+        plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         plt.grid(alpha=0.25, antialiased=True)
-        # plt.subplots_adjust(left=0.04, right=0.99, top=0.98, bottom=0.06)
+        plt.subplots_adjust(left=subplot_l, right=subplot_r, top=subplot_t, bottom=subplot_b)
 
         if figpath is None:
+            mng = plt.get_current_fig_manager()
+            # mng.frame.Maximize(True)    # TODO: [low priority] The below should work on different OSs
+            # mng.window.showMaximized()
+            # mng.full_screen_toggle()
+            # mng.window.state('zoomed')
+
             plt.show()
         else:
             fig.savefig(figpath, dpi=dpi)
@@ -450,7 +457,7 @@ class Probe(ABC):
 
         self.set_persistance(persistance)
 
-    def plot(self, series, ylabel, fig_fpath=None, figsize=(8,8), legend_loc='upper right', dpi=300):
+    def plot(self, series, ylabel, xlabel='Iteration', fig_fpath=None, figsize=(8,8), legend_loc='upper right', dpi=150):
         """Plots data associated with a probe.
 
         This method calls :meth:`~pram.data.ProbePersistance.plot`.
@@ -459,7 +466,7 @@ class Probe(ABC):
         if not self.persistance:
             return print('Plotting error: The probe is not associated with a persistance backend')
 
-        return self.persistance.plot(self, series, ylabel, fig_fpath, figsize, legend_loc, dpi)
+        return self.persistance.plot(self, series, ylabel, xlabel, fig_fpath, figsize, legend_loc, dpi)
 
     @abstractmethod
     def run(self, iter, t):

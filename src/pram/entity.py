@@ -537,10 +537,10 @@ class GroupQry(object):
         GroupQry(attr={ 'flu': 's' })                 # susceptible to the flu
         GroupQry(rel={ Site.AT: Site('school-83') })  # currently located at site 'school-83'
 
-        GroupQry(cond=[lambda g: g.attr['x'] > 100]))                                # with attribute 'x' > 100
-        GroupQry(cond=[lambda g: g.attr['x'] > 100, lambda g: g.attr['y'] == 200]))  # with attribute 'x' > 100 and 'y' == 200
-        GroupQry(cond=[lambda g: g.attr['x'] > 100 and g.attr['y'] ==  200]))        # explicit AND condition between attributes
-        GroupQry(cond=[lambda g: g.attr['x'] > 100 or  g.attr['y'] == -200]))        # explicit OR  condition between attributes
+        GroupQry(cond=[lambda g: g.get_attr('x') > 100]))                                   # with attribute 'x' > 100
+        GroupQry(cond=[lambda g: g.get_attr('x') > 100, lambda g: get_attr('y') == 200]))   # with attribute 'x' > 100 and 'y' == 200
+        GroupQry(cond=[lambda g: g.get_attr('x') > 100 and g.get_attr('y') ==  200]))       # explicit AND condition between attributes
+        GroupQry(cond=[lambda g: g.get_attr('x') > 100 or  g.get_attr('y') == -200]))       # explicit OR  condition between attributes
 
     It would make sense to declare this class frozen (i.e., 'frozen=True'), but as is revealed by the following two
     measurements, performance suffers slightly when slotted classes get frozen.
@@ -673,7 +673,7 @@ class Group(Entity):
 
     __slots__ = ('name', 'm', 'attr', 'rel', 'is_frozen', 'hash', 'callee')
 
-    NIL = { '__nil__': True }  # all groups with this attribute are removed at the end of every iteration
+    VOID = { '__void__': True }  # all groups with this attribute are removed at the end of every iteration
 
     attr_used = None  # a set of attribute that has been conditioned on by at least one rule
     rel_used  = None  # ^ for relations
@@ -714,10 +714,10 @@ class Group(Entity):
         return self.hash
 
     def __repr__(self):
-        return '{}(name={}, n={}, attr={}, rel={})'.format(__class__.__name__, self.name or '.', self.n, self.attr, self.rel)
+        return '{}(name={}, m={}, attr={}, rel={})'.format(__class__.__name__, self.name or '.', self.m, self.attr, self.rel)
 
     def __str__(self):
-        return '{}  name: {:16}  n: {:8}  attr: {}  rel: {}'.format(self.__class__.__name__, self.name or '.', round(self.m, 2), self.attr, self.rel)
+        return '{}  name: {:16}  m: {:8}  attr: {}  rel: {}'.format(self.__class__.__name__, self.name or '.', round(self.m, 2), self.attr, self.rel)
 
     def _isinstance(self, qry, type):
         """
@@ -870,7 +870,7 @@ class Group(Entity):
                 #             if v_new != v_curr:
                 #                 raise ValueError(f'The result of rule application results in an attribute update conflict:\n    Name: {k}\n    Type: {type(v_curr)}\n    Current value: {v_curr}\n    New value: {v_new}')
 
-                ss_comb.attr_set.update(i.attr_set)  # this update has been subsistuted by the logic above
+                ss_comb.attr_set.update(i.attr_set)  # this update has been subsistuted by the logic above (currently commented out)
                 ss_comb.attr_del.update(i.attr_del)
                 ss_comb.rel_set.update(i.rel_set)
                 ss_comb.rel_del.update(i.rel_del)
@@ -878,6 +878,20 @@ class Group(Entity):
 
         # (3) Split the group:
         return self.split(ss_prod)
+
+    def copy(self, is_deep=False):
+        """Generates the group's hash.
+
+        Returns a shallow or deep copy of self.
+
+        Args:
+            is_deep (bool): Flag: Is deep copy?
+
+        Returns:
+            object (Group): A copy of self.
+        """
+
+        return copy.copy(self) if is_deep is False else copy.deepcopy(self)
 
     def done(self):
         """Ends creating the group by notifing the callee that has begun the group creation.
@@ -1320,10 +1334,10 @@ class Group(Entity):
         """
 
         at    = self.get_rel(Site.AT)
-        n     = at.get_pop_size()     #     population at current location
-        n_qry = at.get_pop_size(qry)  # sub-population at current location
+        m     = at.get_pop_size()     #     population at current location
+        m_qry = at.get_pop_size(qry)  # sub-population at current location
 
-        return float(n_qry) / float(n) if n > 0 else 0
+        return float(n_qry) / float(m) if m > 0 else 0
 
     def get_rel(self, name=None):
         """Retrieves relation's value.
@@ -1396,14 +1410,14 @@ class Group(Entity):
 
         return self.has_rel(qry, are_sites)
 
-    def is_nil(self):
-        """Checks if the group is a NIL group (i.e., it should be removed from the simulation).
+    def is_void(self):
+        """Checks if the group is a VOID group (i.e., it should be removed from the simulation).
 
         Returns:
-            bool: True for NIL group; False otherwise.
+            bool: True for VOID group; False otherwise.
         """
 
-        return self.ha(Group.NIL)
+        return self.ha(Group.VOID)
 
     def matches_qry(self, qry):
         """Checks if the group matches the group query specified.

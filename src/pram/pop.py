@@ -68,6 +68,11 @@ class GroupPopulation(object):
     Because groups can be associated with sites via group relations, those sites are also stored inside of this
     class' instance.
 
+    VITA groups, or groups that are the source of new population mass are stored separately from the actual group
+    population.  At the end of every iteration, masses of all VITA groups are transfered back to the population.  It is
+    also at that time that all VOID groups are removed.  VOID groups contain mass that should be removed from the\
+    simulation.
+
     Args:
         sim (Simulation): The simulation.
         do_keep_mass_flow_specs (bool): Flag: Store the last iteration mass flow specs?  This is False by default for
@@ -82,7 +87,11 @@ class GroupPopulation(object):
         self.sites = {}
         self.resources = {}
 
-        self.mass = 0
+        self.vita_groups = {}  # all VITA groups for the current iteration
+
+        self.mass     = 0  # total population mass
+        self.mass_in  = 0  # total population mass added (e.g., via the birth process)
+        self.mass_out = 0  # total population mass removed (e.g., via the death process)
 
         self.is_frozen = False  # the simulation freezes the population on first run
 
@@ -223,6 +232,27 @@ class GroupPopulation(object):
             self.add_site(s)
         return self
 
+    def add_vita_group(self, group):
+        """Adds a VITA group.
+
+        If a VITA group with the same hash already exists, the masses are combined (i.e., no VITA group duplication
+        occurs, much like is the case with regular groups).
+
+        Args:
+            group (Group): The group being added.
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        g = self.vita_groups.get(group.get_hash())
+        if g is not None:
+            g.m += group.m
+        else:
+            self.vita_groups[group.get_hash()] = group
+
+        return self
+
     def apply_rules(self, rules, iter, t, is_rule_setup=False, is_rule_cleanup=False, is_sim_setup=False):
         """Applies all rules in the simulation to all groups in the population.
 
@@ -266,7 +296,8 @@ class GroupPopulation(object):
 
         Whether this is what the user needs is up to them.  However, for large simulations with a high new group
         turnover compacting the group population will make the simulation run faster.  Autocompacting can be turned on
-        on the simulation level via the :meth:`~pram.sim.Simulation.set_pragma_autocompact` method.
+        on the simulation level via the `autocompact` pragma (e.g., via :meth:`~pram.sim.Simulation.set_pragma_autocompact`
+        method).
 
         Returns:
             self: For method call chaining.
@@ -280,20 +311,34 @@ class GroupPopulation(object):
 
         Routines performed:
 
-        (1) Remove NIL groups.
+        (1) Remove VOID groups.
+        (2) Move mass from VITA groups to their corresponding groups.
 
         Returns:
             self: For method call chaining.
         """
 
-        # (1) Remove NIL groups (no dict comprehension because we want to edit the existing dict in-place):
+        # (1) Remove VOID groups (no dict comprehension because we want to edit the existing dict in-place):
         del_keys = []
         for (k,v) in self.groups.items():
-            if v.is_nil():
-                self.mass -= v.m
+            if v.is_void():
+                # print(-v.m)
+                self.mass     -= v.m
+                self.mass_out += v.m
                 del_keys.append(k)
-        for _ in del_keys:
-            del self.groups[k]
+                # print(f'{k}: {v}')
+        # for _ in del_keys:
+        #     if k in self.groups.keys():
+        #         del self.groups[k]
+        self.groups = { k:v for k,v in self.groups.items() if not v.is_void() }
+
+        # (2) Move mass from VITA groups to their corresponding groups:
+        for (k,v) in self.vita_groups.items():
+            # print(v.m)
+            self.mass    += v.m
+            self.mass_in += v.m
+            self.groups[k].m += v.m
+        self.vita_groups = {}
 
         return self
 
@@ -331,19 +376,14 @@ class GroupPopulation(object):
 
     def get_group(self, qry=None):
         """
-        Args:
+        Returns the group with the all attributes and relations as specified; or None if such a group does not exist.
 
+        Args:
+            qry (GroupQry): The query.
 
         Returns:
-            self: For method call chaining.
+            Group if a group is found; None otherwise
         """
-
-        '''
-        Returns the group with the all attributes and relations as specified; or None if such a group does not
-        exist.
-
-        qry: GroupQry
-        '''
 
         qry = qry or GroupQry()
         return self.groups.get(Group.gen_hash(qry.attr, qry.rel))

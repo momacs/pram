@@ -948,6 +948,10 @@ class SimulationSetter(object):
         self.sim.set_pragma(name, value)
         return self
 
+    def pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
+        self.sim.set_pragmas(analyze, autocompact, autoprune_groups, autostop, autostop_n, autostop_p, autostop_t, live_info, live_info_ts, probe_capture_init, rule_analysis_for_db_gen)
+        return self
+
     def pragma_analyze(self, value):
         self.sim.set_pragma_analyze(value)
         return self
@@ -2239,6 +2243,29 @@ class Simulation(object):
         """
 
         self.fn.group_setup = fn
+        return self
+
+    def set_pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        if analyze                  is not None: self.set_pragma_analyze(analyze),
+        if autocompact              is not None: self.set_pragma_autocompact(autocompact),
+        if autoprune_groups         is not None: self.set_pragma_autoprune_groups(autoprune_groups),
+        if autostop                 is not None: self.set_pragma_autostop(autostop),
+        if autostop_n               is not None: self.set_pragma_autostop_n(autostop_n),
+        if autostop_p               is not None: self.set_pragma_autostop_p(autostop_p),
+        if autostop_t               is not None: self.set_pragma_autostop_t(autostop_t),
+        if live_info                is not None: self.set_pragma_live_info(live_info),
+        if live_info_ts             is not None: self.set_pragma_live_info_ts(live_info_ts),
+        if probe_capture_init       is not None: self.set_pragma_probe_capture_init(probe_capture_init),
+        if rule_analysis_for_db_gen is not None: self.set_pragma_rule_analysis_for_db_gen(rule_analysis_for_db_gen)
+
         return self
 
     def set_pragma(self, name, value):
