@@ -457,7 +457,7 @@ class Probe(ABC):
 
         self.set_persistance(persistance)
 
-    def plot(self, series, ylabel, xlabel='Iteration', fig_fpath=None, figsize=(8,8), legend_loc='upper right', dpi=150):
+    def plot(self, series, ylabel, xlabel='Iteration', fig_fpath=None, figsize=(8,8), legend_loc='upper right', dpi=150, subplot_l=0.08, subplot_r=0.98, subplot_t=0.95, subplot_b=0.25):
         """Plots data associated with a probe.
 
         This method calls :meth:`~pram.data.ProbePersistance.plot`.
@@ -466,7 +466,7 @@ class Probe(ABC):
         if not self.persistance:
             return print('Plotting error: The probe is not associated with a persistance backend')
 
-        return self.persistance.plot(self, series, ylabel, xlabel, fig_fpath, figsize, legend_loc, dpi)
+        return self.persistance.plot(self, series, ylabel, xlabel, fig_fpath, figsize, legend_loc, dpi, subplot_l, subplot_r, subplot_t, subplot_b)
 
     @abstractmethod
     def run(self, iter, t):

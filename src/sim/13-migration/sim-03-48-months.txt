@@ -1,0 +1,55 @@
+   0  pop: 1,000,000    dead:         0|  0%    migrating:     2,000|  0%    migration-time:   0.00 (  0.00)    settled:         0|  0%
+   1  pop:   999,999    dead:         1|  0%    migrating:     3,996|  0%    migration-time:   0.25 (  0.50)    settled:         0|  0%
+   2  pop:   999,978    dead:        22|  0%    migrating:     5,968|  1%    migration-time:   0.83 (  0.75)    settled:         0|  0%
+   3  pop:   999,898    dead:       102|  0%    migrating:     7,877|  1%    migration-time:   1.22 (  1.09)    settled:         0|  0%
+   4  pop:   999,723    dead:       277|  0%    migrating:     9,687|  1%    migration-time:   1.67 (  1.37)    settled:         0|  0%
+   5  pop:   999,425    dead:       575|  0%    migrating:    11,370|  1%    migration-time:   2.13 (  1.64)    settled:         0|  0%
+   6  pop:   998,982    dead:     1,018|  0%    migrating:    12,904|  1%    migration-time:   2.61 (  1.91)    settled:         0|  0%
+   7  pop:   998,383    dead:     1,617|  0%    migrating:    14,278|  1%    migration-time:   3.10 (  2.19)    settled:         0|  0%
+   8  pop:   997,623    dead:     2,377|  0%    migrating:    15,487|  2%    migration-time:   3.58 (  2.47)    settled:         0|  0%
+   9  pop:   996,705    dead:     3,295|  0%    migrating:    15,108|  2%    migration-time:   3.88 (  2.46)    settled:     1,427|  0%
+  10  pop:   995,743    dead:     4,257|  0%    migrating:    16,110|  2%    migration-time:   4.00 (  2.75)    settled:     1,427|  0%
+  11  pop:   994,736    dead:     5,264|  1%    migrating:    17,064|  2%    migration-time:   4.22 (  3.12)    settled:     1,427|  0%
+  12  pop:   993,588    dead:     6,412|  1%    migrating:    16,727|  2%    migration-time:   4.29 (  3.14)    settled:     2,571|  0%
+  13  pop:   992,403    dead:     7,597|  1%    migrating:    14,179|  1%    migration-time:   3.51 (  2.96)    settled:     5,888|  1%
+  14  pop:   991,444    dead:     8,556|  1%    migrating:    15,178|  2%    migration-time:   3.12 (  2.79)    settled:     5,887|  1%
+  15  pop:   990,561    dead:     9,439|  1%    migrating:    15,218|  2%    migration-time:   3.00 (  2.77)    settled:     6,917|  1%
+  16  pop:   989,602    dead:    10,398|  1%    migrating:    16,211|  2%    migration-time:   3.17 (  2.84)    settled:     6,915|  1%
+  17  pop:   988,573    dead:    11,427|  1%    migrating:    16,063|  2%    migration-time:   3.38 (  2.93)    settled:     7,979|  1%
+  18  pop:   987,487    dead:    12,513|  1%    migrating:    14,078|  1%    migration-time:   3.26 (  2.59)    settled:    10,820|  1%
+  19  pop:   986,565    dead:    13,435|  1%    migrating:    15,103|  2%    migration-time:   3.24 (  2.43)    settled:    10,816|  1%
+  20  pop:   985,686    dead:    14,314|  1%    migrating:    16,168|  2%    migration-time:   3.61 (  2.64)    settled:    10,812|  1%
+  21  pop:   984,658    dead:    15,342|  2%    migrating:    16,168|  2%    migration-time:   3.96 (  2.77)    settled:    11,717|  1%
+  22  pop:   983,562    dead:    16,438|  2%    migrating:    15,032|  2%    migration-time:   4.04 (  2.80)    settled:    13,686|  1%
+  23  pop:   982,557    dead:    17,443|  2%    migrating:    15,049|  2%    migration-time:   4.05 (  2.80)    settled:    14,588|  1%
+  24  pop:   981,620    dead:    18,380|  2%    migrating:    16,044|  2%    migration-time:   4.23 (  2.83)    settled:    14,579|  1%
+  25  pop:   980,604    dead:    19,396|  2%    migrating:    15,907|  2%    migration-time:   4.48 (  3.06)    settled:    15,621|  2%
+  26  pop:   979,531    dead:    20,469|  2%    migrating:    15,920|  2%    migration-time:   4.46 (  3.05)    settled:    16,448|  2%
+  27  pop:   978,470    dead:    21,530|  2%    migrating:    14,900|  2%    migration-time:   4.49 (  3.01)    settled:    18,316|  2%
+  28  pop:   977,483    dead:    22,517|  2%    migrating:    14,944|  2%    migration-time:   4.65 (  3.10)    settled:    19,199|  2%
+  29  pop:   976,555    dead:    23,445|  2%    migrating:    14,965|  2%    migration-time:   4.62 (  3.09)    settled:    20,146|  2%
+  30  pop:   975,618    dead:    24,382|  2%    migrating:    14,974|  2%    migration-time:   4.50 (  3.02)    settled:    21,091|  2%
+  31  pop:   974,678    dead:    25,322|  3%    migrating:    15,948|  2%    migration-time:   4.41 (  2.91)    settled:    21,076|  2%
+  32  pop:   973,666    dead:    26,334|  3%    migrating:    16,853|  2%    migration-time:   4.67 (  3.01)    settled:    21,060|  2%
+  33  pop:   972,519    dead:    27,481|  3%    migrating:    16,790|  2%    migration-time:   4.91 (  3.21)    settled:    21,866|  2%
+  34  pop:   971,316    dead:    28,684|  3%    migrating:    14,754|  2%    migration-time:   4.80 (  3.14)    settled:    24,569|  3%
+  35  pop:   970,284    dead:    29,716|  3%    migrating:    14,752|  2%    migration-time:   4.73 (  3.16)    settled:    25,419|  3%
+  36  pop:   969,375    dead:    30,625|  3%    migrating:    15,733|  2%    migration-time:   4.62 (  3.04)    settled:    25,400|  3%
+  37  pop:   968,386    dead:    31,614|  3%    migrating:    13,860|  1%    migration-time:   4.80 (  2.95)    settled:    26,257|  3%
+  38  pop:   967,330    dead:    32,670|  3%    migrating:    10,976|  1%    migration-time:   5.24 (  2.64)    settled:    28,050|  3%
+  39  pop:   966,603    dead:    33,397|  3%    migrating:     9,295|  1%    migration-time:   5.84 (  2.42)    settled:    28,976|  3%
+  40  pop:   966,110    dead:    33,890|  3%    migrating:     8,784|  1%    migration-time:   6.47 (  2.23)    settled:    28,964|  3%
+  41  pop:   965,709    dead:    34,291|  3%    migrating:     6,456|  1%    migration-time:   6.90 (  1.92)    settled:    30,859|  3%
+  42  pop:   965,429    dead:    34,571|  3%    migrating:     5,049|  1%    migration-time:   7.49 (  1.73)    settled:    31,959|  3%
+  43  pop:   965,267    dead:    34,733|  3%    migrating:     3,868|  0%    migration-time:   7.98 (  1.46)    settled:    32,942|  3%
+  44  pop:   965,169    dead:    34,831|  3%    migrating:     1,381|  0%    migration-time:   8.51 (  1.28)    settled:    35,291|  4%
+  45  pop:   965,142    dead:    34,858|  3%    migrating:        23|  0%    migration-time:   8.88 (  1.09)    settled:    36,573|  4%
+  46  pop:   965,142    dead:    34,858|  3%    migrating:        18|  0%    migration-time:   9.29 (  0.49)    settled:    36,573|  4%
+  47  pop:   965,142    dead:    34,858|  3%    migrating:         0|  0%    migration-time:  10.00 (  0.00)    settled:    36,573|  4%
+
+Egypt       :    12,052
+Ethiopia    :    12,321
+Chad        :     8,003
+Libya       :     4,198
+TOTAL       :    36,573
+[Finished in 1.095s]

@@ -42,7 +42,7 @@ class ConflictRule(Rule):
 
         return [
             GroupSplitSpec(p=p_death,     attr_set=Group.VOID),
-            GroupSplitSpec(p=p_migration, attr_set={ 'is-migrating': True, 'migration-dur': 0 }),
+            GroupSplitSpec(p=p_migration, attr_set={ 'is-migrating': True, 'migration-time': 0 }),
             GroupSplitSpec(p=1 - p_death - p_migration)
         ]
 
@@ -81,7 +81,7 @@ class MigrationRule(Rule):
 
         return [
             GroupSplitSpec(p=p_death,     attr_set=Group.VOID),
-            GroupSplitSpec(p=1 - p_death, attr_set={ 'migration-dur': group.get_attr('migration-dur') + 1 })
+            GroupSplitSpec(p=1 - p_death, attr_set={ 'migration-time': group.get_attr('migration-time') + 1 })
         ]
 
 
@@ -95,12 +95,12 @@ class PopProbe(Probe):
     def __init__(self, persistance=None):
         self.consts = []
         self.vars = [
-            Var('pop_m',              'float'),
-            Var('dead_m',             'float'),
-            Var('migrating_m',        'float'),
-            Var('migrating_p',        'float'),
-            Var('migrating_dur_mean', 'float'),
-            Var('migrating_dur_sd',   'float')
+            Var('pop_m',               'float'),
+            Var('dead_m',              'float'),
+            Var('migrating_m',         'float'),
+            Var('migrating_p',         'float'),
+            Var('migrating_time_mean', 'float'),
+            Var('migrating_time_sd',   'float')
         ]
 
         super().__init__('pop', persistance)
@@ -117,28 +117,28 @@ class PopProbe(Probe):
     def run_iter(self, iter, t):
         migrating_groups = self.pop.get_groups(GroupQry(cond=[lambda g: g.has_attr({ 'is-migrating': True })]))
         if migrating_groups and len(migrating_groups) > 0:
-            migration_dur_lst = [g.get_attr('migration-dur') for g in migrating_groups]
+            migration_time_lst = [g.get_attr('migration-time') for g in migrating_groups]
 
-            migrating_m        = sum([g.m for g in migrating_groups])
-            migrating_p        = migrating_m / self.pop.mass * 100
-            migrating_dur_mean = statistics.mean (migration_dur_lst)
-            migrating_dur_sd   = statistics.stdev(migration_dur_lst) if len(migration_dur_lst) > 1 else 0
+            migrating_m         = sum([g.m for g in migrating_groups])
+            migrating_p         = migrating_m / self.pop.mass * 100
+            migrating_time_mean = statistics.mean (migration_time_lst)
+            migrating_time_sd   = statistics.stdev(migration_time_lst) if len(migration_time_lst) > 1 else 0
         else:
-            migrating_m        = 0
-            migrating_p        = 0
-            migrating_dur_mean = 0
-            migrating_dur_sd   = 0
+            migrating_m         = 0
+            migrating_p         = 0
+            migrating_time_mean = 0
+            migrating_time_sd   = 0
 
         print(
             f'{iter or 0:>4}  ' +
             f'pop: {self.pop.mass:>9,.0f}    ' +
             f'dead: {self.pop.mass_out:>9,.0f}|{self.pop.mass_out / self.pop_m_init * 100:>3,.0f}%    ' +
             f'migrating: {migrating_m:>9,.0f}|{migrating_p:>3.0f}%    ' +
-            f'migration-dur: {migrating_dur_mean:>6.2f} ({migrating_dur_sd:>6.2f})'
+            f'migration-time: {migrating_time_mean:>6.2f} ({migrating_time_sd:>6.2f})'
         )
 
         if self.persistance:
-            self.persistance.persist(self, [self.pop.mass, self.pop.mass_out, migrating_m, migrating_p, migrating_dur_mean, migrating_dur_sd], iter, t)
+            self.persistance.persist(self, [self.pop.mass, self.pop.mass_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd], iter, t)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -154,7 +154,7 @@ persistance = ProbePersistanceMem()
 # ----------------------------------------------------------------------------------------------------------------------
 # Simulation:
 
-s = (Simulation().
+sim = (Simulation().
     set_pragmas(analyze=False, autocompact=True).
     add([
         ConflictRule(severity=0.05, scale=0.2),
@@ -174,4 +174,4 @@ if persistance:
         { 'var': 'migrating_m', 'lw': 0.75, 'linestyle': '-',  'marker': 'o', 'color': 'blue', 'markersize': 0, 'lbl': 'Migrating' },
         { 'var': 'dead_m',      'lw': 0.75, 'linestyle': '--', 'marker': '+', 'color': 'red',  'markersize': 0, 'lbl': 'Dead'      }
     ]
-    s.probes[0].plot(series, ylabel='Population mass', xlabel='Iteration (month from start of conflict)', figsize=(12,4))
+    sim.probes[0].plot(series, ylabel='Population mass', xlabel='Iteration (month from start of conflict)', figsize=(12,4))

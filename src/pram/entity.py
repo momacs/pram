@@ -334,6 +334,11 @@ class Site(Resource):
 
         self.is_frozen = True
 
+    def ga(self, name=None):
+        """See :meth:`~pram.entity.Site.get_attr` method."""
+
+        return self.get_attr(name)
+
     @classmethod
     def gen_from_db(cls, db_fpath, tbl, name_col, rel_name=AT, attr=[], limit=0):
         """Generates sites from a relational database.
@@ -381,6 +386,18 @@ class Site(Resource):
                 sim.pop.add_site(s)
 
         # return sites
+
+    def get_attr(self, name=None):
+        """Retrieves attribute's value.
+
+        Args:
+            name (str): Attribute's name.
+
+        Returns:
+            Any: Attribute's value.
+        """
+
+        return self.attr.get(name) if name is not None else self.attr
 
     def get_hash(self):
         return self.__hash__()
