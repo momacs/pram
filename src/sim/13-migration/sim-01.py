@@ -1,5 +1,5 @@
 '''
-A model of the interaction between conflict and migration.
+A model of conflict-driven migration.
 '''
 
 import os,sys
