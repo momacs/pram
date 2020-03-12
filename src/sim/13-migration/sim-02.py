@@ -1,5 +1,5 @@
 '''
-A model of the interaction between conflict and migration.
+A model of conflict-driven migration.
 
 This simulation is identical to 'sim-01.py' but with persistance and the associated post-simulation plot.
 '''
