@@ -1,5 +1,5 @@
 '''
-A model of the interaction between conflict and migration.
+A model of conflict-driven migration.
 
 This simulation is an extenstion of 'sim-02.py' and adds the eventual settlement of the migrating population in one of
 the counties cordering the conflict country.
