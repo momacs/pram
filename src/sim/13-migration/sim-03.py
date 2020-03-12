@@ -19,8 +19,8 @@ import statistics
 
 # ----------------------------------------------------------------------------------------------------------------------
 site_sudan    = Site('Sudan')
-site_ethiopia = Site('Ethiopia', attr={ 'travel-time': 8 })
-site_chad     = Site('Chad',     attr={ 'travel-time': 9 })
+site_ethiopia = Site('Ethiopia', attr={ 'travel-time':  8 })
+site_chad     = Site('Chad',     attr={ 'travel-time':  9 })
 site_egypt    = Site('Egypt',    attr={ 'travel-time': 10 })
 site_libya    = Site('Libya',    attr={ 'travel-time': 11 })
 
@@ -114,6 +114,7 @@ class MigrationRule(Rule):
         return [
             GroupSplitSpec(p=1, attr_set={ 'migration-time': group.get_attr('migration-time') + 1, 'is-migrating': False, 'has-settled': True }, rel_set={ Site.AT: group.get_rel('site-dst') }, rel_del=['site-dst'])
         ]
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 class PopProbe(Probe):
@@ -211,6 +212,8 @@ sim = (Simulation().
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+# Summary:
+
 def print_settled_summary():
     print('')
     settled_m = 0
