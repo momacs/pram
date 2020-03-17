@@ -33,10 +33,14 @@ __pycache__/
 /dist/
 /*.egg-info
 
-# Binary files:
+# Binary and local output files:
 /src/**/*.pickle.gz
 /src/**/*.pickle
 /src/**/*.sqlite3
+/src/**/*.sqlite3-shm
+/src/**/*.sqlite3-wal
+/src/**/*.graffle
+/src/**/*.diag
 /src/**/*.png
 
 # Dev:
