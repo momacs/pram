@@ -18,7 +18,7 @@ This software is in the pre-release stage.
 - [dotmap](https://pypi.org/project/dotmap)
 - [sortedcontainers](http://www.grantjenks.com/docs/sortedcontainers/index.html)
 - [attrs](https://github.com/python-attrs/attrs)
-- [dill](https://pypi.org/project/dill/)
+- [cloudpickle](https://github.com/cloudpipe/cloudpickle)
 - [numpy](https://www.numpy.org)
 - [scipy](https://www.scipy.org)
 - [matplotlib](https://matplotlib.org/)
