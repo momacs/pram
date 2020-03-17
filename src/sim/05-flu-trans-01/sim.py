@@ -26,7 +26,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from collections import namedtuple
 
-from pram.data   import ProbeMsgMode, ProbePersistanceDB, GroupSizeProbe
+from pram.data   import ProbeMsgMode, ProbePersistenceDB, GroupSizeProbe
 from pram.entity import GroupQry, GroupSplitSpec, Site
 from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, TimeInt, TimePoint
 from pram.sim    import Simulation
@@ -56,7 +56,7 @@ fpath_db  = os.path.join(dpath_cwd, f'probes-{sim_dur_days}d.sqlite3')
 if os.path.isfile(fpath_db):
     os.remove(fpath_db)
 
-probe_persistance = ProbePersistanceDB(fpath_db)
+probe_persistence = ProbePersistenceDB(fpath_db)
 
 probes_grp_size_flu_school = []
 
@@ -81,7 +81,7 @@ for s in specs:
             ],
             qry_tot=GroupQry(rel={ 'school': site }),
             var_names=['pn', 'pa', 'ps', 'nn', 'na', 'ns'],
-            persistance=probe_persistance,
+            persistence=probe_persistence,
             memo=f'Flu at school {s.name.upper()}'
         )
     )

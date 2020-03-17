@@ -70,7 +70,7 @@ class SARSQuarantineIntervention(Intervention):  # extends the Intervention prim
 # ----------------------------------------------------------------------------------------------------------------------
 # Simulations:
 
-# if os.path.isfile(fpath_db): os.remove(fpath_db)
+if os.path.isfile(fpath_db): os.remove(fpath_db)
 
 te = TrajectoryEnsemble(fpath_db)
 
@@ -84,8 +84,8 @@ if te.is_db_empty:  # generate simulation data if the trajectory ensemble databa
                     chi=0.99,
                     i=intervention_onset
                 ),
-                Group(m=950, attr={ 'sars': 's' }),
-                Group(m= 50, attr={ 'sars': 'e' })
+                Group(m=95000, attr={ 'sars': 's' }),
+                Group(m= 5000, attr={ 'sars': 'e' })
             ])
         ) for intervention_onset in TN(30,120, 75,100, 5)  # a 5-trajectory ensemble
     ])
@@ -95,6 +95,6 @@ if te.is_db_empty:  # generate simulation data if the trajectory ensemble databa
 # te.plot_mass_locus_line     ((1200,300), get_out_fpath('plot-line.png'), col_scheme='tableau10', opacity_min=0.35)
 # te.plot_mass_locus_line_aggr((1200,300), get_out_fpath('plot-ci.png'),   col_scheme='tableau10')
 
-fpath_diag = os.path.join(os.path.dirname(__file__), 'out', 'sim-04.diag')
-fpath_pdf  = os.path.join(os.path.dirname(__file__), 'out', 'sim-04.pdf')
-te.traj[2].sim.gen_diagram(fpath_diag, fpath_pdf)
+# fpath_diag = os.path.join(os.path.dirname(__file__), 'out', 'sim-04.diag')
+# fpath_pdf  = os.path.join(os.path.dirname(__file__), 'out', 'sim-04.pdf')
+# te.traj[2].sim.gen_diagram(fpath_diag, fpath_pdf)

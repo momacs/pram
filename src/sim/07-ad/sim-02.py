@@ -10,7 +10,6 @@ import math
 
 from scipy.stats import poisson
 
-from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
 from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
 from pram.rule   import Rule, TimeAlways
 from pram.sim    import Simulation

@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 from dotmap import DotMap
 
-from pram.data   import GroupSizeProbe, ProbePersistanceMem, ProbeMsgMode
+from pram.data   import GroupSizeProbe, ProbePersistenceMem, ProbeMsgMode
 from pram.entity import Group, GroupQry, GroupSplitSpec
 from pram.rule   import ODESystemMass, Event, TimeAlways, Process
 from pram.sim    import Simulation
@@ -47,7 +47,7 @@ probe_u = GroupSizeProbe(
     queries=[GroupQry(attr={ 'sub-a': 'u' }), GroupQry(attr={ 'sub-b': 'u' })],
     qry_tot=None,
     var_names=['pau', 'pbu', 'nau', 'nbu'],  # pau - proportion of substance A undecayed, etc.
-    persistance=ProbePersistanceMem(),
+    persistence=ProbePersistenceMem(),
     msg_mode=ProbeMsgMode.NONE
 )
 
@@ -56,7 +56,7 @@ probe_d = GroupSizeProbe(
     queries=[GroupQry(attr={ 'sub-a': 'd' }), GroupQry(attr={ 'sub-b': 'd' })],
     qry_tot=None,
     var_names=['pad', 'pbd', 'nad', 'nbd'],  # pad - proportion of substance A decayed, etc.
-    persistance=ProbePersistanceMem(),
+    persistence=ProbePersistenceMem(),
     msg_mode=ProbeMsgMode.NONE
 )
 

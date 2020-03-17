@@ -8,14 +8,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
-from pram.data      import ProbePersistanceMem, GroupSizeProbe
+from pram.data      import ProbePersistenceMem, GroupSizeProbe
 from pram.entity    import Group
 from pram.model.epi import SIRSModel
 from pram.sim       import Simulation
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-p = GroupSizeProbe.by_attr('flu', 'flu', ['s', 'i', 'r'], persistance=ProbePersistanceMem())
+p = GroupSizeProbe.by_attr('flu', 'flu', ['s', 'i', 'r'], persistence=ProbePersistenceMem())
 
 (Simulation().
     add_probe(p).

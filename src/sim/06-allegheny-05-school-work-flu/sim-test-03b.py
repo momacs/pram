@@ -8,7 +8,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import pram.util as util
 
-from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
+from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistenceDB
 from pram.entity import Group, GroupDBRelSpec, GroupQry, Site
 from pram.rule   import FluLocationRule, ProgressFluSimpleRule
 from pram.sim    import Simulation
@@ -22,7 +22,7 @@ fpath_db = os.path.join(os.path.dirname(__file__), 'out-test-03b.sqlite3')
 if os.path.isfile(fpath_db):
     os.remove(fpath_db)
 
-pp = ProbePersistanceDB(fpath_db)
+pp = ProbePersistenceDB(fpath_db)
 
 home     = Site('home')
 school_l = Site('school-l')
@@ -36,7 +36,7 @@ probe_grp_size_flu_school_l = GroupSizeProbe(
         GroupQry(attr={ 'flu': 'r' }, rel={ 'school': school_l })
     ],
     qry_tot=GroupQry(rel={ 'school': school_l }),
-    persistance=pp,
+    persistence=pp,
     var_names=['ps', 'pe', 'pr', 'ns', 'ne', 'nr'],
     memo='Population size across flu states for low-income school'
 )
@@ -49,7 +49,7 @@ probe_grp_size_flu_school_m = GroupSizeProbe(
         GroupQry(attr={ 'flu': 'r' }, rel={ 'school': school_m })
     ],
     qry_tot=GroupQry(rel={ 'school': school_m }),
-    persistance=pp,
+    persistence=pp,
     var_names=['ps', 'pe', 'pr', 'ns', 'ne', 'nr'],
     memo='Population size across flu states for medium-income school'
 )

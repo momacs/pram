@@ -7,7 +7,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
-from pram.data        import ProbePersistanceDB, ProbeMsgMode, GroupSizeProbe
+from pram.data        import ProbePersistenceDB, ProbeMsgMode, GroupSizeProbe
 from pram.entity      import Group, GroupQry, GroupSplitSpec
 from pram.model.model import MCSolver
 from pram.model.epi   import SIRSModel
@@ -39,7 +39,7 @@ from pram.sim         import Simulation
 #     ],
 #     qry_tot=None,
 #     var_names=['ps', 'pi', 'pr', 'ns', 'ni', 'nr'],
-#     persistance=ProbePersistanceDB(fpath_db)
+#     persistence=ProbePersistenceDB(fpath_db)
 # )
 #
 # (Simulation().

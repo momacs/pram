@@ -20,6 +20,7 @@ from pyrqa.neighbourhood import FixedRadius
 from scipy.fftpack       import fft
 from scipy               import signal
 
+from .data   import ProbePersistenceDB
 from .graph  import MassGraph
 from .signal import Signal
 from .sim    import Simulation
@@ -38,7 +39,7 @@ class Trajectory(object):
     Also called orbit.  Can also be thought of as a sequence of vectors in the state space (or a point in a phase
     space).
 
-    This class delegates persistance management to the TrajectoryEnsemble class that contains it.
+    This class delegates persistence management to the TrajectoryEnsemble class that contains it.
 
     This class keeps a reference to a simulation object, but that reference is only needed when running the simulation
     is desired.  When working with a historical trajectory (i.e., the trace of past simulation run), 'self.sim' can be
@@ -130,7 +131,7 @@ class Trajectory(object):
 
         # c = alt.Chart(alt.Data(values=data)).mark_rect().encode(x='x:O', y='y:O', color='z:Q')
         c = alt.Chart(alt.Data(values=data)).mark_rect().encode(x='x:O', y='y:O', color=alt.Color('z:Q', scale=alt.Scale(type='linear', range=['#bfd3e6', '#6e016b'])))
-        c.save(filepath, webdriver='firefox')
+        c.save(filepath, webdriver=self.__class__.WEBDRIVER)
 
     def plot_mass_flow_time_series(self, scale=(1.00, 1.00), filepath=None, iter_range=(-1, -1), v_prop=False, e_prop=False):
         self.gen_mass_graph()
@@ -294,6 +295,7 @@ class TrajectoryEnsemble(object):
         # );
 
     FLUSH_EVERY = 16  # frequency of flushing data to the database
+    WEBDRIVER = 'chrome'  # 'firefox'
 
     def __init__(self, fpath_db=None, do_load_sims=True, flush_every=FLUSH_EVERY):
         self.traj = {}  # index by DB ID
@@ -307,6 +309,8 @@ class TrajectoryEnsemble(object):
         self.cache = DotMap(
             group_hash_to_id = {}
         )
+
+        self.curr_iter_id = None  # ID of the last added row of the 'iter' table; keep for probe persistence to access
 
         self._db_conn_open(fpath_db, do_load_sims)
 
@@ -356,6 +360,8 @@ class TrajectoryEnsemble(object):
             self.is_db_empty = False
             n_traj = self._db_get_one('SELECT COUNT(*) FROM traj', [])
             print(f'Using existing database (trajectories loaded: {n_traj})')
+
+        self.probe_persistence = ProbePersistenceDB.with_traj(self, self.conn)
 
     def _db_get_id(self, tbl, where, col='rowid', conn=None):
         c = conn or self.conn
@@ -410,6 +416,9 @@ class TrajectoryEnsemble(object):
             t.id = c.execute('INSERT INTO traj (name, memo) VALUES (?,?)', [t.name, t.memo]).lastrowid
             # for (i,r) in enumerate(t.sim.rules):
             #     c.execute('INSERT INTO rule (traj_id, ord, name, src) VALUES (?,?,?,?)', [t.id, i, r.__class__.__name__, inspect.getsource(r.__class__)])
+
+            for p in t.sim.probes:
+                p.set_persistence(self.probe_persistence)
 
         t.ens = self
         self.traj[t.id] = t
@@ -541,7 +550,8 @@ class TrajectoryEnsemble(object):
 
     def load_sim(self, traj):
         traj.sim = DB.blob2obj(self.conn.execute('SELECT sim FROM traj WHERE id = ?', [traj.id]).fetchone()[0])
-        traj.sim.traj = traj  # restore the link severed at save time
+        if traj.sim:
+            traj.sim.traj = traj  # restore the link severed at save time
         return self
 
     def load_sims(self):
@@ -598,7 +608,7 @@ class TrajectoryEnsemble(object):
             alt.Color('grp:N', legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15)),
             alt.Size('mean(m):Q')
         )
-        plot.save(filepath, scale_factor=2.0, webdriver='firefox')
+        plot.save(filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER)
 
         return plot if do_ret_plot else self
 
@@ -679,7 +689,7 @@ class TrajectoryEnsemble(object):
             fontSize=20
         ).configure_view(
         ).save(
-            filepath, scale_factor=2.0, webdriver='firefox'
+            filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
         )
 
         return plot if do_ret_plot else self
@@ -889,7 +899,7 @@ class TrajectoryEnsemble(object):
         ).resolve_scale(
             color='independent'
         ).save(
-            filepath, scale_factor=2.0, webdriver='firefox'
+            filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
         )
 
         return plot if do_ret_plot else self
@@ -954,7 +964,7 @@ class TrajectoryEnsemble(object):
         ).resolve_scale(
             color='independent'
         ).save(
-            filepath, scale_factor=2.0, webdriver='firefox'
+            filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
         )
 
         return plot if do_ret_plot else self
@@ -1097,7 +1107,7 @@ class TrajectoryEnsemble(object):
         ).configure_view(
             strokeWidth=0
         ).save(
-            filepath, scale_factor=2.0, webdriver='firefox'
+            filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
         )
 
         return plot if do_ret_plot else self
@@ -1174,14 +1184,17 @@ class TrajectoryEnsemble(object):
         '''
         To pickle the Simulation object, we need to temporarily disconnect it from its Trajectory object container.
         This is because the Trajectory object is connected to the TrajectoryEnsemble object which holds a database
-        connection object and those objects cannot be pickled.  Besides, there is no point in saving the entire class
-        hierarchy anyway.
+        connection object and those objects cannot be pickled.  Besides, there is no point in saving that anyway.
         '''
 
-        s = traj.sim
-        s.traj = None  # sever the link to avoid "pickling SQL connection" error (the link is restored at load time)
-        self._db_upd('UPDATE traj SET sim = ? WHERE id = ?', [DB.obj2blob(s), traj.id])
-        s.traj = traj
+        traj.sim.traj = None  # sever the link to avoid "pickling SQL connection" error (the link is restored at load time)
+        # import dill
+        # print(dill.detect.baditems(traj.sim))
+        # print(dir(traj.sim))
+        # print(traj.sim.db)
+        # self._db_upd('UPDATE traj SET sim = ? WHERE id = ?', [DB.obj2blob(traj.sim), traj.id])
+            # TODO: Uncomment the above line and fix (if at all possible) in Python 37 (works in 36...)
+        traj.sim.traj = traj  # restore the link
 
         return self
 
@@ -1194,10 +1207,10 @@ class TrajectoryEnsemble(object):
         ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
 
         with self.conn as c:
-            iter_id = self.save_iter(traj, c)
+            self.curr_iter_id = self.save_iter(traj, c)  # remember so that probe persistence can use it (yeah... nasty solution)
             # self.save_groups(traj, iter_id, c)
-            self.save_mass_locus(traj, iter_id, c)
-            self.save_mass_flow(traj, iter_id, mass_flow_specs, c)
+            self.save_mass_locus(traj, self.curr_iter_id, c)
+            self.save_mass_flow(traj, self.curr_iter_id, mass_flow_specs, c)
 
         return self
 

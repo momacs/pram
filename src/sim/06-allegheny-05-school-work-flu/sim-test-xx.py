@@ -9,7 +9,7 @@ import pickle
 import signal
 import sys
 
-from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
+from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistenceDB
 from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
 from pram.rule   import ProgressFluRule, TimeInt, TimePoint
 from pram.sim    import Simulation
@@ -63,12 +63,12 @@ fpath_db_out = os.path.join(dpath_cwd, 'sim.sqlite3')
 if os.path.isfile(fpath_db_out):
     os.remove(fpath_db_out)
 
-pp = ProbePersistanceDB(fpath_db_out, flush_every=1)
+pp = ProbePersistenceDB(fpath_db_out, flush_every=1)
 
 probe_school_pop_size = GroupSizeProbe(
     name='school',
     queries=[GroupQry(rel={ Site.AT: s }) for s in sites['school'].values()],
-    persistance=pp,
+    persistence=pp,
     var_names=
         [f'p{i}' for i in range(len(sites['school']))] +
         [f'n{i}' for i in range(len(sites['school']))],

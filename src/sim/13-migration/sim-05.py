@@ -1,8 +1,8 @@
 '''
 A model of conflict-driven migration.
 
-This simulation is an extenstion of 'sim-02.py' and adds the eventual settlement of the migrating population in one of
-the counties cordering the conflict country.
+This simulation is an extenstion of 'sim-04.py' and wraps the simulation in a trajectory ensemble which enables running
+many parametrizations of the simulation.
 '''
 
 import os,sys
@@ -12,9 +12,15 @@ from pram.data   import Probe, ProbePersistenceMode, ProbePersistenceDB, ProbePe
 from pram.entity import Group, GroupQry, GroupSplitSpec, Site
 from pram.rule   import IterAlways, TimeAlways, Rule, Noop
 from pram.sim    import Simulation
+from pram.traj   import Trajectory, TrajectoryEnsemble
 
 import random
 import statistics
+
+import numpy as np
+import scipy
+
+from collections.abc import Iterable
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -26,6 +32,88 @@ site_libya    = Site('Libya',    attr={ 'travel-time': 11 })
 
 site_conflict = site_sudan
 sites_dst = [site_egypt, site_ethiopia, site_chad, site_libya]  # migration destinations
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class MonthlyTemperature(object):
+    """
+    Args:
+        ts (Iterable(Class)): Twelve subclasses of scipy.stats.rv_continuous or scipy.stats.rv_discrete.
+        rv_cls (scipy.stats.rv_generic): A subclass of scipy.stats.rv_continuous or rv_discrete.
+    """
+
+    def __init__(self, ts, rv_cls=scipy.stats.norm):
+        if len(ts) != 12:
+            raise ValueError('Tweleve elements expected.')
+
+        self.ts = []
+        for i in ts:
+            if isinstance(i, scipy.stats.rv_continuous) or isinstance(i, scipy.stats.rv_discrete):
+                self.ts.append(i)
+            elif not isinstance(i, str) and isinstance(i, Iterable) and len(i) == 2:
+                self.ts.append(rv_cls(i[0], i[1]))
+            else:
+                raise ValueError()
+
+    def mean(self, month):
+        return self.ts[month].mean()
+
+    def sample(self, month, n=1, bias=0.00):
+        """
+        Get one or more (n) samples of temperature for the given month.
+
+        Args:
+            month (int): [0..11]
+            bias (float): The bias term to be added to all samples. Useful for simulating a warmer (or colder) world.
+
+        Returns:
+            int, float, list[int], or list[float]
+        """
+
+        return self.ts[month].rvs(n) + bias
+
+    def stdev(self, month):
+        return self.ts[month].stdev()
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class Environment(object):
+    """
+    Args:
+        monthly_temp (MonthlyTemperature): Monthly temperatures.
+    """
+
+    TEMP_MIN =  5  # -15 -> hashness=1
+    TEMP_MID = 20  #   0 -> hashness=0
+    TEMP_MAX = 35  # +15 -> hashness=1
+
+    def __init__(self, monthly_temp):
+        self.monthly_temp = monthly_temp
+
+    def get_harshness(self, month, do_sample=False):
+        """
+        Args:
+            month(int): [0..1]
+
+        Returns:
+            float: [0..1], where 0=benign and 1=harsh
+
+        Todo:
+            Could memoize these values, but that won't help the future, more dynamic incarnations of this object.
+        """
+
+        if do_sample:
+            t = self.monthly_temp.sample(month)[0]
+        else:
+            t = self.monthly_temp.mean(month)
+
+        if t <= self.__class__.TEMP_MIN or t >= self.__class__.TEMP_MAX:
+            return 1.00
+        if t < self.__class__.TEMP_MID:
+            return ( self.__class__.TEMP_MID - t) / ( self.__class__.TEMP_MID - self.__class__.TEMP_MIN)
+        if t > self.__class__.TEMP_MID:
+            return (-self.__class__.TEMP_MID + t) / (-self.__class__.TEMP_MID + self.__class__.TEMP_MAX)
+        return 0.00
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -81,10 +169,10 @@ class MigrationRule(Rule):
     A migrating population end to migrate by settling in its destination site.
     """
 
-    def __init__(self, env_harshness, env_harshness_death_mult=0.001, migration_death_mult=0.05, name='migration', t=TimeAlways(), i=IterAlways()):
+    def __init__(self, env, env_harshness_death_mult=0.001, migration_death_mult=0.05, name='migration', t=TimeAlways(), i=IterAlways()):
         super().__init__(name, t, i, group_qry=GroupQry(cond=[lambda g: g.has_attr({ 'is-migrating': True })]))
 
-        self.env_harshness = env_harshness  # [0=benign .. 1=harsh]
+        self.env = env
 
         self.env_harshness_death_mult = env_harshness_death_mult
         self.migration_death_mult     = migration_death_mult
@@ -103,11 +191,13 @@ class MigrationRule(Rule):
         else:
             migrating_p = 0
 
-        p_death = min(self.env_harshness * self.env_harshness_death_mult + migrating_p * self.migration_death_mult, 1.00)
+        env_harshness = self.env.get_harshness(iter % 11, True)
+        p_death = min(env_harshness * self.env_harshness_death_mult + migrating_p * self.migration_death_mult, 1.00)
+        time_traveled = 1 if env_harshness <= 0.90 else 0  # no travel in very harsh climate
 
         return [
             GroupSplitSpec(p=p_death,     attr_set=Group.VOID),
-            GroupSplitSpec(p=1 - p_death, attr_set={ 'migration-time': group.get_attr('migration-time') + 1, 'travel-time-left': group.get_attr('travel-time-left') - 1 })
+            GroupSplitSpec(p=1 - p_death, attr_set={ 'migration-time': group.get_attr('migration-time') + 1, 'travel-time-left': group.get_attr('travel-time-left') - time_traveled })
         ]
 
     def apply_settle(self, pop, group, iter, t):
@@ -140,12 +230,15 @@ class PopProbe(Probe):
 
     def run(self, iter, t):
         if iter is None:
-            self.run_init()
+            self.run_init(iter, t)
         else:
             self.run_iter(iter, t)
 
-    def run_init(self):
+    def run_init(self, iter, t):
         self.pop_m_init = self.pop.mass
+
+        if self.persistence:
+            self.persistence.persist(self, [self.pop.mass, self.pop.mass_out, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00], iter, t)
 
     def run_iter(self, iter, t):
         # Migrating population:
@@ -173,66 +266,56 @@ class PopProbe(Probe):
             settled_p = 0
 
         # Print and persist:
-        print(
-            f'{iter or 0:>4}  ' +
-            f'pop: {self.pop.mass:>9,.0f}    ' +
-            f'dead: {self.pop.mass_out:>9,.0f}|{self.pop.mass_out / self.pop_m_init * 100:>3,.0f}%    ' +
-            f'migrating: {migrating_m:>9,.0f}|{migrating_p:>3.0f}%    ' +
-            f'migration-time: {migrating_time_mean:>6.2f} ({migrating_time_sd:>6.2f})    ' +
-            f'settled: {settled_m:>9,.0f}|{settled_p:>3.0f}%'
-        )
+        # print(
+        #     f'{iter or 0:>4}  ' +
+        #     f'pop: {self.pop.mass:>9,.0f}    ' +
+        #     f'dead: {self.pop.mass_out:>9,.0f}|{self.pop.mass_out / self.pop_m_init * 100:>3,.0f}%    ' +
+        #     f'migrating: {migrating_m:>9,.0f}|{migrating_p:>3.0f}%    ' +
+        #     f'migration-time: {migrating_time_mean:>6.2f} ({migrating_time_sd:>6.2f})    ' +
+        #     f'settled: {settled_m:>9,.0f}|{settled_p:>3.0f}%    ' +
+        #     f'groups: {len(self.pop.groups):>6,d}'
+        # )
 
         if self.persistence:
             self.persistence.persist(self, [self.pop.mass, self.pop.mass_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd, settled_m, settled_p], iter, t)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-persistence = None
+conflict_dur = 1*12  # [months]
 
-# dpath_cwd = os.path.dirname(__file__)
-# fpath_db  = os.path.join(dpath_cwd, f'sim.sqlite3')
-# persistence = ProbePersistenceDB(fpath_db, mode=ProbePersistenceMode.OVERWRITE)
-
-# persistence = ProbePersistenceMem()
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-# Simulation:
-
-sim = (Simulation().
-    set_pragmas(analyze=False, autocompact=True).
-    add([
-        ConflictRule(severity=0.05, scale=0.2, i=[0,3*12]),
-        MigrationRule(env_harshness=0.05),
-        PopProbe(persistence),
-        Group(m=1*1000*1000, attr={ 'is-migrating': False }, rel={ Site.AT: site_conflict })
-    ]).
-    run(4*12)  # months
+env = Environment(
+    MonthlyTemperature([(24,5), (26,5), (29,5), (33,5), (35,5), (35,5), (33,5), (32,5), (33,5), (33,5), (29,5), (25,5)])  # Sudan
 )
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Summary:
+# Simulations:
 
-def print_settled_summary():
-    print('')
-    settled_m = 0
-    for s in sites_dst:
-        m = s.get_pop_size()
-        settled_m += m
-        print(f'{s.name:<12}: {m:>9,.0f}')
-    print(f'{"TOTAL":<12}: {settled_m:>9,.0f}')
+fpath_traj_db = os.path.join(os.path.dirname(__file__), f'sim-05-traj.sqlite3')
 
-print_settled_summary()
+if os.path.isfile(fpath_traj_db): os.remove(fpath_traj_db)
+
+te = TrajectoryEnsemble(fpath_traj_db)
+
+if te.is_db_empty:
+    te.set_pragma_memoize_group_ids(True)
+    te.add_trajectories([
+        Trajectory(
+            (Simulation().
+                add([
+                    ConflictRule(severity=0.05, scale=scale, i=[0, conflict_dur]),
+                    MigrationRule(env, env_harshness_death_mult=0.1, migration_death_mult=0.0001),  # most deaths due to environment (to show the seasonal effect)
+                    PopProbe(),
+                    Group(m=1*1000*1000, attr={ 'is-migrating': False }, rel={ Site.AT: site_conflict })
+                ])
+            )
+        ) for scale in np.arange(0.10, 0.30, 0.10)
+    ])
+    te.run(conflict_dur + 12)  # [months]
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Plot:
+# Results analysis:
 
-if persistence:
-    series = [
-        { 'var': 'migrating_m', 'lw': 0.75, 'linestyle': '-',  'marker': 'o', 'color': 'blue',  'markersize': 0, 'lbl': 'Migrating' },
-        { 'var': 'settled_m',   'lw': 0.75, 'linestyle': '--', 'marker': '+', 'color': 'green', 'markersize': 0, 'lbl': 'Settled'   },
-        { 'var': 'dead_m',      'lw': 0.75, 'linestyle': ':',  'marker': 'x', 'color': 'red',   'markersize': 0, 'lbl': 'Dead'      }
-    ]
-    sim.probes[0].plot(series, ylabel='Population mass', xlabel='Iteration (month from start of conflict)', figsize=(12,4), subplot_b=0.15)
+# te.plot_mass_locus_line     ((1200,300), os.path.join(os.path.dirname(__file__), 'sim-05-plot-line.png'), col_scheme='tableau10', opacity_min=0.35)
+# te.plot_mass_locus_line_aggr((1200,300), os.path.join(os.path.dirname(__file__), 'sim-05-plot-ci.png'),   col_scheme='tableau10')

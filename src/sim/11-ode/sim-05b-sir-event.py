@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 from dotmap      import DotMap
 from scipy.stats import gamma as gamma
 
-from pram.data   import GroupSizeProbe, ProbePersistanceMem, ProbeMsgMode
+from pram.data   import GroupSizeProbe, ProbePersistenceMem, ProbeMsgMode
 from pram.entity import Group, GroupQry, GroupSplitSpec
 from pram.rule   import ODESystemMass, Event, TimeAlways, Process
 from pram.sim    import Simulation
@@ -151,7 +151,7 @@ probe = GroupSizeProbe(
     queries=[GroupQry(attr={ 'flu': 's' }), GroupQry(attr={ 'flu': 'i' }), GroupQry(attr={ 'flu': 'r' })],
     qry_tot=None,
     var_names=['ps', 'pi', 'pr', 'ns', 'ni', 'nr'],
-    persistance=ProbePersistanceMem(),
+    persistence=ProbePersistenceMem(),
     msg_mode=ProbeMsgMode.NONE
 )
 

@@ -15,7 +15,7 @@ import numpy as np
 
 from collections import namedtuple
 
-from pram.data   import Probe, ProbePersistanceDB, GroupSizeProbe
+from pram.data   import Probe, ProbePersistenceDB, GroupSizeProbe
 from pram.entity import GroupQry, GroupSplitSpec, Site
 from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, TimeInt, TimePoint
 from pram.sim    import HourTimer, Simulation
@@ -45,7 +45,7 @@ fpath_db  = os.path.join(dpath_cwd, f'probes-{sim_dur_days}d.sqlite3')
 if os.path.isfile(fpath_db):
     os.remove(fpath_db)
 
-probe_persistance = ProbePersistanceDB(fpath_db)
+probe_persistence = ProbePersistenceDB(fpath_db)
 
 probes_grp_size_flu_school = []
 
@@ -106,7 +106,7 @@ def run_sim(p_lst):
         setattr(flu_rule, 'p_infection_min', p)
         for p in probes_grp_size_flu_school:
             p.set_consts([Probe.Const('p_inf_min', 'float', str(flu_rule.p_infection_min))])
-            p.set_persistance(probe_persistance)
+            p.set_persistence(probe_persistence)
 
         sim.run()
 

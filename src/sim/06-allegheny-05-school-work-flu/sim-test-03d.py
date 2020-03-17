@@ -63,7 +63,7 @@ fpath_db = os.path.join(os.path.dirname(__file__), 'out-test-03c.sqlite3')
 if os.path.isfile(fpath_db):
     os.remove(fpath_db)
 
-pp = ProbePersistanceDB(fpath_db)
+pp = ProbePersistenceDB(fpath_db)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

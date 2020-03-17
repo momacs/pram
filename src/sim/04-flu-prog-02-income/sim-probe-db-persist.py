@@ -1,5 +1,5 @@
 '''
-A simulation implementing the flu progression model.  This version tests probe database persistance.
+A simulation implementing the flu progression model.  This version tests probe database persistence.
 '''
 
 import os
@@ -11,7 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pram.sim    import Simulation
 from pram.entity import AttrFluStage, GroupQry, GroupSplitSpec
-from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
+from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistenceDB
 from pram.rule   import Rule, TimeInt
 
 from rules import ProgressFluRule
@@ -35,7 +35,7 @@ probe = GroupSizeProbe(
     ],
     qry_tot=None,
     var_names=['pn', 'pa', 'ps', 'nn', 'na', 'ns'],
-    persistance=ProbePersistanceDB(fpath_db)
+    persistence=ProbePersistenceDB(fpath_db)
 )
 
 (Simulation(6,1,16, rand_seed=rand_seed).

@@ -132,7 +132,7 @@ sim = (Simulation().
         ConflictRule(severity=0.05, scale=0.2),
         MigrationRule(env_harshness=0.05),
         PopProbe(),
-        Group(m=1*1000*1000, attr={ 'is-migrating': False }),
+        Group(m=1*1000*1000, attr={ 'is-migrating': False })
     ]).
     run(48)  # months
 )

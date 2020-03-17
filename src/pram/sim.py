@@ -19,7 +19,7 @@
 #     Quick
 #         Sync sim.Timer with rule.Time
 #         Associate time with rules, not simulations
-#         Associate the output database (or a directory) with a simulation, not probe persistance
+#         Associate the output database (or a directory) with a simulation, not probe persistence
 #         - Store school info (e.g., size) in the probe DB and associate with the probes
 #         - Allow simulation to output warning to a file or a database
 #         - Abstract the single-group group splitting mechanism as a dedicated method.  Currently, that is used in
@@ -196,8 +196,8 @@
 #
 #     Data collection
 #         c Probe                                                                              [2019.01.18 - 2019.03.31]
-#         c ProbePersistanceDB                                                                 [2019.03.02 - 2019.03.18]
-#         c ProbePersistanceFS                                                                 [2019.03.02]
+#         c ProbePersistenceDB                                                                 [2019.03.02 - 2019.03.18]
+#         c ProbePersistenceFS                                                                 [2019.03.02]
 #         c GroupSizeProbe                                                                     [2019.01.18 - 2019.07.15]
 #
 #     Logging
@@ -235,7 +235,7 @@
 #         String interning (sys.intern; not needed in Python 3)                                [2019.01.06 - 2019.01.17]
 #         __slots__                                                                            [2019.01.17]
 #         Profiling
-#             ProbePersistanceDB                                                               [2019.03.16 - 2019.03.17]
+#             ProbePersistenceDB                                                               [2019.03.16 - 2019.03.17]
 #
 #     Legend
 #         c Class
@@ -878,7 +878,7 @@ class SimulationDBI(object):
 
     def gen_groups(self, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, is_verbose=False):
         """
-        Here is a usage example::
+        Usage example:
 
             (Simulation().
                 add().
@@ -1007,12 +1007,9 @@ class Simulation(object):
     A PRAM simulation.
 
     At this point, this simulation is a discrete-event simulation (DES).  DES models the operation of a system as a
-    (discrete) sequence of events in time.  DES contrast with continuous simulation in which the system state is
-    changed continuously over time on the basis of a set of differential equations defining the rates of change of
+    (discrete) sequence of events in time.  DES can be contrasted with continuous simulation in which the system state
+    is changed continuously over time on the basis of a set of differential equations defining the rates of change of
     state variables.
-
-    All function callbacks (cb) should take only one argument, the Simulation object, because everything is accessible
-    given that single reference.
     '''
 
     def __init__(self, traj=None, rand_seed=None, do_keep_mass_flow_specs=False):
@@ -2161,8 +2158,8 @@ class Simulation(object):
 
         # Flush any buffered probe data:
         for p in self.probes:
-            if p.persistance is not None:
-                p.persistance.flush()
+            if p.persistence is not None:
+                p.persistence.flush()
 
         return self
 

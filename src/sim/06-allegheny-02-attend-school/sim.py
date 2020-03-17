@@ -1,7 +1,7 @@
 '''
 The second simulation testing constructing a simulation from a database.  The population of interst is the synthetic
 population of the Allegheny county.  The simulation reuses school-attending rules developed earlier (see below) to
-demonstrate that they scale to this more realistic scenario.  Moreover, it also employs probe database persistance to
+demonstrate that they scale to this more realistic scenario.  Moreover, it also employs probe database persistence to
 keep track of vital characteristics over a larger number of sites of interests (specifically, schools).  This data
 saved this way is visualized elsewhere (res.py).
 
@@ -27,7 +27,7 @@ import pickle
 import signal
 import sys
 
-from pram.data   import ProbeMsgMode, ProbePersistanceDB, GroupSizeProbe
+from pram.data   import ProbePersistenceDB, GroupSizeProbe
 from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
 from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, TimeInt, TimePoint
 from pram.sim    import HourTimer, Simulation
@@ -84,12 +84,12 @@ fpath_db_out = os.path.join(dpath_cwd, 'out.sqlite3')
 if os.path.isfile(fpath_db_out):
     os.remove(fpath_db_out)
 
-pp = ProbePersistanceDB(fpath_db_out, flush_every=1)
+pp = ProbePersistenceDB(fpath_db_out, flush_every=1)
 
 probe_school_pop_size = GroupSizeProbe(
     name='school-pop-size',
     queries=[GroupQry(rel={ Site.AT: s }) for s in sites['school'].values()],
-    persistance=pp,
+    persistence=pp,
     var_names=
         [f'p{i}' for i in range(len(sites['school']))] +
         [f'n{i}' for i in range(len(sites['school']))],

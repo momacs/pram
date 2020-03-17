@@ -9,7 +9,7 @@ itself) is lengthened.
 import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from pram.data   import Probe, ProbePersistanceMode, ProbePersistanceDB, ProbePersistanceMem, Var
+from pram.data   import Probe, ProbePersistenceMode, ProbePersistenceDB, ProbePersistenceMem, Var
 from pram.entity import Group, GroupQry, GroupSplitSpec, Site
 from pram.rule   import IterAlways, TimeAlways, Rule, Noop
 from pram.sim    import Simulation
@@ -24,13 +24,13 @@ from collections.abc import Iterable
 
 # ----------------------------------------------------------------------------------------------------------------------
 site_sudan    = Site('Sudan')
-site_ethiopia = Site('Ethiopia', attr={ 'travel-time':  8 })
+site_ethiopia = Site('Ethiopia', attr={ 'travel-time':  8 })  # [months]
 site_chad     = Site('Chad',     attr={ 'travel-time':  9 })
 site_egypt    = Site('Egypt',    attr={ 'travel-time': 10 })
 site_libya    = Site('Libya',    attr={ 'travel-time': 11 })
 
 site_conflict = site_sudan
-sites_dst = [site_egypt, site_ethiopia, site_chad, site_libya]
+sites_dst = [site_egypt, site_ethiopia, site_chad, site_libya]  # migration destinations
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -211,7 +211,7 @@ class PopProbe(Probe):
     post-simulation plotting or data analysis.
     """
 
-    def __init__(self, persistance=None):
+    def __init__(self, persistence=None):
         self.consts = []
         self.vars = [
             Var('pop_m',               'float'),
@@ -224,7 +224,7 @@ class PopProbe(Probe):
             Var('settled_p',           'float')
         ]
 
-        super().__init__('pop', persistance)
+        super().__init__('pop', persistence)
 
     def run(self, iter, t):
         if iter is None:
@@ -267,21 +267,22 @@ class PopProbe(Probe):
             f'dead: {self.pop.mass_out:>9,.0f}|{self.pop.mass_out / self.pop_m_init * 100:>3,.0f}%    ' +
             f'migrating: {migrating_m:>9,.0f}|{migrating_p:>3.0f}%    ' +
             f'migration-time: {migrating_time_mean:>6.2f} ({migrating_time_sd:>6.2f})    ' +
-            f'settled: {settled_m:>9,.0f}|{settled_p:>3.0f}%'
+            f'settled: {settled_m:>9,.0f}|{settled_p:>3.0f}%    ' +
+            f'groups: {len(self.pop.groups):>6,d}'
         )
 
-        if self.persistance:
-            self.persistance.persist(self, [self.pop.mass, self.pop.mass_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd, settled_m, settled_p], iter, t)
+        if self.persistence:
+            self.persistence.persist(self, [self.pop.mass, self.pop.mass_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd, settled_m, settled_p], iter, t)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-persistance = None
+persistence = None
 
 # dpath_cwd = os.path.dirname(__file__)
-# fpath_db  = os.path.join(dpath_cwd, f'sim.sqlite3')
-# persistance = ProbePersistanceDB(fpath_db, mode=ProbePersistanceMode.OVERWRITE)
+# fpath_db  = os.path.join(dpath_cwd, f'sim-04.sqlite3')
+# persistence = ProbePersistenceDB(fpath_db, mode=ProbePersistenceMode.OVERWRITE)
 
-persistance = ProbePersistanceMem()
+persistence = ProbePersistenceMem()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -298,8 +299,8 @@ sim = (Simulation().
     add([
         ConflictRule(severity=0.05, scale=0.2, i=[0, conflict_dur]),
         MigrationRule(env, env_harshness_death_mult=0.1, migration_death_mult=0.0001),  # most deaths due to environment (to show the seasonal effect)
-        PopProbe(persistance),
-        Group(m=1*1000*1000, attr={ 'is-migrating': False }, rel={ Site.AT: site_conflict }),
+        PopProbe(persistence),
+        Group(m=1*1000*1000, attr={ 'is-migrating': False }, rel={ Site.AT: site_conflict })
     ]).
     run(conflict_dur + 12)  # [months]
 )
@@ -323,7 +324,7 @@ print_settled_summary()
 # ----------------------------------------------------------------------------------------------------------------------
 # Plot:
 
-if persistance:
+if persistence:
     series = [
         { 'var': 'migrating_m', 'lw': 0.75, 'linestyle': '-',  'marker': 'o', 'color': 'blue',  'markersize': 0, 'lbl': 'Migrating' },
         { 'var': 'settled_m',   'lw': 0.75, 'linestyle': '--', 'marker': '+', 'color': 'green', 'markersize': 0, 'lbl': 'Settled'   },

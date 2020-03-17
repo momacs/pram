@@ -4,10 +4,10 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import numpy as np
 
-from pram.entity import Group
-from pram.rule   import SIRSModel
-from pram.sim    import Simulation
-from pram.traj   import Trajectory, TrajectoryEnsemble
+from pram.entity    import Group
+from pram.model.epi import SIRSModel
+from pram.sim       import Simulation
+from pram.traj      import Trajectory, TrajectoryEnsemble
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -27,13 +27,13 @@ if os.path.isfile(fpath_db):
 
 te = (TrajectoryEnsemble(fpath_db).
     add_trajectories([
-        Trajectory(f'SIR: b={round(beta,2)}', None,
+        Trajectory(
             (Simulation().
                 add([
                     SIRSModel('flu', beta, 0.50, 0.00),
                     Group(m=1000, attr={ 'flu': 's' })
                 ])
-            )
+            ), f'SIR: b={round(beta,2)}'
         ) for beta in [0.05]  # np.arange(0.05, 0.06, 0.01)
     ]).
     set_group_names([
@@ -49,6 +49,7 @@ te = (TrajectoryEnsemble(fpath_db).
 # (2) Restore a trajectory ensemble from the database for additional runs:
 
 # TrajectoryEnsemble(fpath_db).run(20)
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # (3) Restore a trajectory ensemble from the database for analysis:

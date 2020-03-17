@@ -21,7 +21,7 @@ import os
 import pickle
 import sys
 
-from pram.data   import ProbePersistanceDB, GroupSizeProbe
+from pram.data   import ProbePersistenceDB, GroupSizeProbe
 from pram.entity import GroupDBRelSpec, GroupQry, Site
 from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, TimePoint
 from pram.sim    import Simulation
@@ -78,12 +78,12 @@ fpath_db_out = os.path.join(dpath_cwd, 'out.sqlite3')
 if os.path.isfile(fpath_db_out):
     os.remove(fpath_db_out)
 
-pp = ProbePersistanceDB(fpath_db_out, flush_every=1)
+pp = ProbePersistenceDB(fpath_db_out, flush_every=1)
 
 probe_school_pop_size = GroupSizeProbe(
     name='school-pop-size',
     queries=[GroupQry(rel={ Site.AT: s }) for s in sites['school'].values()],
-    persistance=pp,
+    persistence=pp,
     var_names=
         [f'p{i}' for i in range(len(sites['school']))] +
         [f'n{i}' for i in range(len(sites['school']))],

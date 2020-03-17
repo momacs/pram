@@ -5,11 +5,9 @@ Resource transformation simulation modeling the following process: trees --> woo
 import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
-from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
+from pram.entity import Group
 from pram.rule   import Rule, TimeAlways
 from pram.sim    import Simulation
-from pram.util   import Time as TimeU
 
 
 # ----------------------------------------------------------------------------------------------------------------------

@@ -116,7 +116,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import pram.util as util
 
-from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistanceDB
+from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistenceDB
 from pram.entity import Group, GroupDBRelSpec, GroupQry, Site
 from pram.rule   import FluLocationRule, FluLocationAlleghenyRule, ProgressFluSimpleRule, ProgressFluSimpleAlleghenyRule
 from pram.sim    import Simulation
@@ -166,7 +166,7 @@ fpath_db = os.path.join(os.path.dirname(__file__), 'out-test-03c.sqlite3')
 if os.path.isfile(fpath_db):
     os.remove(fpath_db)
 
-pp = ProbePersistanceDB(fpath_db)
+pp = ProbePersistenceDB(fpath_db)
 
 school_l01 = sites['school'][450149292]
 school_l02 = sites['school'][450149286]  # might be worse than l01
@@ -186,7 +186,7 @@ def probe_grp_size_flu_school(name, school, pp):
             GroupQry(attr={ 'flu': 'r' }, rel={ 'school': school })
         ],
         qry_tot=GroupQry(rel={ 'school': school }),
-        persistance=pp,
+        persistence=pp,
         var_names=['ps', 'pe', 'pr', 'ns', 'ne', 'nr']
     )
 

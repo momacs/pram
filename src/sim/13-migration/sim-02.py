@@ -1,13 +1,13 @@
 '''
 A model of conflict-driven migration.
 
-This simulation is identical to 'sim-01.py' but with persistance and the associated post-simulation plot.
+This simulation is identical to 'sim-01.py' but with persistence and the associated post-simulation plot.
 '''
 
 import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from pram.data   import Probe, ProbePersistanceMode, ProbePersistanceDB, ProbePersistanceMem, Var
+from pram.data   import Probe, ProbePersistenceMode, ProbePersistenceDB, ProbePersistenceMem, Var
 from pram.entity import Group, GroupQry, GroupSplitSpec, Site
 from pram.rule   import IterAlways, TimeAlways, Rule, Noop
 from pram.sim    import Simulation
@@ -92,7 +92,7 @@ class PopProbe(Probe):
     post-simulation plotting or data analysis.
     """
 
-    def __init__(self, persistance=None):
+    def __init__(self, persistence=None):
         self.consts = []
         self.vars = [
             Var('pop_m',               'float'),
@@ -103,7 +103,7 @@ class PopProbe(Probe):
             Var('migrating_time_sd',   'float')
         ]
 
-        super().__init__('pop', persistance)
+        super().__init__('pop', persistence)
 
     def run(self, iter, t):
         if iter is None:
@@ -137,18 +137,18 @@ class PopProbe(Probe):
             f'migration-time: {migrating_time_mean:>6.2f} ({migrating_time_sd:>6.2f})'
         )
 
-        if self.persistance:
-            self.persistance.persist(self, [self.pop.mass, self.pop.mass_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd], iter, t)
+        if self.persistence:
+            self.persistence.persist(self, [self.pop.mass, self.pop.mass_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd], iter, t)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-persistance = None
+persistence = None
 
 # dpath_cwd = os.path.dirname(__file__)
 # fpath_db  = os.path.join(dpath_cwd, f'sim.sqlite3')
-# persistance = ProbePersistanceDB(fpath_db, mode=ProbePersistanceMode.OVERWRITE)
+# persistence = ProbePersistenceDB(fpath_db, mode=ProbePersistenceMode.OVERWRITE)
 
-persistance = ProbePersistanceMem()
+persistence = ProbePersistenceMem()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -159,8 +159,8 @@ sim = (Simulation().
     add([
         ConflictRule(severity=0.05, scale=0.2),
         MigrationRule(env_harshness=0.05),
-        PopProbe(persistance),
-        Group(m=1*1000*1000, attr={ 'is-migrating': False }),
+        PopProbe(persistence),
+        Group(m=1*1000*1000, attr={ 'is-migrating': False })
     ]).
     run(48)  # months
 )
@@ -169,7 +169,7 @@ sim = (Simulation().
 # ----------------------------------------------------------------------------------------------------------------------
 # Plot:
 
-if persistance:
+if persistence:
     series = [
         { 'var': 'migrating_m', 'lw': 0.75, 'linestyle': '-',  'marker': 'o', 'color': 'blue', 'markersize': 0, 'lbl': 'Migrating' },
         { 'var': 'dead_m',      'lw': 0.75, 'linestyle': '--', 'marker': '+', 'color': 'red',  'markersize': 0, 'lbl': 'Dead'      }

@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 from dotmap import DotMap
 
-from pram.data   import GroupSizeProbe, ProbePersistanceMem, ProbeMsgMode
+from pram.data   import GroupSizeProbe, ProbePersistenceMem, ProbeMsgMode
 from pram.entity import Group, GroupQry
 from pram.rule   import ODESystemMass
 from pram.sim    import Simulation
@@ -47,7 +47,7 @@ probe = GroupSizeProbe(
     queries=[GroupQry(attr={ 'flu': 's' }), GroupQry(attr={ 'flu': 'i' }), GroupQry(attr={ 'flu': 'r' })],
     qry_tot=None,
     var_names=['ps', 'pi', 'pr', 'ns', 'ni', 'nr'],
-    persistance=ProbePersistanceMem(),
+    persistence=ProbePersistenceMem(),
     msg_mode=ProbeMsgMode.NONE
 )
 

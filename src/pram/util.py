@@ -12,7 +12,9 @@ import gc
 import gzip
 import multiprocessing
 import os
-import dill as pickle
+import pickle
+# import dill as pickle
+import cloudpickle as pickle
 import random
 import re
 import platform
@@ -47,6 +49,9 @@ class DB(object):
 
     @staticmethod
     def blob2obj(b, do_decompress=True):
+        if b is None:
+            return None
+
         if do_decompress:
             return pickle.loads(gzip.decompress(b))
         else:
@@ -55,9 +60,9 @@ class DB(object):
     @staticmethod
     def obj2blob(o, do_compress=True):
         if do_compress:
-            return gzip.compress(pickle.dumps(o))  # , pickle.HIGHEST_PROTOCOL
+            return gzip.compress(pickle.dumps(o))  #, pickle.HIGHEST_PROTOCOL
         else:
-            return pickle.dumps(o)  # , pickle.HIGHEST_PROTOCOL
+            return pickle.dumps(o)  #, pickle.HIGHEST_PROTOCOL
 
     @staticmethod
     def get_num(conn, tbl, col, where=None):
