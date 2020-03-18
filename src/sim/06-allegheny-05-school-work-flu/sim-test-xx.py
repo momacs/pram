@@ -85,15 +85,15 @@ probe_school_pop_size = GroupSizeProbe(
     add_probe(probe_school_pop_size).
     gen_groups_from_db(
         fpath_db_in,
-        tbl='people',
-        attr={},
-        rel={ 'home': site_home },
-        attr_db=[],
-        rel_db=[
+        tbl      = 'people',
+        attr_fix = {},
+        rel_fix  = { 'home': site_home },
+        attr_db  = [],
+        rel_db   = [
             GroupDBRelSpec('school', 'school_id', sites['school'])
         ],
-        rel_at='home',
-        fpath=fpath_groups
+        rel_at   = 'home',
+        fpath    = fpath_groups
     ).
     summary().
     run(do_disp_t=True)

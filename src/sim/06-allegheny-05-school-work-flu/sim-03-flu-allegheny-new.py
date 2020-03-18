@@ -136,8 +136,8 @@ s = (Simulation().
     gen_groups_from_db(
         fpath_db = fpath_db,
         tbl      = 'students',
-        attr     = {},
-        rel      = { 'home': site_home },
+        attr_fix = {},
+        rel_fix  = { 'home': site_home },
         attr_db  = [],
         # rel_db   = [GroupDBRelSpec(name='school', col='school_id', entities=sites['school'])],
         rel_db   = [GroupDBRelSpec(tbl='schools', col_from='school_id', col_to='sp_id', name='school')],

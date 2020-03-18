@@ -225,14 +225,14 @@ probe_grp_size_flu_school_m03 = probe_grp_size_flu_school('school-m03', school_m
         done().
     gen_groups_from_db(
         fpath_db_in,
-        tbl='students',
-        attr={ 'flu': 's' },
-        rel={ 'home': site_home },
-        attr_db=[],
-        rel_db=[
+        tbl      = 'students',
+        attr_fix = { 'flu': 's' },
+        rel_fix  = { 'home': site_home },
+        attr_db  = [],
+        rel_db   = [
             GroupDBRelSpec('school', 'school_id', sites['school'])
         ],
-        rel_at='school'
+        rel_at   = 'school'
     ).
     run(3).
     summary(True, 0,0,0,0, (1,0))

@@ -86,14 +86,14 @@ pp = ProbePersistenceDB(fpath_db)
         done().
     gen_groups_from_db(
         fpath_db_in,
-        tbl='people',
-        attr={},
-        rel={ 'home': site_home },
-        attr_db=[],
-        rel_db=[
+        tbl      = 'people',
+        attr_fix = {},
+        rel_fix  = { 'home': site_home },
+        attr_db  = [],
+        rel_db   = [
             GroupDBRelSpec('school', 'school_id', sites['school'])
         ],
-        rel_at='home'
+        rel_at   = 'home'
     ).
     run(1).
     summary()

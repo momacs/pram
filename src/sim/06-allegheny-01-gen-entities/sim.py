@@ -186,8 +186,8 @@ else:
     groups = Group.gen_from_db(
         fpath_db,
         tbl='people',
-        attr={},
-        rel={},
+        attr_fix={},
+        rel_fix={},
         attr_db=[],
         rel_db=[
             GroupDBRelSpec('home', 'sp_hh_id', sites['home']),
