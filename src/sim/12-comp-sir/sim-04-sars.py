@@ -1,12 +1,6 @@
 '''
-A simulation modeling the SARS outbreak via the SEQIHR model.  A quarantine intervention interacts with the epidemic
+A simulation modeling a COVID-19 outbreak via the SEQIHR model.  A quarantine intervention interacts with the epidemic
 reducing the number of infected; the sooner it is undertaken the lower the infected count.
-
-"Between November 2002 and July 2003, an outbreak of SARS in southern China caused an eventual 8,098 cases, resulting in
-774 deaths reported in 37 countries, with the majority of cases in China and Hong Kong (9.6% fatality rate) according
-to the World Health Organization."
-
-[https://en.wikipedia.org/wiki/Severe_acute_respiratory_syndrome]
 
 This system uses ordinary differential equations solver to implement the SEQIHR model.
 '''
@@ -15,9 +9,6 @@ import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
-import matplotlib.pyplot as plt
-
-from dotmap import DotMap
 from scipy.stats import truncnorm, uniform
 
 from pram.entity      import Group
@@ -34,9 +25,6 @@ fpath_db = os.path.join(os.path.dirname(__file__), 'data', 'seqihr.sqlite3')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def get_out_fpath(filename):
-    return os.path.join(os.path.dirname(__file__), 'out', filename)
-
 def TN(a,b, mu, sigma, n=None):
     return truncnorm((a - mu) / sigma, (b - mu) / sigma, mu, sigma).rvs(n)
 
@@ -53,7 +41,7 @@ group_names = [
 # ----------------------------------------------------------------------------------------------------------------------
 # A quarantine intervention rule:
 
-class SARSQuarantineIntervention(Intervention):  # extends the Intervention primitive
+class SARSQuarantineIntervention(Intervention):
     def __init__(self, seqihr_model, chi, i):
         Err.type(seqihr_model, 'seqihr_model', SEQIHRModel)
 
@@ -74,7 +62,7 @@ if os.path.isfile(fpath_db): os.remove(fpath_db)
 
 te = TrajectoryEnsemble(fpath_db)
 
-if te.is_db_empty:  # generate simulation data if the trajectory ensemble database is empty
+if te.is_db_empty:
     te.set_pragma_memoize_group_ids(True)
     te.add_trajectories([
         (Simulation().
@@ -87,13 +75,13 @@ if te.is_db_empty:  # generate simulation data if the trajectory ensemble databa
                 Group(m=95000, attr={ 'sars': 's' }),
                 Group(m= 5000, attr={ 'sars': 'e' })
             ])
-        ) for intervention_onset in TN(30,120, 75,100, 5)  # a 5-trajectory ensemble
+        ) for intervention_onset in TN(30,120, 75,100, 5)
     ])
     te.set_group_names(group_names)
     te.run(400)
 
-# te.plot_mass_locus_line     ((1200,300), get_out_fpath('plot-line.png'), col_scheme='tableau10', opacity_min=0.35)
-# te.plot_mass_locus_line_aggr((1200,300), get_out_fpath('plot-ci.png'),   col_scheme='tableau10')
+# te.plot_mass_locus_line     ((1200,300), os.path.join(os.path.dirname(__file__), 'out', 'plot-line.png'), col_scheme='tableau10', opacity_min=0.35)
+# te.plot_mass_locus_line_aggr((1200,300), os.path.join(os.path.dirname(__file__), 'out', 'plot-ci.png'),   col_scheme='tableau10')
 
 # fpath_diag = os.path.join(os.path.dirname(__file__), 'out', 'sim-04.diag')
 # fpath_pdf  = os.path.join(os.path.dirname(__file__), 'out', 'sim-04.pdf')
