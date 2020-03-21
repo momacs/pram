@@ -14,6 +14,8 @@ import numpy as np
 import os
 import xxhash
 
+from dotmap import DotMap
+
 from abc             import ABC
 from attr            import attrs, attrib, converters, validators
 from collections.abc import Iterable
@@ -298,7 +300,7 @@ class Site(Resource):
 
     AT = '@'  # relation name for the group's current location
 
-    __slots__ = ('attr', 'rel_name', 'pop', 'groups')
+    __slots__ = ('attr', 'rel_name', 'pop', 'cache_qry_to_groups', 'cache_qry_to_m')
 
     def __init__(self, name, attr=None, rel_name=AT, pop=None, capacity_max=1):
         # super().__init__(EntityType.SITE, '')
@@ -306,8 +308,15 @@ class Site(Resource):
 
         self.rel_name = rel_name  # name of the relation the site is the object of
         self.attr = attr or {}
-        self.pop = pop  # pointer to the population (can be set elsewhere too)
-        # self.groups = None  # None indicates the groups at the site might have changed and need to be retrieved again from the population
+        self.pop = pop            # pointer to the population (can be set elsewhere too)
+        # self.groups = {}          # None indicates the groups at the site might have changed and need to be retrieved
+                                  # again from the population. This is a
+        # self.cache = DotMap(      # reset by the GroupPopulation object (that manages sites and groups) after mass transfer that crowns each iteration
+        #     qry_to_groups = {},   # groups currently at this site
+        #     qry_to_m      = {}    # mass of population at this site
+        # )
+        self.cache_qry_to_groups = {}   # groups currently at this site
+        self.cache_qry_to_m      = {}   # mass of population at this site
 
     def __eq__(self, other):
         '''
@@ -422,8 +431,6 @@ class Site(Resource):
             Implement memoization (probably of only all the groups, i.e., without accounting for the ``qry``).
         """
 
-        # if self.groups is None:
-
         qry = qry or GroupQry()
         # qry.rel.update({ self.rel_name: self.get_hash() })
         qry.rel.update({ self.rel_name: self })
@@ -433,6 +440,21 @@ class Site(Resource):
             return [g for g in groups if g.m > 0]
         else:
             return groups
+
+        # qry = qry or GroupQry()
+        # qry.rel.update({ self.rel_name: self })
+        #
+        # # if not qry in self.groups.keys():
+        # #     self.groups[qry] = self.pop.get_groups(qry)
+        # groups = self.cache_qry_to_groups.get(qry)
+        # if groups is None:
+        #     groups = self.pop.get_groups(qry)
+        #     self.cache_qry_to_groups[qry] = groups
+        #
+        # if non_empty_only:
+        #     return [g for g in groups if g.m > 0]
+        # else:
+        #     return groups
 
     def get_pop_size(self, qry=None):
         """Returns the total size of the agent population mass currently at this side.
@@ -450,10 +472,20 @@ class Site(Resource):
             Rename to ``get_pop_mass()``?
         """
 
-        return sum(g.m for g in self.get_groups_here(qry))
+        return math.fsum(g.m for g in self.get_groups_here(qry))  # sum
 
-    # def invalidate_pop(self):
-    #     self.groups = None
+        # m = self.cache_qry_to_m.get(qry)
+        # if m is None:
+        #     m = math.fsum(g.m for g in self.get_groups_here(qry))
+        #     self.cache_qry_to_m[qry] = m
+        # return m
+
+    def invalidate_pop(self):
+        # self.groups = {}
+        # self.cache.qry_to_groups = {}
+        # self.cache.qry_to_m = {}
+        self.cache_qry_to_groups = {}
+        self.cache_qry_to_m = {}
 
     def set_pop(self, pop):
         """Sets the group population.
@@ -584,6 +616,33 @@ class GroupQry(object):
     full : bool = attrib(default=False)
 
 
+# class GroupQry(object):
+#     __slots__ = ('attr', 'rel', 'cond', 'full', 'hash')
+#
+#     def __init__(self, attr={}, rel={}, cond=[], full=False):
+#         self.attr = attr
+#         self.rel  = rel
+#         self.cond = cond
+#         self.full = full
+#
+#         self.hash = None  # computed lazily
+#
+#     def __eq__(self, other):
+#         return isinstance(self, type(other)) and (self.attr == other.attr) and (self.rel == other.rel) and (self.cond == other.cond) and (self.full == other.full)
+#
+#     def __hash__(self):
+#         if self.hash is None:
+#             self.hash = GroupQry.gen_hash(self.attr, self.rel, self.cond, self.full)
+#         return self.hash
+#
+#     @staticmethod
+#     def gen_hash(attr, rel=None, cond=None, full=False):
+#         attr = attr or {}
+#         rel  = rel  or {}
+#         cond = cond or []
+#         return xxhash.xxh64(json.dumps((attr, rel, cond, full), sort_keys=True, cls=SiteJSONEncoder)).intdigest()  # .hexdigest()
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 @attrs(kw_only=True, slots=True)
 class GroupSplitSpec(object):
@@ -706,7 +765,7 @@ class Group(Entity):
         self.rel  = rel  or {}
 
         self.is_frozen = False
-        self.hash = None  # computed lazily
+        self.hash = None      # computed lazily
         self.callee = callee  # used only throughout the process of creating group; unset by done()
 
     def __eq__(self, other):
@@ -727,7 +786,6 @@ class Group(Entity):
     def __hash__(self):
         if self.hash is None:
             self.hash = Group.gen_hash(self.attr, self.rel)
-
         return self.hash
 
     def __repr__(self):
@@ -978,7 +1036,7 @@ class Group(Entity):
         # return hash(tuple([frozenset(attr.items()), frozenset(rel.items())]))
         # return hashlib.sha1(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder).encode('utf-8')).hexdigest()
         # return xxhash.xxh32(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder)).hexdigest()
-        return xxhash.xxh64(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder)).hexdigest()
+        return xxhash.xxh64(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder)).hexdigest()  # .intdigest()
 
     @classmethod
     def gen_from_db(cls, db_fpath, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, fn_live_info=None):
@@ -1336,7 +1394,7 @@ class Group(Entity):
 
         return self.__hash__()
 
-    def get_mass_at(self, qry, site=Site.AT):
+    def get_mass_at(self, qry=None, site=Site.AT):
         """Get the proportion of mass at a specific site.
 
         For example, a proportion of infected agents at a particular school.  By default, the site is the groups
@@ -1350,11 +1408,14 @@ class Group(Entity):
             float: Proportion of the total agent population mass at the site.
         """
 
-        at    = self.get_rel(Site.AT)
-        m     = at.get_pop_size()     #     population at current location
-        m_qry = at.get_pop_size(qry)  # sub-population at current location
+        if not qry:
+            return self.get_rel(site).get_pop_size()
+        else:
+            at    = self.get_rel(site)
+            m     = at.get_pop_size()     #     population at current location
+            m_qry = at.get_pop_size(qry)  # sub-population at current location
 
-        return float(n_qry) / float(m) if m > 0 else 0
+            return float(m_qry) / float(m) if m > 0 else 0
 
     def get_rel(self, name=None):
         """Retrieves relation's value.
@@ -1426,6 +1487,16 @@ class Group(Entity):
         """See :meth:`~pram.entity.Group.has_rel` method."""
 
         return self.has_rel(qry, are_sites)
+
+    def is_at_site(self, site):
+        """ Is the groups currently at the site specified? """
+
+        return self.has_rel({ Site.AT: site })
+
+    def is_at_site_name(self, name):
+        """ Is the groups currently at the site with the name specified (that the group has as a relation)? """
+
+        return self.has_rel({ Site.AT: self.get_rel(name) })
 
     def is_void(self):
         """Checks if the group is a VOID group (i.e., it should be removed from the simulation).

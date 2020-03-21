@@ -121,10 +121,6 @@ class Rule(ABC):
     compile_spec = None
 
     def __init__(self, name='rule', t=TimeAlways(), i=IterAlways(), group_qry=None, name_human=None, memo=None):
-        '''
-        t: Time class object
-        '''
-
         # Err.type(t, 't', Time, True)
         # Err.type(i, 'i', Iter, True)
 
@@ -218,38 +214,36 @@ class Rule(ABC):
     def is_applicable(self, group, iter, t):
         ''' Verifies if the rule is applicable to the group at the current iteration and current time. '''
 
-        # Iteration:
-        is_i_ok = True
+        return self.is_applicable_iter(iter) and self.is_applicable_time(t) and self.is_applicable_group(group)
+
+    def is_applicable_iter(self, iter):
         if isinstance(self.i, IterAlways):
-            is_i_ok = is_i_ok and True
+            return True
         elif isinstance(self.i, IterPoint):
-            is_i_ok = is_i_ok and self.i.i == iter
+            return self.i.i == iter
         elif isinstance(self.i, IterInt):
             # is_i_ok = is_i_ok and self.i.i0 <= iter <= self.i.i1
-            is_i_ok = is_i_ok and self.i.i0 <= iter
-            is_i_ok = is_i_ok and (iter <= self.i.i1 or self.i.i1 <= 0)
+            return self.i.i0 <= iter
+            return iter <= self.i.i1 or self.i.i1 <= 0
         elif isinstance(self.i, IterSet):
-            is_i_ok = is_i_ok and iter in self.i.i
+            return iter in self.i.i
         else:
             raise TypeError("Type '{}' used for specifying rule iteration not yet implemented (Rule.is_applicable).".format(type(self.i).__name__))
 
-        # Time:
-        is_t_ok = True
+    def is_applicable_time(self, t):
         if isinstance(self.t, TimeAlways):
-            is_t_ok = is_t_ok and True
+            return True
         elif isinstance(self.t, TimePoint):
-            is_t_ok = is_t_ok and self.t.t == t
+            return self.t.t == t
         elif isinstance(self.t, TimeInt):
-            is_t_ok = is_t_ok and self.t.t0 <= t <= self.t.t1
+            return self.t.t0 <= t <= self.t.t1
         elif isinstance(self.t, TimeSet):
-            is_t_ok = is_t_ok and t in self.i.t
+            return t in self.i.t
         else:
             raise TypeError("Type '{}' used for specifying rule timing not yet implemented (Rule.is_applicable).".format(type(self.t).__name__))
 
-        # Group:
-        is_group_ok = True if self.group_qry is None else group.matches_qry(self.group_qry)
-
-        return is_i_ok and is_t_ok and is_group_ok
+    def is_applicable_group(self, group):
+        return True if self.group_qry is None else group.matches_qry(self.group_qry)
 
     def set_params(self):
         pass
@@ -283,6 +277,34 @@ class Rule(ABC):
         ''' Converts a time probability distribution function (PDF) to a discrete random variable. '''
 
         return rv_discrete(a,b, values=(tuple(tp.keys()), tuple(tp.values())))
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class SimRule(Rule):
+    """Simulation rule, i.e., one that is run at the end of every simulation iteration (i.e., after the mass transfer
+    has concluded).  These sort of rules are especially useful for implementing policy-level like intervention.  For
+    example, should schools in a county, state, or the entire country be closed in response to an epidemic.  This sort
+    of mitigation measure might be in effect after, say, 6% of the population has become infected.
+    """
+
+    def __init__(self, name='rule', t=TimeAlways(), i=IterAlways(), memo=None):
+        # Err.type(t, 't', Time, True)
+        # Err.type(i, 'i', Iter, True)
+
+        self.name = name
+        self.memo = memo
+
+        self._set_t(t)
+        self._set_i(i)
+
+    @abstractmethod
+    def apply(self, sim, iter, t):
+        pass
+
+    def is_applicable(self, group, iter, t):
+        ''' Verifies if the rule is applicable at the current iteration and current time. '''
+
+        return super().is_applicable_iter(iter) and super().is_applicable_time(t)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -984,7 +1006,7 @@ class DiscreteInvMarkovChain(MarkovChain, DiscreteSpacetimeStochasticProcess, St
     tm_i[2] -> A:flu = 'r'
     '''
 
-    def __init__(self, var, tm, name='markov-chain', t=TimeAlways(), i=IterAlways(), memo=None):
+    def __init__(self, var, tm, name='markov-chain', t=TimeAlways(), i=IterAlways(), memo=None, cb_before_apply=None):
         super().__init__(name, t, i, memo)
 
         if sum([i for x in list(tm.values()) for i in x]) != float(len(tm)):
@@ -993,11 +1015,15 @@ class DiscreteInvMarkovChain(MarkovChain, DiscreteSpacetimeStochasticProcess, St
         self.var = var
         self.tm = tm
         self.states = list(self.tm.keys())  # simplify and speed-up lookup in apply()
+        self.cb_before_apply = cb_before_apply
 
     def apply(self, pop, group, iter, t):
-        tm = self.tm.get(group.get_attr(self.var))
+        attr_val = group.get_attr(self.var)
+        tm = self.tm.get(attr_val)
         if tm is None:
             raise ValueError(f"'{self.__class__.__name__}' class: Unknown state '{group.get_attr(self.var)}' for attribute '{self.var}'")
+        if self.cb_before_apply:
+            tm = self.cb_before_apply(group, attr_val, tm) or tm
         return [GroupSplitSpec(p=tm[i], attr_set={ self.var: self.states[i] }) for i in range(len(self.states)) if tm[i] > 0]
 
     def is_applicable(self, group, iter, t):

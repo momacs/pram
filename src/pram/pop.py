@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Contains PRAM group and agent populations code."""
 
+import math
+
 from attr   import attrs, attrib
 from dotmap import DotMap
 
@@ -95,7 +97,7 @@ class GroupPopulation(object):
 
         self.is_frozen = False  # the simulation freezes the population on first run
 
-        self.last_iter = DotMap(    # the most recent iteration
+        self.last_iter = DotMap(    # the most recent iteration info
             mass_flow_tot = 0,      # total mass transfered
             mass_flow_specs = None  # a list of MassFlowSpec objects (i.e., the full picture of mass flow)
         )
@@ -435,6 +437,31 @@ class GroupPopulation(object):
         # return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items())]
         return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
 
+    def get_groups_mass(self, qry=None):
+        """Get the mass of groups that match the query specified.
+
+        Args:
+            qry (GroupQry, optional): Group condition.
+
+        Returns:
+            float: Mass
+        """
+
+        return math.fsum([g.m for g in self.get_groups(qry)])
+
+    def get_groups_mass_prop(self, qry=None):
+        """Get the proportion of the total mass accounted for the groups that match the query specified.
+
+        Args:
+            qry (GroupQry, optional): Group condition.
+
+        Returns:
+            float: Mass proportion [0..1]
+        """
+
+        return self.get_groups_mass(qry) / self.mass
+
+
     def get_next_group_name(self):
         """
         Args:
@@ -497,8 +524,8 @@ class GroupPopulation(object):
                 m_flow_tot += g01.m
 
         # Notify sites of mass transfer:
-        # for s in self.sites.values():
-        #     s.invalidate_pop()  # TODO: Develop this further (AFAIR, unused ATM).
+        for s in self.sites.values():
+            s.invalidate_pop()  # TODO: Develop this further (AFAIR, unused ATM).
 
         # Save last iteration info:
         self.last_iter.m_flow_tot = m_flow_tot

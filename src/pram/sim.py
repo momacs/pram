@@ -393,8 +393,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pickle
+import psutil
 import random
 import sqlite3
+import time
+
 
 from collections import namedtuple, Counter
 from dotmap      import DotMap
@@ -402,10 +405,10 @@ from scipy.stats import gaussian_kde
 
 from .data        import GroupSizeProbe, Probe
 from .entity      import Agent, Group, GroupQry, Site
-from .pop         import GroupPopulation
-from .rule        import Rule, IterAlways, IterPoint, IterInt
-from .util        import Err, FS, Time
 from .model.model import Model
+from .pop         import GroupPopulation
+from .rule        import Rule, SimRule, IterAlways, IterPoint, IterInt
+from .util        import Err, FS, Time
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -856,6 +859,14 @@ class SimulationAdder(object):
         self.sim.add_rules(rules)
         return self
 
+    def sim_rule(self, rule):
+        self.sim.add_sim_rule(rule)
+        return self
+
+    def sim_rules(self, rules):
+        self.sim.add_sim_rules(rules)
+        return self
+
     def site(self, site):
         self.sim.add_site(site)
         return self
@@ -1000,6 +1011,14 @@ class SimulationSetter(object):
         self.sim.set_rand_seed(rand_seed)
         return self
 
+    def var(self, name, val):
+        self.sim.set_var(name, val)
+        return self
+
+    def vars(self, vars):
+        self.sim.set_vars(vars)
+        return self
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Simulation(object):
@@ -1015,11 +1034,13 @@ class Simulation(object):
     def __init__(self, traj=None, rand_seed=None, do_keep_mass_flow_specs=False):
         self.set_rand_seed(rand_seed)
 
-        self.traj = traj  # trajectory
+        self.pid = os.getpid()  # process ID
+        self.traj = traj        # trajectory
         self.run_cnt = 0
 
         self.pop = GroupPopulation(self, do_keep_mass_flow_specs)
         self.rules = []
+        self.sim_rules = []
         self.probes = []
 
         self.timer = None  # value deduced in add_group() based on rule timers
@@ -1038,10 +1059,17 @@ class Simulation(object):
             group_setup = None  # called before the simulation is run for the very first time
         )
 
+        self.last_iter = DotMap(  # the most recent iteration info
+            mem = 0,              # memory usage [B]
+            t = 0                 # time [ms]
+        )
+
         self.analysis = DotMap(
             rule_static  = StaticRuleAnalyzer(),
             rule_dynamic = DynamicRuleAnalyzer(self)
         )
+
+        self.vars = {}  # simulation variables
 
         self.reset_cb()
         self.reset_pragmas()
@@ -1073,6 +1101,8 @@ class Simulation(object):
                     self.add_group(i)
                 elif isinstance(i, Probe):
                     self.add_probe(i)
+                elif isinstance(i, SimRule):  # must be before Rule
+                    self.add_sim_rule(i)
                 elif isinstance(i, Rule):
                     self.add_rule(i)
                 elif isinstance(i, Model):
@@ -1196,6 +1226,31 @@ class Simulation(object):
 
         for r in rules:
             self.add_rule(r)
+        return self
+
+    def add_sim_rule(self, rule):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.sim_rules.append(rule)
+        return self
+
+    def add_sim_rules(self, rules):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        for r in rules:
+            self.add_sim_rule(r)
         return self
 
     def add_site(self, site):
@@ -1743,6 +1798,9 @@ class Simulation(object):
             }
         }
 
+    def get_var(self, name):
+        return self.vars.get(name)
+
     @staticmethod
     def _load(fpath, fn):
         """
@@ -1986,6 +2044,15 @@ class Simulation(object):
         self.analysis.rule_static.reset()
         return self
 
+    def reset_vars(self):
+        """
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.vars = {}
+        return self
+
     def run(self, iter_or_dur=1, do_disp_t=False):
         """
         Args:
@@ -2001,6 +2068,8 @@ class Simulation(object):
         produced, unless silenced.  That output may be useful for making future simulations more efficient by allowing
         the user to remove the unused bits which result in unnecessary group space partitioning.
         '''
+
+        ts0 = Time.ts()
 
         # No rules or groups:
         if len(self.rules) == 0:
@@ -2051,6 +2120,10 @@ class Simulation(object):
             self._inf('Compacting the model')
             self.compact()
 
+        # Save last-iter info:
+        self.last_iter.mem = psutil.Process(self.pid).memory_full_info().uss
+        self.last_iter.t = Time.ts() - ts0
+
         # Force probes to capture the initial state:
         if self.pragma.probe_capture_init and self.run_cnt == 0:
             self._inf('Capturing the initial state')
@@ -2070,6 +2143,8 @@ class Simulation(object):
 
         self.timer.start()
         for i in range(self.timer.get_i_left()):
+            ts0 = Time.ts()
+
             if self.cb.before_iter is not None:
                 self.cb.before_iter(self)
 
@@ -2079,7 +2154,7 @@ class Simulation(object):
             elif do_disp_t:
                 print(f't:{self.timer.get_t()}')
 
-            # Apply rules:
+            # Apply group rules:
             self.pop.apply_rules(self.rules, self.timer.get_i(), self.timer.get_t())
             m_flow = self.pop.last_iter.mass_flow_tot
             m_pop = float(self.pop.get_mass())
@@ -2087,6 +2162,14 @@ class Simulation(object):
                 p_flow = float(m_flow) / m_pop
             else:
                 p_flow = None
+
+            # Apply simulation rules:
+            for r in self.sim_rules:
+                r.apply(self, self.timer.get_i(), self.timer.get_t())
+
+            # Save last-iter info:
+            self.last_iter.mem = psutil.Process(self.pid).memory_full_info().uss
+            self.last_iter.t = Time.ts() - ts0
 
             # Run probes:
             for p in self.probes:
@@ -2465,6 +2548,34 @@ class Simulation(object):
         if self.rand_seed is not None:
             random.seed(self.rand_seed)
             np.random.seed(self.rand_seed)
+        return self
+
+    def set_var(self, name, val):
+        """Sets a simulation variable.
+
+        Args:
+            name (str): Name
+            val (any): Value
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.vars[name] = val
+        return self
+
+    def set_vars(self, vars):
+        """Sets a simulation variable.
+
+        Args:
+            vars (dict): A dictionary of variable name-value pairs.
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        for k,v in vars.items():
+            self.vars[k] = v
         return self
 
     def show_rule_analysis(self):

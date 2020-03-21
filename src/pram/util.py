@@ -10,6 +10,7 @@ import copy
 import datetime
 import gc
 import gzip
+import math
 import multiprocessing
 import os
 import pickle
@@ -551,6 +552,29 @@ class Time(object):
         return Time.DOTW_NUM2STR[int(dt.strftime('%w'))]
 
     @staticmethod
+    def tsdiff2human(ts_diff, do_print_ms=True):
+        '''
+        Convert timestamp difference to 'D days, HH:MM:SS.FFF'.
+        '''
+
+        ms, s = math.modf(round(ts_diff) / 1000)
+        m, s = divmod(s, 60)
+        h, m = divmod(m, 60)
+        d, h = divmod(h, 24)
+        ms = ms * 1000
+
+        if d == 0:
+            if do_print_ms:
+                return f'{int(h):02}:{int(m):02}:{int(s):02}.{int(ms):03}'
+            else:
+                return f'{int(h):02}:{int(m):02}:{int(s):02}'
+        else:
+            if do_print_ms:
+                return f'{int(d):d}d {int(h):02}:{int(m):02}:{int(s):02}.{int(ms):03}'
+            else:
+                return f'{int(d):d}d {int(h):02}:{int(m):02}:{int(s):02}'
+
+    @staticmethod
     def sec2time(sec, n_msec=0):
         '''
         Convert seconds to 'D days, HH:MM:SS.FFF'
@@ -558,6 +582,8 @@ class Time(object):
         References
             stackoverflow.com/questions/775049/python-time-seconds-to-hms
             humanfriendly.readthedocs.io/en/latest/#humanfriendly.format_timespan
+            stackoverflow.com/questions/41635547/convert-python-datetime-to-timestamp-in-milliseconds/41635888
+            datetime.datetime.fromtimestamp(self.pop.sim.last_iter.t).strftime('%H:%M:%S.%f')
         '''
 
         if hasattr(sec,'__len__'): return [sec2time(s) for s in sec]
