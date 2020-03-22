@@ -8,7 +8,7 @@ many parametrizations of the simulation.
 import os,sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from pram.data   import Probe, ProbePersistenceMode, ProbePersistenceDB, ProbePersistenceMem, Var
+from pram.data   import Probe, Var
 from pram.entity import Group, GroupQry, GroupSplitSpec, Site
 from pram.rule   import IterAlways, TimeAlways, Rule, Noop
 from pram.sim    import Simulation

@@ -396,6 +396,7 @@ import pickle
 import psutil
 import random
 import sqlite3
+import statistics
 import time
 
 
@@ -408,7 +409,7 @@ from .entity      import Agent, Group, GroupQry, Site
 from .model.model import Model
 from .pop         import GroupPopulation
 from .rule        import Rule, SimRule, IterAlways, IterPoint, IterInt
-from .util        import Err, FS, Time
+from .util        import Err, FS, Size, Time
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -959,8 +960,8 @@ class SimulationSetter(object):
         self.sim.set_pragma(name, value)
         return self
 
-    def pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
-        self.sim.set_pragmas(analyze, autocompact, autoprune_groups, autostop, autostop_n, autostop_p, autostop_t, live_info, live_info_ts, probe_capture_init, rule_analysis_for_db_gen)
+    def pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, comp_summary=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
+        self.sim.set_pragmas(analyze, autocompact, autoprune_groups, autostop, autostop_n, autostop_p, autostop_t, comp_summary, live_info, live_info_ts, probe_capture_init, rule_analysis_for_db_gen)
         return self
 
     def pragma_analyze(self, value):
@@ -989,6 +990,10 @@ class SimulationSetter(object):
 
     def pragma_autostop_t(self, value):
         self.sim.set_pragma_autostop_t(value)
+        return self
+
+    def pragma_comp_summary(self, value):
+        self.sim.set_pragma_comp_summary(value)
         return self
 
     def pragma_live_info(self, value):
@@ -1059,11 +1064,6 @@ class Simulation(object):
             group_setup = None  # called before the simulation is run for the very first time
         )
 
-        self.last_iter = DotMap(  # the most recent iteration info
-            mem = 0,              # memory usage [B]
-            t = 0                 # time [ms]
-        )
-
         self.analysis = DotMap(
             rule_static  = StaticRuleAnalyzer(),
             rule_dynamic = DynamicRuleAnalyzer(self)
@@ -1073,6 +1073,7 @@ class Simulation(object):
 
         self.reset_cb()
         self.reset_pragmas()
+        self.reset_comp_hist()
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.rand_seed or ""})'
@@ -1722,6 +1723,9 @@ class Simulation(object):
     def get_pragma_autostop_t(self):
         return self.pragma.autostop_t
 
+    def get_pragma_comp_summary(self):
+        return self.pragma.comp_summary
+
     def get_pragma_live_info(self):
         return self.pragma.live_info
 
@@ -1980,6 +1984,22 @@ class Simulation(object):
         )
         return self
 
+    def reset_comp_hist(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.comp_hist = DotMap(  # computational history
+            mem_iter = [],        # memory usage per iteration [B]
+            t_iter = [],          # time per iteration [ms]
+            t_sim = 0             # total simulation time [ms]
+        )
+        return self
+
     def reset_pop(self):
         """
         Args:
@@ -2012,6 +2032,7 @@ class Simulation(object):
             autostop_n = 0,                  #
             autostop_p = 0,                  #
             autostop_t = 10,                 #
+            comp_summary = False,            # flag: show computational summary at the end of a simulation run?
             live_info = False,               #
             live_info_ts = False,            #
             probe_capture_init = True,       # flag: let probes capture the pre-run state of the simulation?
@@ -2069,7 +2090,7 @@ class Simulation(object):
         the user to remove the unused bits which result in unnecessary group space partitioning.
         '''
 
-        ts0 = Time.ts()
+        ts_sim_0 = Time.ts()
 
         # No rules or groups:
         if len(self.rules) == 0:
@@ -2121,8 +2142,8 @@ class Simulation(object):
             self.compact()
 
         # Save last-iter info:
-        self.last_iter.mem = psutil.Process(self.pid).memory_full_info().uss
-        self.last_iter.t = Time.ts() - ts0
+        self.comp_hist.mem_iter.append(psutil.Process(self.pid).memory_full_info().uss)
+        self.comp_hist.t_iter.append(Time.ts() - ts_sim_0)
 
         # Force probes to capture the initial state:
         if self.pragma.probe_capture_init and self.run_cnt == 0:
@@ -2143,7 +2164,7 @@ class Simulation(object):
 
         self.timer.start()
         for i in range(self.timer.get_i_left()):
-            ts0 = Time.ts()
+            ts_iter_0 = Time.ts()
 
             if self.cb.before_iter is not None:
                 self.cb.before_iter(self)
@@ -2168,8 +2189,8 @@ class Simulation(object):
                 r.apply(self, self.timer.get_i(), self.timer.get_t())
 
             # Save last-iter info:
-            self.last_iter.mem = psutil.Process(self.pid).memory_full_info().uss
-            self.last_iter.t = Time.ts() - ts0
+            self.comp_hist.mem_iter.append(psutil.Process(self.pid).memory_full_info().uss)
+            self.comp_hist.t_iter.append(Time.ts() - ts_iter_0)
 
             # Run probes:
             for p in self.probes:
@@ -2244,7 +2265,39 @@ class Simulation(object):
             if p.persistence is not None:
                 p.persistence.flush()
 
+        self.comp_hist.t_sim = Time.ts() - ts_sim_0
+
+        if self.pragma.comp_summary:
+            self.run__comp_summary()
+
         return self
+
+    def run__comp_summary(self):
+        """Called by run() to display computational summary."""
+
+        if len(self.comp_hist.mem_iter) == 0:
+            print('No computational summary to display')
+            return
+
+        mem = {
+            'min':    Size.bytes2human(min               (self.comp_hist.mem_iter)),
+            'max':    Size.bytes2human(max               (self.comp_hist.mem_iter)),
+            'mean':   Size.bytes2human(statistics.mean   (self.comp_hist.mem_iter)),
+            'median': Size.bytes2human(statistics.median (self.comp_hist.mem_iter)),
+            'stdev':  Size.bytes2human(statistics.stdev  (self.comp_hist.mem_iter))
+        }
+        t = {
+            'min':    Time.tsdiff2human(min               (self.comp_hist.t_iter)),
+            'max':    Time.tsdiff2human(max               (self.comp_hist.t_iter)),
+            'mean':   Time.tsdiff2human(statistics.mean   (self.comp_hist.t_iter)),
+            'median': Time.tsdiff2human(statistics.median (self.comp_hist.t_iter)),
+            'stdev':  Time.tsdiff2human(statistics.stdev  (self.comp_hist.t_iter))
+        }
+
+        print('Computational summary')
+        print(f'    Iteration memory : Range: [{mem["min"]}, {mem["max"]}]    Mean (SD): {mem["mean"]} ({mem["stdev"]})    Median: {mem["median"]}')
+        print(f'    Iteration time   : Range: [{t  ["min"]}, {t  ["max"]}]    Mean (SD): {t  ["mean"]} ({t  ["stdev"]})    Median: {t  ["median"]}')
+        print(f'    Simulation time  : {Time.tsdiff2human(self.comp_hist.t_sim)}')
 
     def _save(self, fpath, fn):
         with fn(fpath, 'wb') as f:
@@ -2325,10 +2378,11 @@ class Simulation(object):
         self.fn.group_setup = fn
         return self
 
-    def set_pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
-        """
-        Args:
+    def set_pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, comp_summary=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
+        """Sets multiple pragmas at one time.
 
+        Args:
+            Names of all pragmas; values set only when not None (which is also the default value).
 
         Returns:
             self: For method call chaining.
@@ -2341,6 +2395,7 @@ class Simulation(object):
         if autostop_n               is not None: self.set_pragma_autostop_n(autostop_n),
         if autostop_p               is not None: self.set_pragma_autostop_p(autostop_p),
         if autostop_t               is not None: self.set_pragma_autostop_t(autostop_t),
+        if comp_summary             is not None: self.set_pragma_comp_summary(comp_summary),
         if live_info                is not None: self.set_pragma_live_info(live_info),
         if live_info_ts             is not None: self.set_pragma_live_info_ts(live_info_ts),
         if probe_capture_init       is not None: self.set_pragma_probe_capture_init(probe_capture_init),
@@ -2459,6 +2514,18 @@ class Simulation(object):
         """
 
         self.pragma.autostop_t = value
+        return self
+
+    def set_pragma_comp_summary(self, value):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.pragma.comp_summary = value
         return self
 
     def set_pragma_live_info(self, value):

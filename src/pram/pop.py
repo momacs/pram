@@ -71,7 +71,7 @@ class GroupPopulation(object):
     class' instance.
 
     VITA groups, or groups that are the source of new population mass are stored separately from the actual group
-    population.  At the end of every iteration, masses of all VITA groups are transfered back to the population.  It is
+    population.  At the end of every iteration, masses of all VITA groups are transferred back to the population.  It is
     also at that time that all VOID groups are removed.  VOID groups contain mass that should be removed from the\
     simulation.
 
@@ -94,11 +94,12 @@ class GroupPopulation(object):
         self.mass     = 0  # total population mass
         self.mass_in  = 0  # total population mass added (e.g., via the birth process)
         self.mass_out = 0  # total population mass removed (e.g., via the death process)
+            # TODO: Change 'mass' to 'm'.
 
         self.is_frozen = False  # the simulation freezes the population on first run
 
         self.last_iter = DotMap(    # the most recent iteration info
-            mass_flow_tot = 0,      # total mass transfered
+            mass_flow_tot = 0,      # total mass transferred
             mass_flow_specs = None  # a list of MassFlowSpec objects (i.e., the full picture of mass flow)
         )
 
@@ -279,7 +280,6 @@ class GroupPopulation(object):
             self: For method call chaining.
         """
 
-
         mass_flow_specs = []
         src_group_hashes = set()  # hashes of groups to be updated (a safeguard against resetting mass of unaffected groups)
         for g in self.groups.values():
@@ -405,12 +405,16 @@ class GroupPopulation(object):
             return len(self.groups)
 
     def get_groups(self, qry=None):
-        """
+        """Get groups that match the group query specified, or all groups if no query is specified.
+
+        This method should only be used for population-wide queries.  The
+        :meth:`Site.get_groups() pram.entity.Site.get_groups` should be used instead for querying groups located at a
+        :class:`~pram.entity.Site`.
+
         Args:
 
-
         Returns:
-            self: For method call chaining.
+            [Group]: List of groups (can be empty)
         """
 
         '''
@@ -440,6 +444,10 @@ class GroupPopulation(object):
     def get_groups_mass(self, qry=None):
         """Get the mass of groups that match the query specified.
 
+        This method should only be used for population-wide queries.  The
+        :meth:`Site.get_groups_mass() pram.entity.Site.get_groups_mass` should be used instead for querying groups
+        located at a :class:`~pram.entity.Site`.
+
         Args:
             qry (GroupQry, optional): Group condition.
 
@@ -452,15 +460,35 @@ class GroupPopulation(object):
     def get_groups_mass_prop(self, qry=None):
         """Get the proportion of the total mass accounted for the groups that match the query specified.
 
+        This method should only be used for population-wide queries.  The
+        :meth:`Site.get_groups_prop() pram.entity.Site.get_groups_prop` should be used instead for querying groups
+        located at a :class:`~pram.entity.Site`.
+
         Args:
             qry (GroupQry, optional): Group condition.
 
         Returns:
-            float: Mass proportion [0..1]
+            float: Mass proportion
         """
 
-        return self.get_groups_mass(qry) / self.mass
+        return self.get_groups_mass(qry) / self.mass if self.mass > 0 else 0
 
+    def get_groups_mass_and_prop(self, qry=None):
+        """Get the total mass and its proportion that corresponds to the groups that match the query specified.
+
+        This method should only be used for population-wide queries.  The
+        :meth:`Site.get_groups_mass_prop() pram.entity.Site.get_groups_mass_prop` should be used instead for querying
+        groups located at a :class:`~pram.entity.Site`.
+
+        Args:
+            qry (GroupQry, optional): Group condition.
+
+        Returns:
+            tuple(float, float): (Mass, Mass proportion)
+        """
+
+        m = self.get_groups_mass(qry)
+        return (m, m / self.mass if self.mass > 0 else 0)
 
     def get_next_group_name(self):
         """
@@ -501,12 +529,11 @@ class GroupPopulation(object):
         Transfers the mass as described by the list of "destination" groups.  "Source" groups (i.e., those that
         participate in mass transfer) have their masses reset before the most-transfer mass is tallied up.
 
-        Because this method is called only once per simulation iteration, it is a good place to put
-        simulation-wide computations that should happen after the iteration-specific computations have
-        been completed (e.g., the entirety of mass transfer has been figured out).
+        Because this method is called only once per simulation iteration, it is a good place to put simulation-
+        wide computations that should happen after the iteration-specific computations have concluded.
         '''
 
-        m_flow_tot = 0  # total mass transfered
+        m_flow_tot = 0  # total mass transferred
 
         # Reset the mass of the groups being updated:
         for h in src_group_hashes:
@@ -523,9 +550,11 @@ class GroupPopulation(object):
 
                 m_flow_tot += g01.m
 
-        # Notify sites of mass transfer:
+        # Relink groups to sites:
         for s in self.sites.values():
-            s.invalidate_pop()  # TODO: Develop this further (AFAIR, unused ATM).
+            s.reset_group_links()
+        for g in self.groups.values():
+            g.link_to_site_at()
 
         # Save last iteration info:
         self.last_iter.m_flow_tot = m_flow_tot

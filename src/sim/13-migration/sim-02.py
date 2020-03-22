@@ -143,12 +143,8 @@ class PopProbe(Probe):
 
 # ----------------------------------------------------------------------------------------------------------------------
 persistence = None
-
-# dpath_cwd = os.path.dirname(__file__)
-# fpath_db  = os.path.join(dpath_cwd, f'sim.sqlite3')
-# persistence = ProbePersistenceDB(fpath_db, mode=ProbePersistenceMode.OVERWRITE)
-
 persistence = ProbePersistenceMem()
+# persistence = ProbePersistenceDB(os.path.join(os.path.dirname(__file__), f'sim-02.sqlite3'), mode=ProbePersistenceMode.OVERWRITE)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

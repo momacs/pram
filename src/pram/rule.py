@@ -1603,15 +1603,15 @@ class SegregationModel(Rule):
         self.p_repel = 1.00 / attr_dom_card  # population will be repelled (i.e., will move) if the site that population is at has a proportion of same self.attr lower than this
 
     def apply(self, pop, group, iter, t):
-        attr   = group.ga(self.attr)
-        site   = group.gr(Site.AT)
-        n      = site.get_pop_size()
-        n_team = site.get_pop_size(GroupQry(attr={ self.attr: attr }))
+        attr_val = group.ga(self.attr)
+        site     = group.gr(Site.AT)
+        m        = site.get_mass()
+        m_team   = site.get_mass(GroupQry(attr={ self.attr: attr_val }))
 
-        if n == 0:
+        if m == 0:
             return None
 
-        p_team = n_team / n  # proportion of same self.attr
+        p_team = m_team / m  # proportion of same self.attr
 
         if p_team < self.p_repel:
             site_rnd = self.get_random_site(pop, site)
@@ -2123,7 +2123,7 @@ class SimpleFluProgressRule(Rule):
     def apply(self, pop, group, iter, t):
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
-            p_infection = group.get_mass_at(GroupQry(attr={ 'flu': 'i' }))
+            p_infection = group.get_site_at().get_groups_mass(GroupQry(attr={ 'flu': 'i' }))
             return [
                 GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'i' }),
                 GroupSplitSpec(p=1 - p_infection, attr_set={ 'flu': 's' })
@@ -2202,7 +2202,7 @@ class SimpleFluProgressMoodRule(Rule):
     def apply(self, pop, group, iter, t):
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
-            p_infection = group.get_mass_at(GroupQry(attr={ 'flu': 'i' }))
+            p_infection = group.get_site_at().get_groups_mass(GroupQry(attr={ 'flu': 'i' }))
 
             return [
                 GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'i', 'mood': 'annoyed' }),

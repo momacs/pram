@@ -277,12 +277,8 @@ class PopProbe(Probe):
 
 # ----------------------------------------------------------------------------------------------------------------------
 persistence = None
-
-# dpath_cwd = os.path.dirname(__file__)
-# fpath_db  = os.path.join(dpath_cwd, f'sim-04.sqlite3')
-# persistence = ProbePersistenceDB(fpath_db, mode=ProbePersistenceMode.OVERWRITE)
-
 persistence = ProbePersistenceMem()
+# persistence = ProbePersistenceDB(os.path.join(os.path.dirname(__file__), f'sim-04.sqlite3'), mode=ProbePersistenceMode.OVERWRITE)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -313,7 +309,7 @@ def print_settled_summary():
     print('\n')
     settled_m = 0
     for s in sites_dst:
-        m = s.get_pop_size()
+        m = s.get_mass()
         settled_m += m
         print(f'{s.name:<12}: {m:>9,.0f}')
     print(f'{"TOTAL":<12}: {settled_m:>9,.0f}')

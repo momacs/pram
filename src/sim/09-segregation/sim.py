@@ -21,13 +21,14 @@ from pram.sim    import Simulation
 
 loc = [Site('a'), Site('b')]
 
-probe_loc = GroupSizeProbe.by_rel('site', Site.AT, loc, msg_mode=ProbeMsgMode.DISP)
-
-probe_a = GroupSizeProbe(
-    name='site',
+probe_loc = GroupSizeProbe.by_rel('loc', Site.AT, loc, msg_mode=ProbeMsgMode.DISP)
+probe_sim = GroupSizeProbe(
+    name='sim',
     queries=[
         GroupQry(attr={ 'team': 'blue' }, rel={ Site.AT: loc[0] }),
-        GroupQry(attr={ 'team': 'red'  }, rel={ Site.AT: loc[0] })
+        GroupQry(attr={ 'team': 'red'  }, rel={ Site.AT: loc[0] }),
+        GroupQry(attr={ 'team': 'blue' }, rel={ Site.AT: loc[1] }),
+        GroupQry(attr={ 'team': 'red'  }, rel={ Site.AT: loc[1] })
     ],
     qry_tot=None,
     msg_mode=ProbeMsgMode.DISP
@@ -44,8 +45,8 @@ probe_a = GroupSizeProbe(
         Group(m=300, attr={ 'team': 'blue' }, rel={ Site.AT: loc[1] }),
         Group(m=100, attr={ 'team': 'red'  }, rel={ Site.AT: loc[0] }),
         Group(m=400, attr={ 'team': 'red'  }, rel={ Site.AT: loc[1] }),
-        # probe_loc
-        probe_a
+        probe_loc  # the distribution should tend to 50%-50%
+        # probe_sim  # mass should tend to move towards two of the four sites
     ]).
     run(100)
 )

@@ -300,17 +300,16 @@ class Site(Resource):
 
     AT = '@'  # relation name for the group's current location
 
-    __slots__ = ('attr', 'rel_name', 'pop', 'cache_qry_to_groups', 'cache_qry_to_m')
+    __slots__ = ('attr', 'rel_name', 'pop', 'm', 'groups', 'cache_qry_to_groups', 'cache_qry_to_m')
 
     def __init__(self, name, attr=None, rel_name=AT, pop=None, capacity_max=1):
-        # super().__init__(EntityType.SITE, '')
-        super().__init__(name, capacity_max)
+        super().__init__(name, capacity_max)  # previously called as: (EntityType.SITE, '')
 
-        self.rel_name = rel_name  # name of the relation the site is the object of
-        self.attr = attr or {}
-        self.pop = pop            # pointer to the population (can be set elsewhere too)
-        # self.groups = {}          # None indicates the groups at the site might have changed and need to be retrieved
-                                  # again from the population. This is a
+        self.rel_name = rel_name    # name of the relation the site is the object of
+        self.attr     = attr or {}
+        self.pop      = pop         # pointer to the population (can be set elsewhere too)
+        self.m        = 0.0
+        self.groups   = set()
         # self.cache = DotMap(      # reset by the GroupPopulation object (that manages sites and groups) after mass transfer that crowns each iteration
         #     qry_to_groups = {},   # groups currently at this site
         #     qry_to_m      = {}    # mass of population at this site
@@ -337,6 +336,20 @@ class Site(Resource):
 
     def __key(self):
         return (self.name)
+
+    def add_group_link(self, group):
+        """Adds a link to a group.  This is to speed up lookup from sites to groups.
+
+        Args:
+            group (Group): The group.
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.groups.add(group)
+        self.m += group.m
+        return self
 
     def freeze(self):
         """Freezes the site thus disallowing any direct changes to it."""
@@ -411,7 +424,7 @@ class Site(Resource):
     def get_hash(self):
         return self.__hash__()
 
-    def get_groups_here(self, qry=None, non_empty_only=True):
+    def get_groups(self, qry=None, non_empty_only=True):
         """Returns groups which currently are at this site.
 
         The word "currently" is key here because as a PRAM simulation evolved, agents move between groups and different
@@ -431,16 +444,18 @@ class Site(Resource):
             Implement memoization (probably of only all the groups, i.e., without accounting for the ``qry``).
         """
 
-        qry = qry or GroupQry()
-        # qry.rel.update({ self.rel_name: self.get_hash() })
-        qry.rel.update({ self.rel_name: self })
-        groups = self.pop.get_groups(qry)
+        # No optimization:
+        # qry = qry or GroupQry()
+        # # qry.rel.update({ self.rel_name: self.get_hash() })
+        # qry.rel.update({ self.rel_name: self })
+        # groups = self.pop.get_groups(qry)
+        #
+        # if non_empty_only:
+        #     return [g for g in groups if g.m > 0]
+        # else:
+        #     return groups
 
-        if non_empty_only:
-            return [g for g in groups if g.m > 0]
-        else:
-            return groups
-
+        # Cache results by GroupQry (currently doesn't work with attrs and looses groups with regular class due to a bug somewhere):
         # qry = qry or GroupQry()
         # qry.rel.update({ self.rel_name: self })
         #
@@ -456,45 +471,97 @@ class Site(Resource):
         # else:
         #     return groups
 
-    def get_pop_size(self, qry=None):
-        """Returns the total size of the agent population mass currently at this side.
+        # Current attempt:
+        if not qry:
+            groups = self.groups
+        else:
+            groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+
+        if non_empty_only:
+            return [g for g in groups if g.m > 0]
+        else:
+            return groups
+
+    def get_mass(self, qry=None):
+        """Get the mass of groups that match the query specified.  Only groups currently residing at the site are
+        searched.
 
         Args:
-            qry (GroupQry, optional): Further restrictions imposed on attributes and relations of groups currently at
-                this site.  For example, the user may be interested in retrieving only groups of agents infected with
-                the flu (which is a restriction on the group's attribute) or only groups of agents who attend a
-                specific school (which is a restriction on the group's relation).
+            qry (GroupQry, optional): Group condition.
 
         Returns:
-            int: The population size.
-
-        Todo:
-            Rename to ``get_pop_mass()``?
+            float: Mass
         """
 
-        return math.fsum(g.m for g in self.get_groups_here(qry))  # sum
+        # No optimization:
+        # return math.fsum(g.m for g in self.get_groups(qry))  # sum
 
+        # Cache results by GroupQry (currently doesn't work with attrs and looses groups with regular class due to a bug somewhere):
         # m = self.cache_qry_to_m.get(qry)
         # if m is None:
-        #     m = math.fsum(g.m for g in self.get_groups_here(qry))
+        #     m = math.fsum(g.m for g in self.get_groups(qry))
         #     self.cache_qry_to_m[qry] = m
         # return m
 
-    def invalidate_pop(self):
-        # self.groups = {}
-        # self.cache.qry_to_groups = {}
-        # self.cache.qry_to_m = {}
-        self.cache_qry_to_groups = {}
-        self.cache_qry_to_m = {}
+        if not qry:
+            return self.m
+        else:
+            return math.fsum([g.m for g in self.get_groups(qry)])
+
+    def get_mass_prop(self, qry=None):
+        """Get the proportion of the total mass accounted for the groups that match the query specified.  Only groups
+        currently residing at the site are searched.
+
+        Args:
+            qry (GroupQry, optional): Group condition.
+
+        Returns:
+            float: Mass proportion
+        """
+
+        return self.get_mass(qry) / self.m if self.m > 0 else 0
+
+    def get_mass_and_prop(self, qry=None):
+        """Get the total mass and its proportion that corresponds to the groups that match the query specified.  Only
+        groups currently residing at the site are searched.
+
+        Args:
+            qry (GroupQry, optional): Group condition.
+
+        Returns:
+            tuple(float, float): (Mass, Mass proportion)
+        """
+
+        m = self.get_mass(qry)
+        return (m, m / self.m if self.m > 0 else 0)
 
     def set_pop(self, pop):
         """Sets the group population.
 
         Args:
             pop (GroupPopulation): The group population.
+
+        Returns:
+            self: For method call chaining.
         """
 
         self.pop = pop
+        return self
+
+    def reset_group_links(self):
+        """Resets the groups located at the site and other cache and memoization related data structures.
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.groups = set()
+        self.m = 0.0
+        # self.cache.qry_to_groups = {}
+        # self.cache.qry_to_m = {}
+        self.cache_qry_to_groups = {}
+        self.cache_qry_to_m = {}
+        return self
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -768,6 +835,8 @@ class Group(Entity):
         self.hash = None      # computed lazily
         self.callee = callee  # used only throughout the process of creating group; unset by done()
 
+        self.link_to_site_at()
+
     def __eq__(self, other):
         """Compare this group to another.
 
@@ -1027,7 +1096,7 @@ class Group(Entity):
             rel (Mapping[str, Site], optional): Group's relations.
 
         Returns:
-            str: A hash of the attributes and relations specified.
+            int: A hash of the attributes and relations specified.
         """
 
         attr = attr or {}
@@ -1036,7 +1105,7 @@ class Group(Entity):
         # return hash(tuple([frozenset(attr.items()), frozenset(rel.items())]))
         # return hashlib.sha1(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder).encode('utf-8')).hexdigest()
         # return xxhash.xxh32(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder)).hexdigest()
-        return xxhash.xxh64(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder)).hexdigest()  # .intdigest()
+        return xxhash.xxh64(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder)).intdigest()  # .hexdigest()
 
     @classmethod
     def gen_from_db(cls, db_fpath, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, fn_live_info=None):
@@ -1394,28 +1463,36 @@ class Group(Entity):
 
         return self.__hash__()
 
-    def get_mass_at(self, qry=None, site=Site.AT):
-        """Get the proportion of mass at a specific site.
+    # def get_mass_at(self, qry=None, site_name=Site.AT):
+    #     """Get the proportion of mass at a specific site.  For example, a proportion of infected agents at a particular
+    #     school.  The site in question must be one of the group's relations.
+    #
+    #     Args:
+    #         qry (GroupQry): Group selector.
+    #         site_name (str): The name of site to measure mass proportions at.  Defaults to the groups current location.
+    #
+    #     Returns:
+    #         float: Proportion of the total mass at the site.
+    #     """
+    #
+    #     if not qry:
+    #         return self.get_rel(site_name).get_groups_mass()
+    #     else:
+    #         # at    = self.get_rel(site_name)
+    #         # m     = at.get_pop_size()     #     population at current location
+    #         # m_qry = at.get_pop_size(qry)  # sub-population at current location
+    #         #
+    #         # return float(m_qry) / float(m) if m > 0 else 0
+    #         return self.get_rel(site_name).get_groups_mass(qry)
 
-        For example, a proportion of infected agents at a particular school.  By default, the site is the groups
-        current location.
-
-        Args:
-            qry (GroupQry): Group selector.
-            site (Site): The site to measure population proportions at.  Defaults to the groups current location.
+    def get_site_at(self):
+        """Get the site the group is currently located at.
 
         Returns:
-            float: Proportion of the total agent population mass at the site.
+            Site
         """
 
-        if not qry:
-            return self.get_rel(site).get_pop_size()
-        else:
-            at    = self.get_rel(site)
-            m     = at.get_pop_size()     #     population at current location
-            m_qry = at.get_pop_size(qry)  # sub-population at current location
-
-            return float(m_qry) / float(m) if m > 0 else 0
+        return self.get_rel(Site.AT)
 
     def get_rel(self, name=None):
         """Retrieves relation's value.
@@ -1506,6 +1583,18 @@ class Group(Entity):
         """
 
         return self.ha(Group.VOID)
+
+    def link_to_site_at(self):
+        """Links the group to the site it currently resides at.
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        at = self.rel.get(Site.AT)
+        if at:
+            at.add_group_link(self)
+        return self
 
     def matches_qry(self, qry):
         """Checks if the group matches the group query specified.
@@ -1609,6 +1698,9 @@ class Group(Entity):
         self.rel[name] = value
         self.hash = None
 
+        if name == Site.AT:
+            self.link_to_site_at()
+
         return self
 
     def set_rels(self, rel, do_force=True):
@@ -1646,7 +1738,7 @@ class Group(Entity):
         A note on performance.  The biggest performance hit is likley going to be generating a hash which happens as
         part of instantiating a new Group object.  While this may seem like a good reason to avoid crearing new groups,
         that line of reasoning is deceptive in that a group's hash is needed regardless.  Other than that, a group
-        object is light so its impact on performance should be negligeable.  Furthermore, this also grants access to
+        object is light so its impact on performance should be negligible.  Furthermore, this also grants access to
         full functionality of the Group class to any function that uses the result of the present method.
 
         Args:

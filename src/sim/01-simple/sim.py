@@ -19,7 +19,7 @@ from pram.sim    import Simulation
 progress_flu_rule = DiscreteInvMarkovChain('flu-status', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.50, 0.50], 'r': [0.10, 0.00, 0.90] })
     # s - susceptible
     # i - infectious
-    # r - recoverd
+    # r - recovered
 
 sites = { 'home': Site('h'), 'work': Site('w') }
 
