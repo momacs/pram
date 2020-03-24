@@ -1583,7 +1583,7 @@ class Simulation(object):
         subprocess.run(['blockdiag', '-Tpdf', fpath_diag])
         subprocess.run(['open', fpath_pdf])
 
-    def gen_groups_from_db(self, fpath_db, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, is_verbose=False):
+    def gen_groups_from_db(self, fpath_db, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0, is_verbose=False):
         """
         Args:
 
@@ -1621,7 +1621,7 @@ class Simulation(object):
             # rel_db  = self.analysis.rule_static.rel_used  # TODO: Need to use entity.GroupDBRelSpec class
 
         fn_live_info = self._inf if self.pragma.live_info else None
-        self.add_groups(Group.gen_from_db(fpath_db, tbl, attr_db, rel_db, attr_fix, rel_fix, rel_at, limit, fn_live_info))
+        self.add_groups(Group.gen_from_db(fpath_db, tbl, attr_db, rel_db, attr_fix, rel_fix, attr_rm, rel_rm, rel_at, limit, fn_live_info))
         return self
 
     def gen_groups_from_db_old(self, fpath_db, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0, fpath=None, is_verbose=False):

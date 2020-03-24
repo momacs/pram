@@ -1135,7 +1135,7 @@ class Group(Entity):
         return xxhash.xxh64(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder)).intdigest()  # .hexdigest()
 
     @classmethod
-    def gen_from_db(cls, db_fpath, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, fn_live_info=None):
+    def gen_from_db(cls, db_fpath, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0, fn_live_info=None):
         """Generate groups from a relational database.
 
         In this method, lists are sometimes converted to allow for set operations (e.g., union or difference) and the
@@ -1156,6 +1156,8 @@ class Group(Entity):
             rel_db (Iterable[GroupDBRelSpec]): Group relation to be retrieved from the database (if extant).
             attr_fix (Mappint[str, Any]): Group attributes to be fixed for every group.
             rel_fix (Mapping[str, Site]): Group relations to be fixed for every group.
+            attr_rm (Iterable[str]): Group attributes to NOT be retrieved from the database (overwrites all).
+            rel_rm (Iterable[str]): Group relation to NOT be retrieved from the database (overwrites all).
             rel_at (Site, optional): A site to be set as every group's current location.
             limit (int): The maximum number of groups to be generated.  Ordinarily, this is not changed from its
                 default value of zero.  It is however useful for testing, especially with very large databases.
@@ -1191,14 +1193,20 @@ class Group(Entity):
             inf( '    Fixed manually')
             inf(f'        Attributes : {attr_fix}')
             inf(f'        Relations  : {rel_fix}')
+            inf( '    Removed manually')
+            inf(f'        Attributes : {attr_rm}')
+            inf(f'        Relations  : {rel_rm}')
             if len(set(attr_db_keep) & set(attr_fix)) > 0:
                 inf( '    WARNING: The following exist in the table but will be masked because are manually fixed')
                 inf(f'        Attributes : {list(set(attr_db_keep)             & set(attr_fix.keys()))}')
                 inf(f'        Relations  : {list(set([r.col for r in rel_db])  & set(rel_fix.keys()))}')
 
-        # (1.2) Remove the fixed attributes and relations:
+        # (1.2) Remove the manually fixed and removed attributes and relations:
         attr_db_keep = list(set(attr_db_keep) - set(attr_fix.keys()))
         rel_db_keep  = [r for r in rel_db_keep if not r.col in rel_fix.keys()]
+
+        attr_db_keep = list(set(attr_db_keep) - set(attr_rm))
+        rel_db_keep  = [r for r in rel_db_keep if not r.col in rel_rm]
 
         if inf:
             inf( '    Final combination used for group forming')
@@ -1263,7 +1271,7 @@ class Group(Entity):
             inf(f'        Records in table: {"{:,}".format(row_cnt)}')
             inf(f'        Groups formed: {"{:,}".format(len(groups))}')
             inf(f'        Sites formed: {"{:,}".format(site_n)}')
-            inf(f'        Agent population accounted for by the groups: {"{:,}".format(grp_pop)}')
+            inf(f'        Agent population accounted for by the groups: {"{:,}".format(grp_pop)} ({grp_pop / row_cnt * 100:.0f}% of the table)')
 
         return groups
 
