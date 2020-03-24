@@ -389,7 +389,7 @@ class ProbePersistenceDB(ProbePersistence):
         fig = plt.figure(figsize=figsize, dpi=dpi)
         # plt.title('SIR Model')
         for s in series:
-            plt.plot(data['i'], data[s['var']], lw=s['lw'], linestyle=s['linestyle'], marker=s['marker'], color=s['color'], markersize=s['markersize'], mfc='none', antialiased=True)
+            plt.plot(data['i'], data[s['var']], lw=s.get('lw'), ls=s.get('ls'), dashes=s.get('dashes', []), marker=s.get('marker'), color=s.get('color'), ms=s.get('ms'), mfc='none', antialiased=True)
         plt.legend([s['lbl'] for s in series], loc=legend_loc)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)

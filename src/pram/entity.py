@@ -300,11 +300,12 @@ class Site(Resource):
 
     AT = '@'  # relation name for the group's current location
 
-    __slots__ = ('attr', 'rel_name', 'pop', 'm', 'groups', 'cache_qry_to_groups', 'cache_qry_to_m')
+    __slots__ = ('name', 'attr', 'rel_name', 'pop', 'm', 'groups', 'cache_qry_to_groups', 'cache_qry_to_m')
 
     def __init__(self, name, attr=None, rel_name=AT, pop=None, capacity_max=1):
         super().__init__(name, capacity_max)  # previously called as: (EntityType.SITE, '')
 
+        self.name     = name
         self.rel_name = rel_name    # name of the relation the site is the object of
         self.attr     = attr or {}
         self.pop      = pop         # pointer to the population (can be set elsewhere too)
@@ -772,6 +773,10 @@ class Group(Entity):
     identical groups are considered (by definition) functionally equivalent.  It is important to note that only one
     group with a particular combination of attributes and relations can exist in PRAM.
 
+    A Group object can be either standalone or group population bound.  All Group objects are created standalone, but
+    when added to a simulation (more specifically, an instance of the GroupPopulation class) it changes its mode.  This
+    is to minimize memory utilization by storing Site instances only once in a simulation.
+
     Here is an example of creating and setting up a group in a chain of method calls::
 
         (Simulation().
@@ -786,7 +791,7 @@ class Group(Entity):
             run(12)
         )
 
-    Naturally, group can also be created in a regular fashion like so::
+    Groups can also be created in a regular fashion like so::
 
         (Simulation().
             add([
@@ -814,7 +819,7 @@ class Group(Entity):
             :meth:`Group.done() pram.entity.Group.done`.  See usage examples above.
     """
 
-    __slots__ = ('name', 'm', 'attr', 'rel', 'is_frozen', 'hash', 'callee')
+    __slots__ = ('name', 'm', 'attr', 'rel', 'pop', 'is_frozen', 'hash', 'callee')
 
     VOID = { '__void__': True }  # all groups with this attribute are removed at the end of every iteration
 
@@ -823,13 +828,14 @@ class Group(Entity):
         # both of the above should be kept None unless a simulation is running and the dynamic rule analysis
         # should be on-going
 
-    def __init__(self, name=None, m=0.0, attr={}, rel={}, callee=None):
+    def __init__(self, name=None, m=0.0, attr={}, rel={}, pop=None, callee=None):
         super().__init__(EntityType.GROUP, '')
 
         self.name = name
         self.m    = float(m)
         self.attr = attr or {}
         self.rel  = rel  or {}
+        self.pop  = pop
 
         self.is_frozen = False
         self.hash = None      # computed lazily
@@ -877,6 +883,27 @@ class Group(Entity):
 
         if isinstance(qry, Iterable):
             return all([isinstance(self.rel[i], type) for i in qry])
+
+    def _get_rel(self, key):
+        """Get relation.
+
+        This is the method that should be called internally when access to relations is required.  Depending on the
+        Group's object mode (i.e., standalone or group population bound), it will return the Site object referenced
+        properly.
+
+        Args:
+            key (int): The key to the dict of Site objects.  For standalond Group object, this is the key in the
+                self.rel dict.  For group population bound Group object, this is the hash of the Site object which is
+                stores in the ``pram.pop.GroupPopulation.sites`` dict.
+
+        Returns:
+            Site: The site sought or None if not found.
+        """
+
+        if self.pop:
+            return self.pop.sites.get(key)
+        else:
+            return self.rel.get(key)
 
     @staticmethod
     def _has(d, qry, used_set):
@@ -1463,28 +1490,6 @@ class Group(Entity):
 
         return self.__hash__()
 
-    # def get_mass_at(self, qry=None, site_name=Site.AT):
-    #     """Get the proportion of mass at a specific site.  For example, a proportion of infected agents at a particular
-    #     school.  The site in question must be one of the group's relations.
-    #
-    #     Args:
-    #         qry (GroupQry): Group selector.
-    #         site_name (str): The name of site to measure mass proportions at.  Defaults to the groups current location.
-    #
-    #     Returns:
-    #         float: Proportion of the total mass at the site.
-    #     """
-    #
-    #     if not qry:
-    #         return self.get_rel(site_name).get_groups_mass()
-    #     else:
-    #         # at    = self.get_rel(site_name)
-    #         # m     = at.get_pop_size()     #     population at current location
-    #         # m_qry = at.get_pop_size(qry)  # sub-population at current location
-    #         #
-    #         # return float(m_qry) / float(m) if m > 0 else 0
-    #         return self.get_rel(site_name).get_groups_mass(qry)
-
     def get_site_at(self):
         """Get the site the group is currently located at.
 
@@ -1492,23 +1497,31 @@ class Group(Entity):
             Site
         """
 
-        return self.get_rel(Site.AT)
+        # return self.get_rel(Site.AT)  # old sites handling
+
+        if self.rel.get(Site.AT) is None:
+            return None
+        return self._get_rel(self.rel.get(Site.AT))
 
     def get_rel(self, name=None):
-        """Retrieves relation's value.
+        """Retrieves relation's value or all relations if no name is provided.
 
         Args:
-            name (str): Relation's name.
+            name (str, optional): Relation's name.
 
         Returns:
-            Any: Relation's value.
+            Any: Relation's value or all relations.
         """
 
         if name and self.rel_used is not None:
             self.rel_used.add(name)
 
-        # return self.rel[name] if name is not None else self.rel
-        return self.rel.get(name) if name else self.rel
+        # return self.rel[name] if name is not None else self.rel  # old
+        # return self.rel.get(name) if name else self.rel  # old sites handling
+
+        if self.rel.get(name) is None:
+            return False
+        return self._get_rel(self.rel.get(name))
 
     def get_mass(self):
         return self.m
@@ -1516,7 +1529,8 @@ class Group(Entity):
     def gr(self, name=None):
         """See :meth:`~pram.entity.Group.get_rel` method."""
 
-        return self.get_rel(name)
+        # return self.get_rel(name)  # old sites handling
+        return self._get_rel(name)
 
     def ha(self, qry):
         """See :meth:`~pram.entity.Group.has_attr` method."""
@@ -1568,12 +1582,17 @@ class Group(Entity):
     def is_at_site(self, site):
         """ Is the groups currently at the site specified? """
 
-        return self.has_rel({ Site.AT: site })
+        # return self.has_rel({ Site.AT: site })
+        return self.has_rel({ Site.AT: site.get_hash() })
 
     def is_at_site_name(self, name):
         """ Is the groups currently at the site with the name specified (that the group has as a relation)? """
 
-        return self.has_rel({ Site.AT: self.get_rel(name) })
+        # return self.has_rel({ Site.AT: self.get_rel(name) })
+
+        if self.rel.get(name) is None:
+            return False
+        return self.has_rel({ Site.AT: self._get_rel(self.rel.get(name)) })
 
     def is_void(self):
         """Checks if the group is a VOID group (i.e., it should be removed from the simulation).
@@ -1593,7 +1612,9 @@ class Group(Entity):
 
         at = self.rel.get(Site.AT)
         if at:
-            at.add_group_link(self)
+            # at.add_group_link(self)
+            if self.pop:
+                self.pop.sites[at].add_group_link(self)
         return self
 
     def matches_qry(self, qry):

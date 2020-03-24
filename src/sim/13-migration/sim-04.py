@@ -291,7 +291,7 @@ env = Environment(
 )
 
 sim = (Simulation().
-    set_pragmas(analyze=False, autocompact=True).
+    set_pragmas(analyze=False, autocompact=True, comp_summary=True).
     add([
         ConflictRule(severity=0.05, scale=0.2, i=[0, conflict_dur]),
         MigrationRule(env, env_harshness_death_mult=0.1, migration_death_mult=0.0001),  # most deaths due to environment (to show the seasonal effect)
@@ -303,18 +303,18 @@ sim = (Simulation().
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Summary:
+# Settlement summary:
 
-def print_settled_summary():
-    print('\n')
+def disp_settlement_summary():
+    print('Settlement summary')
     settled_m = 0
     for s in sites_dst:
         m = s.get_mass()
         settled_m += m
-        print(f'{s.name:<12}: {m:>9,.0f}')
-    print(f'{"TOTAL":<12}: {settled_m:>9,.0f}')
+        print(f'    {s.name:<12}: {m:>9,.0f}')
+    print(f'    {"TOTAL":<12}: {settled_m:>9,.0f}')
 
-print_settled_summary()
+disp_settlement_summary()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -322,8 +322,8 @@ print_settled_summary()
 
 if persistence:
     series = [
-        { 'var': 'migrating_m', 'lw': 0.75, 'linestyle': '-',  'marker': 'o', 'color': 'blue',  'markersize': 0, 'lbl': 'Migrating' },
-        { 'var': 'settled_m',   'lw': 0.75, 'linestyle': '--', 'marker': '+', 'color': 'green', 'markersize': 0, 'lbl': 'Settled'   },
-        { 'var': 'dead_m',      'lw': 0.75, 'linestyle': ':',  'marker': 'x', 'color': 'red',   'markersize': 0, 'lbl': 'Dead'      }
+        { 'var': 'migrating_m', 'lw': 0.75, 'ls': 'solid',  'marker': 'o', 'color': 'blue',  'ms': 5, 'lbl': 'Migrating' },
+        { 'var': 'settled_m',   'lw': 0.75, 'ls': 'dashed', 'marker': '*', 'color': 'green', 'ms': 5, 'lbl': 'Settled'   },
+        { 'var': 'dead_m',      'lw': 0.75, 'ls': 'dotted', 'marker': 'x', 'color': 'red',   'ms': 5, 'lbl': 'Dead'      }
     ]
     sim.probes[0].plot(series, ylabel='Population mass', xlabel='Iteration (month from start of conflict)', figsize=(12,4), subplot_b=0.15)

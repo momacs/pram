@@ -87,7 +87,7 @@ class GroupPopulation(object):
 
         self.groups = {}
         self.sites = {}
-        self.resources = {}
+        self.resources = {}  # TODO: doesn't seem to be used
 
         self.vita_groups = {}  # all VITA groups for the current iteration
 
@@ -134,14 +134,29 @@ class GroupPopulation(object):
         if not self.is_frozen:
             self.mass += group.m
 
-        g = self.groups.get(group.get_hash())
-        if g is not None:
-            g.m += group.m
+        group_hash = group.get_hash()
+        if group_hash in self.groups.keys():
+            self.groups.get(group_hash).m += group.m
         else:
-            self.groups[group.get_hash()] = group
-            self.add_sites    ([v for (_,v) in group.get_rel().items() if isinstance(v, Site)])
-            self.add_resources([v for (_,v) in group.get_rel().items() if isinstance(v, Resource)])
+            # Old vay to handle sites:
+            # self.add_sites    ([v for (_,v) in group.get_rel().items() if isinstance(v, Site)])
+            # self.add_resources([v for (_,v) in group.get_rel().items() if isinstance(v, Resource)])
+
+            # Add Site and Resource objects to self and replace them with their hashes in the group object:
+            # TODO: Do we actually need to distuinguish between Site and Resource?  If we do, it might be better to use
+            #       an explicit indication of which dict the object is stored in.
+            for k,v in group.rel.items():
+                if isinstance(v, Site):
+                    self.add_site(v)
+                    group.rel[k] = v.get_hash()
+                if isinstance(v, Resource):
+                    self.add_resource(v)
+                    group.rel[k] = v.get_hash()
+
+            group.pop = self
             group.freeze()
+
+            self.groups[group_hash] = group
 
         return self
 
@@ -174,11 +189,9 @@ class GroupPopulation(object):
         """
 
         h = resource.get_hash()
-        if h in self.resources.keys():
-            return
-
-        self.resources[h] = resource
-        # resource.set_pop(self)
+        if h not in self.resources.keys():
+            self.resources[h] = resource
+            # resource.set_pop(self)
 
         return self
 
@@ -211,12 +224,9 @@ class GroupPopulation(object):
         """
 
         h = site.get_hash()
-        if h in self.sites.keys():
-            return self
-
-        self.sites[h] = site
-        site.set_pop(self)
-
+        if h not in self.sites.keys():
+            self.sites[h] = site
+            site.set_pop(self)
         return self
 
     def add_sites(self, sites):
@@ -438,8 +448,13 @@ class GroupPopulation(object):
         if qry is None:
             return self.groups.values()
 
-        # return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items())]
-        return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+        # return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items())]  # before 'qry.cond' got added
+        # return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+
+        if qry.full:
+            return [g for g in self.groups.values() if (qry.attr.items() == g.attr.items()) and (qry.rel.items() == g.rel.items()) and all([fn(g) for fn in qry.cond])]
+        else:
+            return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
 
     def get_groups_mass(self, qry=None):
         """Get the mass of groups that match the query specified.

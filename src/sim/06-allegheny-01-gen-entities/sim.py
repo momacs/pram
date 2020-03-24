@@ -190,7 +190,7 @@ else:
         rel_fix={},
         attr_db=[],
         rel_db=[
-            GroupDBRelSpec('home', 'sp_hh_id', sites['home']),
+            GroupDBRelSpec('home',   'sp_hh_id',  sites['home']),
             GroupDBRelSpec('school', 'school_id', sites['school'])
         ],
         rel_at='home'

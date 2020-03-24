@@ -1239,6 +1239,7 @@ class Simulation(object):
         """
 
         self.sim_rules.append(rule)
+        self.set_vars(rule.vars)
         return self
 
     def add_sim_rules(self, rules):
@@ -2284,7 +2285,8 @@ class Simulation(object):
             'max':    Size.bytes2human(max               (self.comp_hist.mem_iter)),
             'mean':   Size.bytes2human(statistics.mean   (self.comp_hist.mem_iter)),
             'median': Size.bytes2human(statistics.median (self.comp_hist.mem_iter)),
-            'stdev':  Size.bytes2human(statistics.stdev  (self.comp_hist.mem_iter))
+            'stdev':  Size.bytes2human(statistics.stdev  (self.comp_hist.mem_iter)),
+            'sum':    Size.bytes2human(sum               (self.comp_hist.mem_iter))
         }
         t = {
             'min':    Time.tsdiff2human(min               (self.comp_hist.t_iter)),
@@ -2295,7 +2297,7 @@ class Simulation(object):
         }
 
         print('Computational summary')
-        print(f'    Iteration memory : Range: [{mem["min"]}, {mem["max"]}]    Mean (SD): {mem["mean"]} ({mem["stdev"]})    Median: {mem["median"]}')
+        print(f'    Iteration memory : Range: [{mem["min"]}, {mem["max"]}]    Mean (SD): {mem["mean"]} ({mem["stdev"]})    Median: {mem["median"]}    Sum: {mem["sum"]}')
         print(f'    Iteration time   : Range: [{t  ["min"]}, {t  ["max"]}]    Mean (SD): {t  ["mean"]} ({t  ["stdev"]})    Median: {t  ["median"]}')
         print(f'    Simulation time  : {Time.tsdiff2human(self.comp_hist.t_sim)}')
 

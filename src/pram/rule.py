@@ -280,11 +280,15 @@ class Rule(ABC):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class SimRule(Rule):
+class SimRule(Rule, ABC):
     """Simulation rule, i.e., one that is run at the end of every simulation iteration (i.e., after the mass transfer
     has concluded).  These sort of rules are especially useful for implementing policy-level like intervention.  For
     example, should schools in a county, state, or the entire country be closed in response to an epidemic.  This sort
     of mitigation measure might be in effect after, say, 6% of the population has become infected.
+
+    Upon adding an instance of this class to the :class:`~pram.sim.Simulation` object, the latter will add all
+    'self.vars' as simulation variables.  Consequently, this ABC's constructor should ordinarily be called as the first
+    step in the child's constructor so that the dict is not overwritten.
     """
 
     def __init__(self, name='rule', t=TimeAlways(), i=IterAlways(), memo=None):
@@ -293,6 +297,7 @@ class SimRule(Rule):
 
         self.name = name
         self.memo = memo
+        self.vars = {}
 
         self._set_t(t)
         self._set_i(i)

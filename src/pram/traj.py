@@ -1237,7 +1237,7 @@ class TrajectoryEnsemble(object):
 
             conn.execute(
                 'INSERT INTO grp (iter_id, hash, m, m_p, attr, rel) VALUES (?,?,?,?,?,?)',
-                [iter_id, g.get_hash(), g.m, g.m / m_pop, DB.obj2blob(g.attr), DB.obj2blob(g.rel)]
+                [iter_id, str(g.get_hash()), g.m, g.m / m_pop, DB.obj2blob(g.attr), DB.obj2blob(g.rel)]
             )
 
             for s in g.rel.values():  # restore the link
@@ -1278,13 +1278,13 @@ class TrajectoryEnsemble(object):
         m_pop = traj.sim.pop.get_mass()  # to get proportion of mass flow
         for g in traj.sim.pop.groups.values():
             # Persist the group if new:
-            if self._db_get_one('SELECT COUNT(*) FROM grp WHERE hash = ?', [g.get_hash()], conn) == 0:
+            if self._db_get_one('SELECT COUNT(*) FROM grp WHERE hash = ?', [str(g.get_hash())], conn) == 0:
                 for s in g.rel.values():  # sever the 'pop.sim.traj.traj_ens._conn' link (or pickle error)
                     s.pop = None
 
                 group_id = conn.execute(
                     'INSERT INTO grp (hash, attr, rel) VALUES (?,?,?)',
-                    [g.get_hash(), DB.obj2blob(g.attr), DB.obj2blob(g.rel)]
+                    [str(g.get_hash()), DB.obj2blob(g.attr), DB.obj2blob(g.rel)]
                 ).lastrowid
 
                 if self.pragma.memoize_group_ids:
@@ -1313,9 +1313,9 @@ class TrajectoryEnsemble(object):
         with self.conn as c:
             id = self._db_get_id('grp_name', f'hash = "{hash}"', conn=c)
             if id is None:
-                self._db_ins('INSERT INTO grp_name (ord, hash, name) VALUES (?,?,?)', [ord, hash, name], conn=c)
+                self._db_ins('INSERT INTO grp_name (ord, hash, name) VALUES (?,?,?)', [ord, str(hash), name], conn=c)
             else:
-                self._db_upd('UPDATE grp_name SET ord = ? AND name = ? WHERE hash = ?', [ord, name, hash], conn=c)
+                self._db_upd('UPDATE grp_name SET ord = ? AND name = ? WHERE hash = ?', [ord, name, str(hash)], conn=c)
 
         return self
 
