@@ -20,6 +20,7 @@ from abc             import ABC
 from attr            import attrs, attrib, converters, validators
 from collections.abc import Iterable
 from enum            import auto, unique, IntEnum
+from iteround        import saferound
 from scipy.stats     import rv_continuous
 
 from .util import DB, Err, FS
@@ -843,6 +844,10 @@ class Group(Entity):
 
         self.link_to_site_at()
 
+    # @classmethod
+    # def set_pop(cls, pop):
+    #     cls.pop  = pop
+
     def __eq__(self, other):
         """Compare this group to another.
 
@@ -1590,17 +1595,19 @@ class Group(Entity):
     def is_at_site(self, site):
         """ Is the groups currently at the site specified? """
 
-        # return self.has_rel({ Site.AT: site })
+        # return self.has_rel({ Site.AT: site })  # old sites handling
         return self.has_rel({ Site.AT: site.get_hash() })
 
     def is_at_site_name(self, name):
         """ Is the groups currently at the site with the name specified (that the group has as a relation)? """
 
-        # return self.has_rel({ Site.AT: self.get_rel(name) })
+        # return self.has_rel({ Site.AT: self.get_rel(name) })  # old sites handling
 
         if self.rel.get(name) is None:
             return False
-        return self.has_rel({ Site.AT: self._get_rel(self.rel.get(name)) })
+        # return self.has_rel({ Site.AT: self._get_rel(self.rel.get(name)) })
+        # return self.has_rel({ Site.AT: self.get_rel(name) })
+        return self.rel.get(Site.AT) and self.rel[Site.AT] == self.rel.get(name)
 
     def is_void(self):
         """Checks if the group is a VOID group (i.e., it should be removed from the simulation).
@@ -1620,7 +1627,7 @@ class Group(Entity):
 
         at = self.rel.get(Site.AT)
         if at:
-            # at.add_group_link(self)
+            # at.add_group_link(self)  # old sites handling
             if self.pop:
                 self.pop.sites[at].add_group_link(self)
         return self
@@ -1778,6 +1785,8 @@ class Group(Entity):
         p_sum = 0.0  # sum of split proportions (being probabilities, they must sum up to 1)
         m_sum = 0.0  # sum of total mass redistributed via group splitting
 
+        # Compute masses of new groups:
+        m_lst = [0.0] * len(specs)
         for (i,s) in enumerate(specs):
             if i == len(specs) - 1:  # last group spec
                 p = 1 - p_sum        # complement the probability
@@ -1786,10 +1795,21 @@ class Group(Entity):
                 p = s.p
                 m = self.m * p
                 # m = math.floor(self.m * p)  # conservative floor() use to make sure we don't go over due to rounding
+            m_lst[i] = m
 
             p_sum += p
             m_sum += m
 
+            if p_sum == 1.0:  # the remaining split specs must have p=0 so we might as well skip them
+                break
+
+        # Round masses of new groups to integers:
+        if not self.pop.sim.get_pragma_fractional_mass():
+            m_lst = saferound(m_lst,0)
+
+        # Instantiate new groups:
+        for (i,s) in enumerate(specs):
+            m = m_lst[i]
             if m == 0:  # preventing instantiating empty groups
                 continue
 
@@ -1803,9 +1823,6 @@ class Group(Entity):
 
             # groups.append(Group(None, m, attr, rel))  # None means we do not use group names any more
             groups.append(Group(self.name, m, attr, rel))  # use the same group name
-
-            if p_sum == 1.0:  # the remaining split specs must have p=0 so we might as well skip them
-                break
 
         return groups
 

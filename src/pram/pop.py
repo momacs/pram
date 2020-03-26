@@ -149,9 +149,11 @@ class GroupPopulation(object):
                 if isinstance(v, Site):
                     self.add_site(v)
                     group.rel[k] = v.get_hash()
+                    # group.rel[k] = self.add_site(v)
                 if isinstance(v, Resource):
                     self.add_resource(v)
                     group.rel[k] = v.get_hash()
+                    # group.rel[k] = self.add_resource(v)
 
             group.pop = self
             group.freeze()
@@ -192,8 +194,8 @@ class GroupPopulation(object):
         if h not in self.resources.keys():
             self.resources[h] = resource
             # resource.set_pop(self)
-
-        return self
+        # return self
+        return self.resources[h]
 
     def add_resources(self, resources):
         """Adds multiple resources to the population.
@@ -227,7 +229,8 @@ class GroupPopulation(object):
         if h not in self.sites.keys():
             self.sites[h] = site
             site.set_pop(self)
-        return self
+        # return self
+        return self.sites[h]
 
     def add_sites(self, sites):
         """Adds multiple sites to the population.

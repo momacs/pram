@@ -996,6 +996,10 @@ class SimulationSetter(object):
         self.sim.set_pragma_comp_summary(value)
         return self
 
+    def pragma_fractional_mass(self, value):
+        self.sim.set_pragma_fractional_mass(value)
+        return self
+
     def pragma_live_info(self, value):
         self.sim.set_pragma_live_info(value)
         return self
@@ -1694,6 +1698,7 @@ class Simulation(object):
             'autostop_t'               : self.get_pragma_autostop_t,
             'live_info'                : self.get_pragma_live_info,
             'live_info_ts'             : self.get_pragma_live_info_ts,
+            'partial_mass'             : self.get_pragma_partial_mass,
             'probe_capture_init'       : self.get_pragma_probe_capture_init,
             'rule_analysis_for_db_gen' : self.get_pragma_rule_analysis_for_db_gen
         }.get(name, None)
@@ -1726,6 +1731,9 @@ class Simulation(object):
 
     def get_pragma_comp_summary(self):
         return self.pragma.comp_summary
+
+    def get_pragma_fractional_mass(self):
+        return self.pragma.fractional_mass
 
     def get_pragma_live_info(self):
         return self.pragma.live_info
@@ -2029,13 +2037,14 @@ class Simulation(object):
             analyze = True,                  # flag: analyze the simulation and suggest improvements?
             autocompact = False,             # flag: remove empty groups after every iteration?
             autoprune_groups = False,        # flag: remove attributes and relations not referenced by rules?
-            autostop = False,                # flag
+            autostop = False,                # flag: stop simulation when the n, p, or t condition is met?
             autostop_n = 0,                  #
             autostop_p = 0,                  #
             autostop_t = 10,                 #
             comp_summary = False,            # flag: show computational summary at the end of a simulation run?
             live_info = False,               #
             live_info_ts = False,            #
+            fractional_mass = False,         # flag: should fractional mass be allowed?
             probe_capture_init = True,       # flag: let probes capture the pre-run state of the simulation?
             rule_analysis_for_db_gen = True  # flag: should static rule analysis results help form DB groups
         )
@@ -2406,9 +2415,13 @@ class Simulation(object):
         return self
 
     def set_pragma(self, name, value):
-        """
-        Args:
+        """Set pragma.
 
+        All ``set_pragma_X`` return ``self`` for method call chaining.
+
+        Args:
+            name(str): Name
+            value(Any): Value
 
         Returns:
             self: For method call chaining.
@@ -2435,146 +2448,54 @@ class Simulation(object):
         return self
 
     def set_pragma_analyze(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.analyze = value
         return self
 
     def set_pragma_autocompact(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.autocompact = value
         return self
 
     def set_pragma_autoprune_groups(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.autoprune_groups = value
         return self
 
     def set_pragma_autostop(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.autostop = value
         return self
 
     def set_pragma_autostop_n(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.autostop_n = value
         return self
 
     def set_pragma_autostop_p(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.autostop_p = value
         return self
 
     def set_pragma_autostop_t(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.autostop_t = value
         return self
 
+    def set_pragma_fractional_mass(self, value):
+        self.pragma.fractional_mass = value
+        return self
+
     def set_pragma_comp_summary(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.comp_summary = value
         return self
 
     def set_pragma_live_info(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.live_info = value
         return self
 
     def set_pragma_live_info_ts(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.live_info_ts = value
         return self
 
     def set_pragma_probe_capture_init(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.probe_capture_init = value
         return self
 
     def set_pragma_rule_analysis_for_db_gen(self, value):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         self.pragma.rule_analysis_for_db_gen = value
         return self
 
