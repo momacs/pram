@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Contains PRAM group and agent populations code."""
 
+import jsonpickle
 import math
 
 from attr   import attrs, attrib
@@ -104,6 +105,11 @@ class GroupPopulation(object):
         )
 
         self.do_keep_mass_flow_specs = do_keep_mass_flow_specs
+
+        self.cache = DotMap(
+            qry_to_groups = {},   # cache for get_groups(qry) calls
+            qry_to_m      = {}    # cache for get_groups_mass(qry) calls
+        )
 
     def __repr__(self):
         pass
@@ -454,10 +460,19 @@ class GroupPopulation(object):
         # return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items())]  # before 'qry.cond' got added
         # return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
 
-        if qry.full:
-            return [g for g in self.groups.values() if (qry.attr.items() == g.attr.items()) and (qry.rel.items() == g.rel.items()) and all([fn(g) for fn in qry.cond])]
-        else:
-            return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+        # if qry.full:
+        #     return [g for g in self.groups.values() if (qry.attr.items() == g.attr.items()) and (qry.rel.items() == g.rel.items()) and all([fn(g) for fn in qry.cond])]
+        # else:
+        #     return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+
+        groups = self.cache.qry_to_groups.get(jsonpickle.encode(qry))
+        if groups is None:
+            if qry.full:
+                groups = [g for g in self.groups.values() if (qry.attr.items() == g.attr.items()) and (qry.rel.items() == g.rel.items()) and all([fn(g) for fn in qry.cond])]
+            else:
+                groups = [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+            self.cache.qry_to_groups[jsonpickle.encode(qry)] = groups
+        return groups
 
     def get_groups_mass(self, qry=None):
         """Get the mass of groups that match the query specified.
@@ -534,6 +549,19 @@ class GroupPopulation(object):
         # return sum([g.m for g in self.groups.values()])
         return self.mass
 
+    def reset_cache(self):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.cache.qry_to_groups = {}
+        self.cache.qry_to_m = {}
+        return self
+
     def transfer_mass(self, src_group_hashes, mass_flow_specs, iter, t):
         """
         Args:
@@ -582,5 +610,8 @@ class GroupPopulation(object):
         # Save the trajectory state:
         if self.sim.traj is not None:
             self.sim.traj.save_state(mass_flow_specs)
+
+        # Reset cache:
+        self.reset_cache()
 
         return self
