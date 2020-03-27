@@ -256,7 +256,7 @@ class SiteJSONEncoder(json.JSONEncoder):
     """JSON encoder used by the :meth:`~pram.entity.Group.gen_hash` method.
 
     JSON encoding is used when hashing :class:`~pram.enity.Group` objects.  Because those objects may hold references
-    to :class:`~pram.enity.Site` and :class:`~pram.enity.Resource` objects, we must accomodate for them here.
+    to :class:`~pram.enity.Site` and :class:`~pram.enity.Resource` objects, we accomodate them here.
     """
 
     def default(self, o):
@@ -270,7 +270,7 @@ class SiteJSONEncoder(json.JSONEncoder):
         """
 
         if isinstance(o, Site):
-            return { '__Site__': o.name }  # return {'__Site__': o.__hash__()}
+            return { '__Site__': o.__hash__() }  # return {'__Site__': o.__hash__()}
         if isinstance(o, Resource):
             return { '__Resource__': o.name }
         return json.JSONEncoder.default(self, o)
@@ -299,7 +299,7 @@ class Site(Resource):
         capacity_max (int): The maximum capacity of the Site when considered a Resource.
     """
 
-    AT = '@'  # relation name for the group's current location
+    AT = '@'  # relation name for the group's current site
 
     __slots__ = ('name', 'attr', 'rel_name', 'pop', 'm', 'groups', 'cache_qry_to_groups', 'cache_qry_to_m')
 
@@ -477,7 +477,11 @@ class Site(Resource):
         if not qry:
             groups = self.groups
         else:
-            groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+            # groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+            groups = self.cache_qry_to_groups.get(qry)
+            if groups is None:
+                groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+                self.cache_qry_to_groups[qry] = groups
 
         if non_empty_only:
             return [g for g in groups if g.m > 0]
@@ -551,7 +555,7 @@ class Site(Resource):
         return self
 
     def reset_group_links(self):
-        """Resets the groups located at the site and other cache and memoization related data structures.
+        """Resets the groups located at the site and other cache and memoization data structures.
 
         Returns:
             self: For method call chaining.
@@ -643,7 +647,49 @@ class Agent(Entity):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-@attrs(slots=True)
+# @attrs(slots=True)
+# class GroupQry(object):
+#     """A group query.
+#
+#     Objects of this class are used to select groups from a group population using attribute- and relation-based search
+#     criteria.
+#
+#     Typical usage example for selecting groups of agents that meet certain criteria:
+#
+#         GroupQry(attr={ 'flu': 's' })                 # susceptible to the flu
+#         GroupQry(rel={ Site.AT: Site('school-83') })  # currently located at site 'school-83'
+#
+#         GroupQry(cond=[lambda g: g.get_attr('x') > 100]))                                   # with attribute 'x' > 100
+#         GroupQry(cond=[lambda g: g.get_attr('x') > 100, lambda g: get_attr('y') == 200]))   # with attribute 'x' > 100 and 'y' == 200
+#         GroupQry(cond=[lambda g: g.get_attr('x') > 100 and g.get_attr('y') ==  200]))       # explicit AND condition between attributes
+#         GroupQry(cond=[lambda g: g.get_attr('x') > 100 or  g.get_attr('y') == -200]))       # explicit OR  condition between attributes
+#
+#     It would make sense to declare this class frozen (i.e., 'frozen=True'), but as is revealed by the following two
+#     measurements, performance suffers slightly when slotted classes get frozen.
+#
+#     python -m timeit -s "import attr; C = attr.make_class('C', ['x', 'y', 'z'], slots=True)"             "C(1,2,3)"
+#     python -m timeit -s "import attr; C = attr.make_class('C', ['x', 'y', 'z'], slots=True,frozen=True)" "C(1,2,3)"
+#
+#     Args:
+#         attr (Mapping[str, Any], optional): Group's attributes.
+#         rel (Mapping[str, Any], optional): Group's relations.
+#         cond (list(Callable), optional): Conditions on group's attributes and relations.  These conditions are given as
+#             callables which take one argument, the group.  Assuming the group argument is ``g``, the callables can then
+#             access the group's attributes and relations respectively as ``g.attr`` and ``g.rel``.  See the typical
+#             usage examples above.
+#         full (bool): Flag: Does the match need to be full?  To satisfy a full match, a group's attributes and relations
+#             need to fully match the query.  Because PRAM cannot have two groups with the same attributes and relations,
+#             it follows that a full match can either return one group on no groups (if no match exists).  A partial
+#             match requires that a group's attributes _contain_ the query's attributes (and same for relations).
+#     """
+#
+#     attr : dict = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
+#     rel  : dict = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
+#     cond : list = attrib(factory=list, converter=converters.default_if_none(factory=list))
+#     full : bool = attrib(default=False)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class GroupQry(object):
     """A group query.
 
@@ -660,12 +706,6 @@ class GroupQry(object):
         GroupQry(cond=[lambda g: g.get_attr('x') > 100 and g.get_attr('y') ==  200]))       # explicit AND condition between attributes
         GroupQry(cond=[lambda g: g.get_attr('x') > 100 or  g.get_attr('y') == -200]))       # explicit OR  condition between attributes
 
-    It would make sense to declare this class frozen (i.e., 'frozen=True'), but as is revealed by the following two
-    measurements, performance suffers slightly when slotted classes get frozen.
-
-    python -m timeit -s "import attr; C = attr.make_class('C', ['x', 'y', 'z'], slots=True)"             "C(1,2,3)"
-    python -m timeit -s "import attr; C = attr.make_class('C', ['x', 'y', 'z'], slots=True,frozen=True)" "C(1,2,3)"
-
     Args:
         attr (Mapping[str, Any], optional): Group's attributes.
         rel (Mapping[str, Any], optional): Group's relations.
@@ -679,37 +719,30 @@ class GroupQry(object):
             match requires that a group's attributes _contain_ the query's attributes (and same for relations).
     """
 
-    attr : dict = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
-    rel  : dict = attrib(factory=dict, converter=converters.default_if_none(factory=dict))
-    cond : list = attrib(factory=list, converter=converters.default_if_none(factory=list))
-    full : bool = attrib(default=False)
+    __slots__ = ('attr', 'rel', 'cond', 'full', 'hash')
 
+    def __init__(self, attr={}, rel={}, cond=[], full=False):
+        self.attr = attr
+        self.rel  = rel
+        self.cond = cond
+        self.full = full
 
-# class GroupQry(object):
-#     __slots__ = ('attr', 'rel', 'cond', 'full', 'hash')
-#
-#     def __init__(self, attr={}, rel={}, cond=[], full=False):
-#         self.attr = attr
-#         self.rel  = rel
-#         self.cond = cond
-#         self.full = full
-#
-#         self.hash = None  # computed lazily
-#
-#     def __eq__(self, other):
-#         return isinstance(self, type(other)) and (self.attr == other.attr) and (self.rel == other.rel) and (self.cond == other.cond) and (self.full == other.full)
-#
-#     def __hash__(self):
-#         if self.hash is None:
-#             self.hash = GroupQry.gen_hash(self.attr, self.rel, self.cond, self.full)
-#         return self.hash
-#
-#     @staticmethod
-#     def gen_hash(attr, rel=None, cond=None, full=False):
-#         attr = attr or {}
-#         rel  = rel  or {}
-#         cond = cond or []
-#         return xxhash.xxh64(json.dumps((attr, rel, cond, full), sort_keys=True, cls=SiteJSONEncoder)).intdigest()  # .hexdigest()
+        self.hash = None  # computed lazily
+
+    def __eq__(self, other):
+        return isinstance(self, type(other)) and (self.attr == other.attr) and (self.rel == other.rel) and (self.cond == other.cond) and (self.full == other.full)
+
+    def __hash__(self):
+        if self.hash is None:
+            self.hash = GroupQry.gen_hash(self.attr, self.rel, self.cond, self.full)
+        return self.hash
+
+    @staticmethod
+    def gen_hash(attr, rel=None, cond=None, full=False):
+        attr = attr or {}
+        rel  = rel  or {}
+        cond = cond or []
+        return xxhash.xxh64(json.dumps((attr, rel, cond, full), sort_keys=True, cls=SiteJSONEncoder)).intdigest()  # .hexdigest()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
