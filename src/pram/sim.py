@@ -129,14 +129,14 @@
 #     Development started (Python 3.6.1; MacOS 10.12.6)                                        [2018.12.16]
 #     GitHub repository created                                                                [2019.01.18]
 #     Ported to FreeBSD (Python 3._._; 12.0R)                                                  []
-#     Ported to Ubuntu (Python 3._._; 18.04 LTS)                                               []
+#     Ported to Ubuntu (Python 3._._; 18.04 LTS)                                               [2019.11.05]
 #     Moved to PyPy                                                                            []
 #     Published to PyPI                                                                        []
 #     Containerized                                                                            []
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
-# Milestones: Code
+# Milestones: Code  [30-50% outdated]
 #     Simulation
 #         c Simulation class                                                                   [2018.12.16 - 2019.07.19]
 #         Timer
@@ -184,21 +184,23 @@
 #                 c ProgressAndTransmitFluRule (deprecated)                                    [2019.02.05 - 2019.03.11]
 #                 c SEIRRule                                                                   [2019.03.25 - 2019.04.06]
 #                 c SEIRFluRule                                                                [2019.04.06 - 2019.04.08]
-#             f Setup                                                                          [2019.01.23]
+#             f Setup                                                                          [2019.01.23 - 2020.03.26]
 #         Population
 #             c Population                                                                     [2019.01.07]
 #             c AgentPopulation                                                                [2019.01.07]
 #             c GroupPopulation                                                                [2019.01.07 - 2019.07.15]
-#                 f Selecting groups                                                           [2019.01.07 - 2019.01.21]
-#                 f Rule application                                                           [2019.01.04 - 2019.01.17]
-#                 f Mass transfer                                                              [2019.01.04 - 2019.02.24]
+#                 f Selecting groups                                                           [2019.01.07 - 2020.03.29]
+#                 f Rule application                                                           [2019.01.04 - 2020.02.18]
+#                 f Mass transfer                                                              [2019.01.04 - 2020.03.29]
 #             c MassFlowGraph                                                                  [2019.07.26 - ...]
+#             c GroupPopulationHistory                                                         [2020.03.29]
 #
 #     Data collection
-#         c Probe                                                                              [2019.01.18 - 2019.03.31]
-#         c ProbePersistenceDB                                                                 [2019.03.02 - 2019.03.18]
+#         c Probe                                                                              [2019.01.18 - 2020.03.29]
+#         c ProbePersistenceDB                                                                 [2019.03.02 - 2020.03.29]
 #         c ProbePersistenceFS                                                                 [2019.03.02]
-#         c GroupSizeProbe                                                                     [2019.01.18 - 2019.07.15]
+#         c GroupProbe                                                                         [2019.01.18 - 2020.03.29]
+#         c GroupSizeProbe                                                                     [2019.01.18 - 2020.03.29]
 #
 #     Logging
 #         c Log                                                                                [2019.01.06]
@@ -221,7 +223,7 @@
 #
 #     Utilities
 #         c Data                                                                               [2019.01.06]
-#         c DB                                                                                 [2019.02.11 - 2019.03.18]
+#         c DB                                                                                 [2019.02.11 - 2020.03.25]
 #         c Err                                                                                [2019.01.21]
 #         c FS                                                                                 [2019.01.06 - 2019.03.22]
 #         c Hash                                                                               [2019.01.06]
@@ -229,11 +231,13 @@
 #         c Size                                                                               [2019.01.06 - 2019.02.11]
 #         c Str                                                                                [2019.01.06]
 #         c Tee                                                                                [2019.01.06]
-#         c Time                                                                               [2019.01.06 - 2019.04.01]
+#         c Time                                                                               [2019.01.06 - 2020.03.18]
 #
 #     Optimization
 #         String interning (sys.intern; not needed in Python 3)                                [2019.01.06 - 2019.01.17]
 #         __slots__                                                                            [2019.01.17]
+#         Site-to-group references                                                             [2020.03.20]
+#         Integer-only mass                                                                    [2020.03.26]
 #         Profiling
 #             ProbePersistenceDB                                                               [2019.03.16 - 2019.03.17]
 #
@@ -407,7 +411,7 @@ from scipy.stats import gaussian_kde
 from .data        import GroupSizeProbe, Probe
 from .entity      import Agent, Group, GroupQry, Site
 from .model.model import Model
-from .pop         import GroupPopulation
+from .pop         import GroupPopulation, GroupPopulationHistory
 from .rule        import Rule, SimRule, IterAlways, IterPoint, IterInt
 from .util        import Err, FS, Size, Time
 
@@ -1040,14 +1044,14 @@ class Simulation(object):
     state variables.
     '''
 
-    def __init__(self, traj=None, rand_seed=None, do_keep_mass_flow_specs=False):
+    def __init__(self, pop_hist_len=0, traj=None, rand_seed=None, do_keep_mass_flow_specs=False):
         self.set_rand_seed(rand_seed)
 
         self.pid = os.getpid()  # process ID
         self.traj = traj        # trajectory
         self.run_cnt = 0
 
-        self.pop = GroupPopulation(self, do_keep_mass_flow_specs)
+        self.pop = GroupPopulation(self, pop_hist_len, do_keep_mass_flow_specs)
         self.rules = []
         self.sim_rules = []
         self.probes = []

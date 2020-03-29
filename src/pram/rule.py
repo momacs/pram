@@ -1031,6 +1031,9 @@ class DiscreteInvMarkovChain(MarkovChain, DiscreteSpacetimeStochasticProcess, St
             tm = self.cb_before_apply(group, attr_val, tm) or tm
         return [GroupSplitSpec(p=tm[i], attr_set={ self.var: self.states[i] }) for i in range(len(self.states)) if tm[i] > 0]
 
+    def get_states(self):
+        return self.states
+
     def is_applicable(self, group, iter, t):
         return super().is_applicable(group, iter, t) and group.has_attr([ self.var ])
 
@@ -1097,6 +1100,9 @@ class DiscreteVarMarkovChain(MarkovChain, DiscreteSpacetimeStochasticProcess):
         if hasattr(tm, '__call__'):
             tm = tm(pop, group, iter, t)
         return [GroupSplitSpec(p=tm[i], attr_set={ self.var: self.states[i] }) for i in range(len(self.states)) if tm[i] > 0]
+
+    def get_states(self):
+        return self.states
 
     def is_applicable(self, group, iter, t):
         return super().is_applicable(group, iter, t) and group.has_attr([ self.var ])
@@ -1608,14 +1614,14 @@ class SegregationModel(Rule):
         self.p_repel = 1.00 / attr_dom_card  # population will be repelled (i.e., will move) if the site that population is at has a proportion of same self.attr lower than this
 
     def apply(self, pop, group, iter, t):
-        attr_val = group.ga(self.attr)
-        site     = group.gr(Site.AT)
+        attr_val = group.get_attr(self.attr)
+        site     = group.get_site_at()
         m        = site.get_mass()
-        m_team   = site.get_mass(GroupQry(attr={ self.attr: attr_val }))
 
         if m == 0:
             return None
 
+        m_team = site.get_mass(GroupQry(attr={ self.attr: attr_val }))
         p_team = m_team / m  # proportion of same self.attr
 
         if p_team < self.p_repel:

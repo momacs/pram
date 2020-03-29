@@ -355,10 +355,18 @@ class ProbePersistenceDB(ProbePersistence):
             probe (Probe): The probe.
             series (dict): Series specification (see examples below).
             ylabel (str): Label of the Y axis.
+            xlabel (str, optional): Label of the X axis.
             figpath (str, optional): Filepath to save the figure.
             figsize ((int,int)): Figure size in (w,h) format.
             legend_loc (str): Legend location (e.g., 'upper right').
             dpi (int): Resolution.
+            subplot_l (float): Left margin adjustment.
+            subplot_r (float): Right margin adjustment.
+            subplot_t (float): Top margin adjustment.
+            subplot_b (float): Bottom margin adjustment.
+
+        Returns:
+            matplotlib.figure.Figure: The figure generated.
 
         Examples::
 
@@ -406,6 +414,63 @@ class ProbePersistenceDB(ProbePersistence):
             plt.show()
         else:
             fig.savefig(figpath, dpi=dpi)
+
+        return fig
+
+    def plot_line(self, probe, xvar, yvar, ylabel, xlabel, figpath=None, figsize=(6,6), dpi=150, subplot_l=0.08, subplot_r=0.98, subplot_t=0.95, subplot_b=0.25):
+        """Generates a 2D line plot based on data associated with a probe.
+
+        Args:
+            probe (Probe): The probe.
+            xvar (str): Name of X axis variable.
+            yvar (str): Name of Y axis variable.
+            ylabel (str): Label of the Y axis.
+            xlabel (str): Label of the X axis.
+            figpath (str, optional): Filepath to save the figure.
+            figsize ((int,int)): Figure size in (w,h) format.
+            dpi (int): Resolution.
+            subplot_l (float): Left margin adjustment.
+            subplot_r (float): Right margin adjustment.
+            subplot_t (float): Top margin adjustment.
+            subplot_b (float): Bottom margin adjustment.
+
+        Returns:
+            matplotlib.figure.Figure: The figure generated.
+        """
+
+        probe_item = self.probes[DB.str_to_name(probe.name)]
+
+        data = { s['var']:[] for s in series }
+        data['i'] = []
+        with self.conn as c:
+            for r in c.execute(probe_item.sel_qry).fetchall():
+                data['i'].append(r['i'])
+                for s in series:
+                    data[s['var']].append(r[s['var']])
+
+        # Plot:
+        fig = plt.figure(figsize=figsize, dpi=dpi)
+        # plt.title('SIR Model')
+
+        # TODO: Implement when actually needed:
+        # for s in series:
+        #     plt.plot(data['i'], data[s['var']], lw=s.get('lw'), ls=s.get('ls'), dashes=s.get('dashes', []), marker=s.get('marker'), color=s.get('color'), ms=s.get('ms'), mfc='none', antialiased=True)
+        # plt.legend([s['lbl'] for s in series], loc=legend_loc)
+        # plt.xlabel(xlabel)
+        # plt.ylabel(ylabel)
+        # plt.grid(alpha=0.25, antialiased=True)
+        # plt.subplots_adjust(left=subplot_l, right=subplot_r, top=subplot_t, bottom=subplot_b)
+        #
+        # if figpath is None:
+        #     mng = plt.get_current_fig_manager()
+        #     # mng.frame.Maximize(True)    # TODO: [low priority] The below should work on different OSs
+        #     # mng.window.showMaximized()
+        #     # mng.full_screen_toggle()
+        #     # mng.window.state('zoomed')
+        #
+        #     plt.show()
+        # else:
+        #     fig.savefig(figpath, dpi=dpi)
 
         return fig
 
@@ -894,20 +959,20 @@ class GroupSizeProbe(GroupProbe):
         """
 
         if self.msg_mode != 0 or self.persistence:
-            n_tot = sum([g.m for g in self.pop.get_groups(self.qry_tot)])  # TODO: If the total mass never changed, we could memoize this (either here or in GroupPopulation).
-            n_qry = [sum([g.m for g in self.pop.get_groups(q)]) for q in self.queries]
+            m_tot = self.pop.get_groups_mass(self.qry_tot)
+            m_qry = [self.pop.get_groups_mass(q) for q in self.queries]
 
         # Message:
         if self.msg_mode != 0:
             msg = []
-            if n_tot > 0:
+            if m_tot > 0:
                 msg.append('{:2}  {}: ('.format(t if not t is None else '.', self.name))
-                for n in n_qry:
-                    msg.append('{:.2f} '.format(abs(round(n / n_tot, 2))))  # abs solves -0.00, likely due to rounding and string conversion
+                for m in m_qry:
+                    msg.append('{:.2f} '.format(abs(round(m / m_tot, 2))))  # abs solves -0.00, likely due to rounding and string conversion
                 msg.append(')   (')
-                for n in n_qry:
-                    msg.append('{:>7} '.format(abs(round(n, 1))))  # abs solves -0.00, likely due to rounding and string conversion
-                msg.append(')   [{}]'.format(round(n_tot, 1)))
+                for m in m_qry:
+                    msg.append('{:>7} '.format(abs(round(m, 1))))  # abs solves -0.00, likely due to rounding and string conversion
+                msg.append(')   [{}]'.format(round(m_tot, 1)))
             else:
                 msg.append('{:2}  {}: ---'.format(t if not t is None else '.', self.name))
 
@@ -919,9 +984,9 @@ class GroupSizeProbe(GroupProbe):
         # Persistence:
         if self.persistence and not iter is None:
             vals_p = []
-            vals_n = []
-            for n in n_qry:
-                vals_p.append(n / n_tot)
-                vals_n.append(n)
+            vals_m = []
+            for m in m_qry:
+                vals_p.append(m / m_tot)
+                vals_m.append(m)
 
-            self.persistence.persist(self, vals_p + vals_n, iter, t)
+            self.persistence.persist(self, vals_p + vals_m, iter, t)

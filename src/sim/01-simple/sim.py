@@ -23,7 +23,7 @@ progress_flu_rule = DiscreteInvMarkovChain('flu-status', { 's': [0.95, 0.05, 0.0
 
 sites = { 'home': Site('h'), 'work': Site('w') }
 
-probe_grp_size_flu = GroupSizeProbe.by_attr('flu', 'flu-status', ['s', 'i', 'r'], msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across flu status')
+probe_grp_size_flu = GroupSizeProbe.by_attr('flu', 'flu-status', progress_flu_rule.get_states(), msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across flu status')
 probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), msg_mode=ProbeMsgMode.DISP, memo='Mass distribution across sites')
 
 

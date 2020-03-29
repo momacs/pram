@@ -7,8 +7,10 @@ The three types of entities which can comprise a PRAM model are *groups*, *sites
 import copy
 import gc
 import hashlib
+import inspect
 import itertools
 import json
+import jsonpickle
 import math
 import numpy as np
 import os
@@ -250,9 +252,13 @@ class Resource(Entity):
 
         self.capacity = max(0, self.capacity - n)
 
+    def toJson(self):
+        # return json.dumps(self, default=lambda o: o.__dict__)
+        return json.dumps(self, default=lambda o: o.__dict__)
+
 
 # ----------------------------------------------------------------------------------------------------------------------
-class SiteJSONEncoder(json.JSONEncoder):
+class EntityJSONEncoder(json.JSONEncoder):
     """JSON encoder used by the :meth:`~pram.entity.Group.gen_hash` method.
 
     JSON encoding is used when hashing :class:`~pram.enity.Group` objects.  Because those objects may hold references
@@ -270,9 +276,11 @@ class SiteJSONEncoder(json.JSONEncoder):
         """
 
         if isinstance(o, Site):
-            return { '__Site__': o.__hash__() }  # return {'__Site__': o.__hash__()}
+            return { '__Site__': o.get_hash() }  # return {'__Site__': o.__hash__()}
         if isinstance(o, Resource):
-            return { '__Resource__': o.name }
+            return { '__Resource__': o.get_hash() }  # return { '__Resource__': o.name }
+        if callable(o):
+            return { '__function__': xxhash.xxh64(str(inspect.getsource(o))).hexdigest() }
         return json.JSONEncoder.default(self, o)
 
 
@@ -301,7 +309,7 @@ class Site(Resource):
 
     AT = '@'  # relation name for the group's current site
 
-    __slots__ = ('name', 'attr', 'rel_name', 'pop', 'm', 'groups', 'cache_qry_to_groups', 'cache_qry_to_m')
+    __slots__ = ('name', 'attr', 'rel_name', 'pop', 'm', 'groups', 'hash', 'cache_qry_to_groups', 'cache_qry_to_m')
 
     def __init__(self, name, attr=None, rel_name=AT, pop=None, capacity_max=1):
         super().__init__(name, capacity_max)  # previously called as: (EntityType.SITE, '')
@@ -312,6 +320,9 @@ class Site(Resource):
         self.pop      = pop         # pointer to the population (can be set elsewhere too)
         self.m        = 0.0
         self.groups   = set()
+
+        self.hash = None  # computed lazily
+
         # self.cache = DotMap(      # reset by the GroupPopulation object (that manages sites and groups) after mass transfer that crowns each iteration
         #     qry_to_groups = {},   # groups currently at this site
         #     qry_to_m      = {}    # mass of population at this site
@@ -328,7 +339,15 @@ class Site(Resource):
         return isinstance(self, type(other)) and (self.__key() == other.__key())
 
     def __hash__(self):
-        return hash(self.__key())
+        # return hash(self.__key())
+        if self.hash is None:
+            self.hash = Site.gen_hash(self.name, self.rel_name, self.attr)
+        return self.hash
+
+    @staticmethod
+    def gen_hash(name, rel_name, attr=None):
+        attr = attr or {}
+        return xxhash.xxh64(json.dumps((name, rel_name, attr))).intdigest()  # .hexdigest()
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.__hash__())
@@ -350,6 +369,7 @@ class Site(Resource):
         """
 
         self.groups.add(group)
+        # self.groups.add(group.get_hash())
         self.m += group.m
         return self
 
@@ -379,7 +399,8 @@ class Site(Resource):
                 value of zero.  It is however useful for testing, especially with very large databases.
 
         Returns:
-            dict(str, Site): A dictonary of sites with the Site object's hash as keys.
+            dict(str, Site): A dictonary of sites with the Site object's database IDs as keys.  Previously, Site hashes
+                were used as keys, but a recent change in the internal design did away with that.
         """
 
         FS.req_file(db_fpath, f'The database does not exist: {db_fpath}')
@@ -388,7 +409,8 @@ class Site(Resource):
         with DB.open_conn(db_fpath) as c:
             for row in c.execute('SELECT {} FROM {}{}'.format(','.join(attr + [name_col]), tbl, '' if limit <= 0 else f' LIMIT {limit}')).fetchall():
                 s = cls(row[name_col], { a: row[a] for a in attr }, rel_name=rel_name)
-                sites[s.get_hash()] = s
+                # sites[s.get_hash()] = s  # old ways of handling sites
+                sites[row[name_col]] = s
 
         return sites
 
@@ -422,9 +444,6 @@ class Site(Resource):
         """
 
         return self.attr.get(name) if name is not None else self.attr
-
-    def get_hash(self):
-        return self.__hash__()
 
     def get_groups(self, qry=None, non_empty_only=True):
         """Returns groups which currently are at this site.
@@ -474,14 +493,20 @@ class Site(Resource):
         #     return groups
 
         # Current attempt:
+        # groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+
         if not qry:
             groups = self.groups
         else:
-            # groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
-            groups = self.cache_qry_to_groups.get(qry)
+            groups = self.cache_qry_to_groups.get(qry.__hash__())
             if groups is None:
                 groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
-                self.cache_qry_to_groups[qry] = groups
+                # groups = []
+                # for gh in self.groups:
+                #     g = self.pop.groups[gh]
+                #     if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond]):
+                #         groups.append(g)
+                self.cache_qry_to_groups[qry.__hash__()] = groups
 
         if non_empty_only:
             return [g for g in groups if g.m > 0]
@@ -509,10 +534,12 @@ class Site(Resource):
         #     self.cache_qry_to_m[qry] = m
         # return m
 
-        if not qry:
-            return self.m
-        else:
-            return math.fsum([g.m for g in self.get_groups(qry)])
+        # if not qry:
+        #     return self.m
+        # else:
+        #     return math.fsum([g.m for g in self.get_groups(qry)])
+
+        return math.fsum([g.m for g in self.get_groups(qry)])
 
     def get_mass_prop(self, qry=None):
         """Get the proportion of the total mass accounted for the groups that match the query specified.  Only groups
@@ -568,6 +595,10 @@ class Site(Resource):
         self.cache_qry_to_groups = {}
         self.cache_qry_to_m = {}
         return self
+
+    def toJson(self):
+        # return json.dumps(self, default=lambda o: o.__dict__)
+        return json.dumps(self.hash)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -647,6 +678,9 @@ class Agent(Entity):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+# Classes based on attrs are not hashable.  This definitoin is kept here for later investigation, but moving to regular
+# Python classes as of Mar 27, 2020.
+
 # @attrs(slots=True)
 # class GroupQry(object):
 #     """A group query.
@@ -706,6 +740,10 @@ class GroupQry(object):
         GroupQry(cond=[lambda g: g.get_attr('x') > 100 and g.get_attr('y') ==  200]))       # explicit AND condition between attributes
         GroupQry(cond=[lambda g: g.get_attr('x') > 100 or  g.get_attr('y') == -200]))       # explicit OR  condition between attributes
 
+    Group query objects do not have any utility outside of a simulation context (which implies population bound groups)
+    and consequently won't play well with standalong groups because all Site references are turned into their hashes
+    (which is what a GroupPopulation object operates on internally).
+
     Args:
         attr (Mapping[str, Any], optional): Group's attributes.
         rel (Mapping[str, Any], optional): Group's relations.
@@ -729,6 +767,12 @@ class GroupQry(object):
 
         self.hash = None  # computed lazily
 
+        for (k,v) in self.rel.items():
+            if isinstance(v, Site):
+                self.rel[k] = v.__hash__()
+            # TODO: If we need to distinguish between Sites and Resources, do it here and also look in
+            #       GroupPopulation.add_group().
+
     def __eq__(self, other):
         return isinstance(self, type(other)) and (self.attr == other.attr) and (self.rel == other.rel) and (self.cond == other.cond) and (self.full == other.full)
 
@@ -738,11 +782,15 @@ class GroupQry(object):
         return self.hash
 
     @staticmethod
-    def gen_hash(attr, rel=None, cond=None, full=False):
-        attr = attr or {}
-        rel  = rel  or {}
-        cond = cond or []
-        return xxhash.xxh64(json.dumps((attr, rel, cond, full), sort_keys=True, cls=SiteJSONEncoder)).intdigest()  # .hexdigest()
+    def gen_hash(attr={}, rel={}, cond=[], full=False):
+        # hash = xxhash.xxh64(json.dumps((attr, rel, cond, full), sort_keys=True, cls=EntityJSONEncoder)).intdigest()
+        # hash = xxhash.xxh64(jsonpickle.encode((attr, rel, str([inspect.getsource(i) for i in cond], full))).intdigest()
+        hash = xxhash.xxh64(json.dumps((attr, rel, str([inspect.getsource(i) for i in cond]), full), sort_keys=True)).intdigest()
+        return hash
+
+    # def toJson(self):
+    #     # return json.dumps(self, default=lambda o: o.__dict__)
+    #     return json.dumps(self.hash)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -865,11 +913,11 @@ class Group(Entity):
     def __init__(self, name=None, m=0.0, attr={}, rel={}, pop=None, callee=None):
         super().__init__(EntityType.GROUP, '')
 
-        self.name = name
-        self.m    = float(m)
-        self.attr = attr or {}
-        self.rel  = rel  or {}
-        self.pop  = pop
+        self.name     = name
+        self.m        = float(m)
+        self.attr     = attr or {}
+        self.rel      = rel  or {}
+        self.pop      = pop
 
         self.is_frozen = False
         self.hash = None      # computed lazily
@@ -922,26 +970,26 @@ class Group(Entity):
         if isinstance(qry, Iterable):
             return all([isinstance(self.rel[i], type) for i in qry])
 
-    def _get_rel(self, key):
-        """Get relation.
-
-        This is the method that should be called internally when access to relations is required.  Depending on the
-        Group's object mode (i.e., standalone or group population bound), it will return the Site object referenced
-        properly.
-
-        Args:
-            key (int): The key to the dict of Site objects.  For standalond Group object, this is the key in the
-                self.rel dict.  For group population bound Group object, this is the hash of the Site object which is
-                stores in the ``pram.pop.GroupPopulation.sites`` dict.
-
-        Returns:
-            Site: The site sought or None if not found.
-        """
-
-        if self.pop:
-            return self.pop.sites.get(key)
-        else:
-            return self.rel.get(key)
+    # def _get_rel(self, key):
+    #     """Get relation.
+    #
+    #     This is the method that should be called internally when access to relations is required.  Depending on the
+    #     Group's object mode (i.e., standalone or group population bound), it will return the Site object referenced
+    #     properly.
+    #
+    #     Args:
+    #         key (int): The key to the dict of Site objects.  For standalond Group object, this is the key in the
+    #             self.rel dict.  For group population bound Group object, this is the hash of the Site object which is
+    #             stores in the ``pram.pop.GroupPopulation.sites`` dict.
+    #
+    #     Returns:
+    #         Site: The site sought or None if not found.
+    #     """
+    #
+    #     if self.pop:
+    #         return self.pop.sites.get(key)
+    #     else:
+    #         return self.rel.get(key)
 
     @staticmethod
     def _has(d, qry, used_set):
@@ -971,6 +1019,10 @@ class Group(Entity):
         if isinstance(qry, dict):
             if used_set is not None:
                 used_set.update(qry.keys())
+            # print(d.items())
+            # print(qry.items())
+            # print(qry.items() <= d.items())
+            # print(qry.items() >= d.items())
             return qry.items() <= d.items()
 
         if isinstance(qry, str):  # needs to be above the Iterable check because a string itself is an Iterable
@@ -1168,9 +1220,9 @@ class Group(Entity):
         rel  = rel  or {}
 
         # return hash(tuple([frozenset(attr.items()), frozenset(rel.items())]))
-        # return hashlib.sha1(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder).encode('utf-8')).hexdigest()
-        # return xxhash.xxh32(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder)).hexdigest()
-        return xxhash.xxh64(json.dumps((attr, rel), sort_keys=True, cls=SiteJSONEncoder)).intdigest()  # .hexdigest()
+        # return hashlib.sha1(json.dumps((attr, rel), sort_keys=True, cls=EntityJSONEncoder).encode('utf-8')).hexdigest()
+        # return xxhash.xxh32(json.dumps((attr, rel), sort_keys=True, cls=EntityJSONEncoder)).hexdigest()
+        return xxhash.xxh64(json.dumps((attr, rel), sort_keys=True, cls=EntityJSONEncoder)).intdigest()  # .hexdigest()
 
     @classmethod
     def gen_from_db(cls, db_fpath, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0, fn_live_info=None):
@@ -1545,9 +1597,12 @@ class Group(Entity):
 
         # return self.get_rel(Site.AT)  # old sites handling
 
-        if self.rel.get(Site.AT) is None:
+        if Site.AT not in self.rel.keys():
             return None
-        return self._get_rel(self.rel.get(Site.AT))
+        if self.pop:
+            return self.pop.sites[self.rel[Site.AT]]
+        else:
+            return self.rel[Site.AT]
 
     def get_rel(self, name=None):
         """Retrieves relation's value or all relations if no name is provided.
@@ -1565,9 +1620,12 @@ class Group(Entity):
         # return self.rel[name] if name is not None else self.rel  # old
         # return self.rel.get(name) if name else self.rel  # old sites handling
 
-        if self.rel.get(name) is None:
-            return False
-        return self._get_rel(self.rel.get(name))
+        if name not in self.rel.keys():
+            return None
+        if self.pop:
+            return self.pop.sites[self.rel[name]]
+        else:
+            return self.rel[name]
 
     def get_mass(self):
         return self.m
@@ -1575,8 +1633,7 @@ class Group(Entity):
     def gr(self, name=None):
         """See :meth:`~pram.entity.Group.get_rel` method."""
 
-        # return self.get_rel(name)  # old sites handling
-        return self._get_rel(name)
+        return self.get_rel(name)
 
     def ha(self, qry):
         """See :meth:`~pram.entity.Group.has_attr` method."""
@@ -1629,7 +1686,7 @@ class Group(Entity):
         """ Is the groups currently at the site specified? """
 
         # return self.has_rel({ Site.AT: site })  # old sites handling
-        return self.has_rel({ Site.AT: site.get_hash() })
+        return self.get_site_at() == site
 
     def is_at_site_name(self, name):
         """ Is the groups currently at the site with the name specified (that the group has as a relation)? """
@@ -1638,8 +1695,6 @@ class Group(Entity):
 
         if self.rel.get(name) is None:
             return False
-        # return self.has_rel({ Site.AT: self._get_rel(self.rel.get(name)) })
-        # return self.has_rel({ Site.AT: self.get_rel(name) })
         return self.rel.get(Site.AT) and self.rel[Site.AT] == self.rel.get(name)
 
     def is_void(self):
@@ -1669,7 +1724,7 @@ class Group(Entity):
         """Checks if the group matches the group query specified.
 
         Args:
-            qry (GroupQry): The query.
+            qry (GroupQry): The query.  A group automatially matches a None qry.
 
         Returns:
             bool: True if the group matches the query; False otherwise.
@@ -1767,7 +1822,7 @@ class Group(Entity):
         self.rel[name] = value
         self.hash = None
 
-        if name == Site.AT:
+        if self.pop and name == Site.AT:
             self.link_to_site_at()
 
         return self
@@ -1814,12 +1869,11 @@ class Group(Entity):
             specs (Iterable[GroupSplitSpec]): Group split specs.
         """
 
-        groups = []  # split result (i.e., new groups; note that those groups may already exist in the simulation)
+        # (1) Compute masses of new groups:
         p_sum = 0.0  # sum of split proportions (being probabilities, they must sum up to 1)
         m_sum = 0.0  # sum of total mass redistributed via group splitting
-
-        # Compute masses of new groups:
         m_lst = [0.0] * len(specs)
+
         for (i,s) in enumerate(specs):
             if i == len(specs) - 1:  # last group spec
                 p = 1 - p_sum        # complement the probability
@@ -1833,17 +1887,19 @@ class Group(Entity):
             p_sum += p
             m_sum += m
 
-            if p_sum == 1.0:  # the remaining split specs must have p=0 so we might as well skip them
+            if p_sum == 1.0:  # the remaining split specs must have p=0 so might as well skip them
                 break
 
-        # Round masses of new groups to integers:
+        # (2) Round masses of new groups to integers:
         if not self.pop.sim.get_pragma_fractional_mass():
             m_lst = saferound(m_lst,0)
 
-        # Instantiate new groups:
+        # (3) Instantiate new groups:
+        groups = []  # split result (i.e., new groups; note that those groups may already exist in the simulation)
+
         for (i,s) in enumerate(specs):
             m = m_lst[i]
-            if m == 0:  # preventing instantiating empty groups
+            if m == 0:  # don't instantiate empty groups
                 continue
 
             attr = Group.gen_dict(self.attr, s.attr_set, s.attr_del)

@@ -21,8 +21,8 @@ from pram.sim    import Simulation
 
 loc = [Site('a'), Site('b')]
 
-probe_loc = GroupSizeProbe.by_rel('loc', Site.AT, loc, msg_mode=ProbeMsgMode.DISP)
-probe_sim = GroupSizeProbe(
+probe_loc  = GroupSizeProbe.by_rel('loc', Site.AT, loc, msg_mode=ProbeMsgMode.DISP)
+probe_sim  = GroupSizeProbe(
     name='sim',
     queries=[
         GroupQry(attr={ 'team': 'blue' }, rel={ Site.AT: loc[0] }),
@@ -45,10 +45,10 @@ probe_sim = GroupSizeProbe(
         Group(m=300, attr={ 'team': 'blue' }, rel={ Site.AT: loc[1] }),
         Group(m=100, attr={ 'team': 'red'  }, rel={ Site.AT: loc[0] }),
         Group(m=400, attr={ 'team': 'red'  }, rel={ Site.AT: loc[1] }),
-        probe_loc  # the distribution should tend to 50%-50%
-        # probe_sim  # mass should tend to move towards two of the four sites
+        # probe_loc  # the distribution should tend to 50%-50%
+        probe_sim  # mass should tend to move towards two of the four sites
     ]).
-    run(100)
+    run(70)
 )
 
 
@@ -66,26 +66,23 @@ probe_sim = GroupSizeProbe(
 #
 # (Simulation().
 #     set().
-#         # rand_seed(1928).
 #         pragma_autocompact(True).
 #         pragma_live_info(False).
 #         fn_group_setup(grp_setup).
 #         done().
 #     add([
 #         SegregationModel('team', len(loc)),
-#         Group(n=500, attr={ 'team': 'blue' }),
-#         Group(n=500, attr={ 'team': 'red'  }),
+#         Group(m=500, attr={ 'team': 'blue' }),
+#         Group(m=500, attr={ 'team': 'red'  }),
 #         probe_loc
 #     ]).
-#     run(10)
+#     run(40)
 # )
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # (3) Simulation (synthetic Allegheny County population)
 
-# fpath_db = os.path.join(os.path.dirname(__file__), 'db', 'allegheny-students.sqlite3')
-#
 # # sites = [Site(450066968), Site(450086847), Site(450066968)]
 # # probe_loc = GroupSizeProbe.by_rel('site', Site.AT, sites, msg_mode=ProbeMsgMode.DISP)
 #
@@ -111,14 +108,14 @@ probe_sim = GroupSizeProbe(
 #         # rule(SegregationModel('race', len([1,2,3,5,6,7,8,9]))).
 #         probe(probe_loc).
 #         done().
-#     db(fpath_db).
+#     db(os.path.join(os.path.dirname(__file__), '..', 'data', 'allegheny-students.sqlite3')).
 #         gen_groups(
 #             tbl      = 'students',
+#             attr_fix = {},
+#             rel_fix  = {},
 #             attr_db  = ['sex'],
 #             # attr_db  = ['race'],
-#             rel_db   = [GroupDBRelSpec(name=Site.AT, col='school_id')],
-#             attr_fix = {},
-#             rel_fix  = {}
+#             rel_db   = [GroupDBRelSpec(name=Site.AT, col='school_id')]
 #         ).
 #         done().
 #     run(5)
