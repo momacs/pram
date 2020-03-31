@@ -331,23 +331,16 @@ class Site(Resource):
         self.cache_qry_to_m      = {}   # mass of population at this site
 
     def __eq__(self, other):
-        '''
-        We will make two sites identical if their keys are equal (i.e., object identity is not necessary).  This will
-        let us recognize sites even if they are instantiated multiple times.
-        '''
-
-        return isinstance(self, type(other)) and (self.__key() == other.__key())
+        return isinstance(self, type(other)) and (self.name == other.name) and (self.rel_name == other.rel_name) and (self.attr == other.attr)
 
     def __hash__(self):
-        # return hash(self.__key())
         if self.hash is None:
             self.hash = Site.gen_hash(self.name, self.rel_name, self.attr)
         return self.hash
 
     @staticmethod
-    def gen_hash(name, rel_name, attr=None):
-        attr = attr or {}
-        return xxhash.xxh64(json.dumps((name, rel_name, attr))).intdigest()  # .hexdigest()
+    def gen_hash(name, rel_name, attr={}):
+        return xxhash.xxh64(json.dumps((name, rel_name, attr), sort_keys=True)).intdigest()
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.__hash__())
@@ -445,7 +438,7 @@ class Site(Resource):
 
         return self.attr.get(name) if name is not None else self.attr
 
-    def get_groups(self, qry=None, non_empty_only=True):
+    def get_groups(self, qry=None, non_empty_only=False):
         """Returns groups which currently are at this site.
 
         The word "currently" is key here because as a PRAM simulation evolved, agents move between groups and different
@@ -534,12 +527,18 @@ class Site(Resource):
         #     self.cache_qry_to_m[qry] = m
         # return m
 
-        # if not qry:
-        #     return self.m
-        # else:
-        #     return math.fsum([g.m for g in self.get_groups(qry)])
+        # return math.fsum([g.m for g in self.get_groups(qry)])
 
-        return math.fsum([g.m for g in self.get_groups(qry)])
+        if not qry:
+            return self.m
+        else:
+            m = self.cache_qry_to_m.get(qry)
+            if m is None:
+                m = math.fsum(g.m for g in self.get_groups(qry))
+                self.cache_qry_to_m[qry] = m
+            # else:
+            #     print('hit')
+            return m
 
     def get_mass_prop(self, qry=None):
         """Get the proportion of the total mass accounted for the groups that match the query specified.  Only groups
@@ -596,9 +595,9 @@ class Site(Resource):
         self.cache_qry_to_m = {}
         return self
 
-    def toJson(self):
-        # return json.dumps(self, default=lambda o: o.__dict__)
-        return json.dumps(self.hash)
+    # def toJson(self):
+    #     # return json.dumps(self, default=lambda o: o.__dict__)
+    #     return json.dumps(self.hash)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -785,8 +784,7 @@ class GroupQry(object):
     def gen_hash(attr={}, rel={}, cond=[], full=False):
         # hash = xxhash.xxh64(json.dumps((attr, rel, cond, full), sort_keys=True, cls=EntityJSONEncoder)).intdigest()
         # hash = xxhash.xxh64(jsonpickle.encode((attr, rel, str([inspect.getsource(i) for i in cond], full))).intdigest()
-        hash = xxhash.xxh64(json.dumps((attr, rel, str([inspect.getsource(i) for i in cond]), full), sort_keys=True)).intdigest()
-        return hash
+        return xxhash.xxh64(json.dumps((attr, rel, str([inspect.getsource(i) for i in cond]), full), sort_keys=True)).intdigest()
 
     # def toJson(self):
     #     # return json.dumps(self, default=lambda o: o.__dict__)
@@ -1186,7 +1184,7 @@ class Group(Entity):
         return self.get_attr(name)
 
     @staticmethod
-    def gen_hash(attr, rel=None):
+    def gen_hash(attr={}, rel={}):
         """Generates the group's hash.
 
         Generates a hash for the attributes and relations dictionaries.  This sort of hash is desired because groups
@@ -1215,9 +1213,6 @@ class Group(Entity):
         Returns:
             int: A hash of the attributes and relations specified.
         """
-
-        attr = attr or {}
-        rel  = rel  or {}
 
         # return hash(tuple([frozenset(attr.items()), frozenset(rel.items())]))
         # return hashlib.sha1(json.dumps((attr, rel), sort_keys=True, cls=EntityJSONEncoder).encode('utf-8')).hexdigest()
@@ -1730,13 +1725,37 @@ class Group(Entity):
             bool: True if the group matches the query; False otherwise.
         """
 
+        if not qry:
+            return True
+
+        # if qry.full:
+        #     return qry.attr == self.attr and qry.rel == self.rel and all([fn(self) for fn in qry.cond])
+        # else:
+        #     return qry.attr.items() <= self.attr.items() and qry.rel.items() <= self.rel.items() and all([fn(self) for fn in qry.cond])
+
+        # Check where most time is spent when evaluating a group-query match:
         if qry.full:
-            return (qry.attr.items() == self.attr.items()) and (qry.rel.items() == self.rel.items()) and all([fn(self) for fn in qry.cond])
+            if len(qry.cond) == 0:
+                return self.matches_qry_full_cond0(qry)
+            else:
+                return self.matches_qry_full_cond1(qry)
         else:
-            return (
-                qry is None or
-                ((qry.attr.items() <= self.attr.items()) and (qry.rel.items() <= self.rel.items()) and all([fn(self) for fn in qry.cond]))
-            )
+            if len(qry.cond) == 0:
+                return self.matches_qry_part_cond0(qry)
+            else:
+                return self.matches_qry_part_cond1(qry)
+
+    def matches_qry_full_cond0(self, qry):
+        return qry.attr == self.attr and qry.rel == self.rel
+
+    def matches_qry_full_cond1(self, qry):
+        return self.matches_qry_full_cond0(qry) and all([fn(self) for fn in qry.cond])
+
+    def matches_qry_part_cond0(self, qry):
+        return qry.attr.items() <= self.attr.items() and qry.rel.items() <= self.rel.items()
+
+    def matches_qry_part_cond1(self, qry):
+        return self.matches_qry_part_cond0(qry) and all([fn(self) for fn in qry.cond])
 
     def set_attr(self, name, value, do_force=True):
         """Sets a group's attribute.

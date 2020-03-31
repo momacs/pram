@@ -473,11 +473,13 @@ class GroupPopulation(object):
         # qry_hash = xxhash.xxh64(json.dumps((attr, rel, cond, full), sort_keys=True, cls=EntityJSONEncoder)).intdigest()  # .hexdigest()
         # qry_hash = qry.__hash__()
         # print(qry_hash)
-        
+
         groups = self.cache.qry_to_groups.get(qry)
         if groups is None:
             groups = [g for g in self.groups.values() if g.matches_qry(qry)]
             self.cache.qry_to_groups[qry] = groups
+        # else:
+        #     print('hit')
         return groups
 
     def get_groups_mass(self, qry=None, hist_delta=0):
