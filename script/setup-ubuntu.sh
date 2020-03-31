@@ -47,7 +47,7 @@ if [ "$do_venv" -eq "1" ]; then
     python3 -m venv $name
     cd $name
     source ./bin/activate
-    
+
     git init
     git remote add origin https://github.com/momacs/$name
     git pull origin master
