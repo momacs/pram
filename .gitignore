@@ -44,7 +44,7 @@ __pycache__/
 /src/**/*.png
 
 # Dev:
-/src/dev
+#/src/dev
 /src/tmp
 
 # Sphinx docs:
