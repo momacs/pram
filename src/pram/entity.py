@@ -517,18 +517,6 @@ class Site(Resource):
             float: Mass
         """
 
-        # No optimization:
-        # return math.fsum(g.m for g in self.get_groups(qry))  # sum
-
-        # Cache results by GroupQry (currently doesn't work with attrs and looses groups with regular class due to a bug somewhere):
-        # m = self.cache_qry_to_m.get(qry)
-        # if m is None:
-        #     m = math.fsum(g.m for g in self.get_groups(qry))
-        #     self.cache_qry_to_m[qry] = m
-        # return m
-
-        # return math.fsum([g.m for g in self.get_groups(qry)])
-
         if not qry:
             return self.m
         else:
@@ -923,10 +911,6 @@ class Group(Entity):
 
         self.link_to_site_at()
 
-    # @classmethod
-    # def set_pop(cls, pop):
-    #     cls.pop  = pop
-
     def __eq__(self, other):
         """Compare this group to another.
 
@@ -953,44 +937,8 @@ class Group(Entity):
     def __str__(self):
         return '{}  name: {:16}  m: {:8}  attr: {}  rel: {}'.format(self.__class__.__name__, self.name or '.', round(self.m, 2), self.attr, self.rel)
 
-    def _isinstance(self, qry, type):
-        """
-        Checks if items in the 'qry' are all of the specified 'type'.  'qry' can be a dictionary, an iterable, or a
-        string.
-        """
-
-        if isinstance(qry, dict):
-            return all([isinstance(self.rel[i], type) for i in list(qry.items())])
-
-        if isinstance(qry, str):  # needs to be above the Iterable check because a string is an Iterable
-            return isinstance(self.rel[qry], type)
-
-        if isinstance(qry, Iterable):
-            return all([isinstance(self.rel[i], type) for i in qry])
-
-    # def _get_rel(self, key):
-    #     """Get relation.
-    #
-    #     This is the method that should be called internally when access to relations is required.  Depending on the
-    #     Group's object mode (i.e., standalone or group population bound), it will return the Site object referenced
-    #     properly.
-    #
-    #     Args:
-    #         key (int): The key to the dict of Site objects.  For standalond Group object, this is the key in the
-    #             self.rel dict.  For group population bound Group object, this is the hash of the Site object which is
-    #             stores in the ``pram.pop.GroupPopulation.sites`` dict.
-    #
-    #     Returns:
-    #         Site: The site sought or None if not found.
-    #     """
-    #
-    #     if self.pop:
-    #         return self.pop.sites.get(key)
-    #     else:
-    #         return self.rel.get(key)
-
-    @staticmethod
-    def _has(d, qry, used_set):
+    # @staticmethod
+    def _has(self, d, qry, used_set):
         """Checks if a dictionary has keys or key-value pairs specified.
 
         This method compares the dictionary ``d`` against ``qry`` which can be a mapping, an iterable, and a string.
@@ -1017,10 +965,8 @@ class Group(Entity):
         if isinstance(qry, dict):
             if used_set is not None:
                 used_set.update(qry.keys())
-            # print(d.items())
-            # print(qry.items())
-            # print(qry.items() <= d.items())
-            # print(qry.items() >= d.items())
+            if self.pop:
+                qry = { k:v.__hash__() if isinstance(v, Site) else v for (k,v) in qry.items() }  # TODO: Double-check this line
             return qry.items() <= d.items()
 
         if isinstance(qry, str):  # needs to be above the Iterable check because a string itself is an Iterable
@@ -1031,7 +977,9 @@ class Group(Entity):
         if isinstance(qry, Iterable):
             if used_set is not None:
                 used_set.update(qry)
-            return all(i in list(d.keys()) for i in qry)
+            if self.pop:
+                qry = [q.__hash__() if isinstance(q, Site) else q for q in qry]
+            return all(i in d.keys() for i in qry)
 
         raise TypeError(Err.type('qry', 'dictionary, Iterable, or string'))
 
@@ -1644,38 +1592,35 @@ class Group(Entity):
             bool
         """
 
-        return Group._has(self.attr, qry, self.attr_used)
+        return self._has(self.attr, qry, self.attr_used)
 
-    def has_rel(self, qry, are_sites=False):
+    def has_rel(self, qry):
         """Checks if the group has the specified relations.
 
         See :meth:`~pram.entity.Group._has` method for details on what ``qry`` can be and the specifics of the check.
 
-        Todo:
-            Remove the ``are_sites`` argument?
-
         Returns:
             bool
         """
 
-        return Group._has(self.rel, qry, self.rel_used)
+        return self._has(self.rel, qry, self.rel_used)
 
-    def has_sites(self, qry):
+    def has_sites(self, sites):
         """Checks if the groups has the sites specified.
 
         Args:
-            qry (Iterable[Site]): Sites required.
+            sites (Iterable[Site]): Sites the existence of which should be checked for.
 
         Returns:
             bool
         """
 
-        return Group._has(self.rel, qry, self.rel_used) and self._isinstance(qry, Site)
+        return self._has(self.rel, sites, self.rel_used)
 
-    def hr(self, qry, are_sites=False):
+    def hr(self, qry):
         """See :meth:`~pram.entity.Group.has_rel` method."""
 
-        return self.has_rel(qry, are_sites)
+        return self.has_rel(qry)
 
     def is_at_site(self, site):
         """ Is the groups currently at the site specified? """

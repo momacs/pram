@@ -348,7 +348,7 @@ class ProbePersistenceDB(ProbePersistence):
         probe_item = self.probes[DB.str_to_name(probe.name)]
         probe_item.ins_val.append([c.val for c in probe.consts] + vals)
 
-    def plot(self, probe, series, ylabel, xlabel='Iteration', figpath=None, figsize=(12,4), legend_loc='upper right', dpi=150, subplot_l=0.08, subplot_r=0.98, subplot_t=0.95, subplot_b=0.25):
+    def plot(self, probe, series, ylabel='Population mass', xlabel='Iteration', figpath=None, figsize=(12,4), legend_loc='upper right', dpi=150, subplot_l=0.08, subplot_r=0.98, subplot_t=0.95, subplot_b=0.25):
         """Plots data associated with a probe.
 
         Args:
@@ -614,15 +614,15 @@ class ProbeMsgMode(Flag):
 class Var(namedtuple('Var', ['name', 'type'])):
     """Probe's variable.
 
-    A probe can be in charge of storing multiple variables that relate to the state of the simulation as it evolves.  This
-    class shows how such a variable can be defined.
+    A probe can be in charge of storing multiple variables that relate to the state of the simulation as it evolves.
+    This class shows how such a variable can be defined.
 
     Args:
-        name (str): The variable's name.  If relational database persistence is used, this name will become the name of a
-            table column.  While PyPRAM escapes special characters, problematic names should be avoided (e.g., those
+        name (str): The variable's name.  If relational database persistence is used, this name will become the name of
+            a table column.  While PyPRAM escapes special characters, problematic names should be avoided (e.g., those
             containing spaces or weird characters).
-        type (str): The variable's type.  If relational database persistence is used, this needs to be a valid data types
-            of the RDBMS of choice.
+        type (str): The variable's type.  If relational database persistence is used, this needs to be a valid data
+            types of the RDBMS of choice.
     """
 
     pass
@@ -636,11 +636,11 @@ class Const(namedtuple('Const', ['name', 'type', 'val'])):
     how such a constant can be defined.
 
     Args:
-        name (str): The constants's name.  If relational database persistence is used, this name will become the name of a
-            table column.  While PyPRAM escapes special characters, problematic names should be avoided (e.g., those
-            containing spaces or weird characters).
-        type (str): The constants's type.  If relational database persistence is used, this needs to be a valid data types
-            of the RDBMS of choice.
+        name (str): The constants's name.  If relational database persistence is used, this name will become the name
+            of a table column.  While PyPRAM escapes special characters, problematic names should be avoided (e.g.,
+            those containing spaces or weird characters).
+        type (str): The constants's type.  If relational database persistence is used, this needs to be a valid data
+            types of the RDBMS of choice.
         val (Any): The variable's value (must match the ``type``, although in case of database persistence the driver
             or the RDBMS itself may attempt to cast).
     """

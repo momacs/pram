@@ -20,27 +20,27 @@ probe_grp_size_site = GroupSizeProbe.by_rel('site', Site.AT, sites.values(), msg
 
 (Simulation().
     add().
-        rule(GoToRule(TimeInt( 8,12), 0.4, 'home',  'work',  'Some agents leave home to go to work')).
-        rule(GoToRule(TimeInt(16,20), 0.4, 'work',  'home',  'Some agents return home from work')).
-        rule(GoToRule(TimeInt(16,21), 0.2, 'home',  'store', 'Some agents go to a store after getting back home')).
-        rule(GoToRule(TimeInt(17,23), 0.3, 'store', 'home',  'Some shopping agents return home from a store')).
-        rule(GoToRule(TimePoint(24),  1.0, 'store', 'home',  'All shopping agents return home after stores close')).
-        rule(GoToRule(TimePoint( 2),  1.0, None,    'home',  'All still-working agents return home')).
+        rule(GoToRule(0.4, 'home',  'work',  TimeInt( 8,12), memo='Some agents leave home to go to work')).
+        rule(GoToRule(0.4, 'work',  'home',  TimeInt(16,20), memo='Some agents return home from work')).
+        rule(GoToRule(0.2, 'home',  'store', TimeInt(16,21), memo='Some agents go to a store after getting back home')).
+        rule(GoToRule(0.3, 'store', 'home',  TimeInt(17,23), memo='Some shopping agents return home from a store')).
+        rule(GoToRule(1.0, 'store', 'home',  TimePoint(24),  memo='All shopping agents return home after stores close')).
+        rule(GoToRule(1.0, None,    'home',  TimePoint( 2),  memo='All still-working agents return home')).
         probe(probe_grp_size_site).
         done().
-    new_group(1000).
+    new_group(m=1000).
         set_rel(Site.AT, sites['home']).
         set_rel('home',  sites['home']).
         set_rel('work',  sites['work-a']).
         set_rel('store', sites['store-a']).
         done().
-    new_group(1000).
+    new_group(m=1000).
         set_rel(Site.AT, sites['home']).
         set_rel('home',  sites['home']).
         set_rel('work',  sites['work-b']).
         set_rel('store', sites['store-b']).
         done().
-    new_group(100).
+    new_group(m=100).
         set_rel(Site.AT, sites['home']).
         set_rel('home',  sites['home']).
         set_rel('work',  sites['work-c']).

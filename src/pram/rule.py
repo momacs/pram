@@ -12,6 +12,7 @@ import string
 
 from abc             import abstractmethod, ABC
 from attr            import attrs, attrib, converters
+from collections     import Iterable
 from dotmap          import DotMap
 from enum            import IntEnum
 from scipy.stats     import gamma, lognorm, norm, poisson, rv_discrete
@@ -1904,21 +1905,15 @@ class GoToRule(Rule):
 
     NAME = 'Goto'
 
-    def __init__(self, t, i, p, rel_from, rel_to, name_human=None, memo=None):
+    def __init__(self, p, rel_from, rel_to, t=TimeAlways(), i=IterAlways(), name_human=None, memo=None):
         super().__init__('goto', t, i, name_human, memo)
 
-        Err.type(rel_from, 'rel_from', str, True)
-        Err.type(rel_to, 'rel_to', str)
+        # Err.type(rel_from, 'rel_from', str, True)
+        # Err.type(rel_to, 'rel_to', str)
 
         self.p = p
         self.rel_from = rel_from  # if None, the rule will not be conditional on current location
         self.rel_to = rel_to
-
-    def __repr__(self):
-        return '{}(name={}, t={}, p={}, rel_from={}, rel_to={})'.format(self.__class__.__name__, self.name, self.t.t, self.p, self.rel_from, self.rel_to)
-
-    def __str__(self):
-        return 'Rule  name: {:16}  t: {}  p: {}  rel: {} --> {}'.format(self.name, self.t, self.p, self.rel_from, self.rel_to)
 
     def apply(self, pop, group, iter, t):
         return [
