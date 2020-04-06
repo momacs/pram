@@ -8,9 +8,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import pram.util as util
 
-from pram.data   import GroupSizeProbe, ProbeMsgMode
+from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistenceDB
 from pram.entity import Group, GroupDBRelSpec, GroupQry, Site
-from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, Rule, SEIRFluRule, TimeAlways, TimePoint
+from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, Rule, SEIRModel, TimeAlways, TimePoint
 from pram.sim    import Simulation
 
 
@@ -28,7 +28,7 @@ rand_seed = 1928
 pragma_live_info = True
 pragma_live_info_ts = False
 
-fpath_db_in  = os.path.join(os.path.dirname(__file__), 'allegheny.sqlite3')
+fpath_db_in = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data', 'allegheny-county', 'allegheny.sqlite3')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -53,10 +53,10 @@ site_home = Site('home')
 # ----------------------------------------------------------------------------------------------------------------------
 # (2) Probes:
 
-# n_schools = 8
-# few_schools = [sites['school'][k] for k in list(sites['school'].keys())[:n_schools]]
-#
-# probe_grp_size_schools = GroupSizeProbe('school', [GroupQry(rel={ Site.AT: s }) for s in few_schools], msg_mode=ProbeMsgMode.DISP)
+n_schools = 8
+few_schools = [sites['school'][k] for k in list(sites['school'].keys())[:n_schools]]
+
+probe_grp_size_schools = GroupSizeProbe('school', [GroupQry(rel={ Site.AT: s }) for s in few_schools], msg_mode=ProbeMsgMode.DISP)
 
 fpath_db = os.path.join(os.path.dirname(__file__), 'out-test-03c.sqlite3')
 
@@ -78,10 +78,10 @@ pp = ProbePersistenceDB(fpath_db)
         pragma_rule_analysis_for_db_gen(True).
         done().
     add().
-        rule(SEIRFluRule()).
+        rule(SEIRModel()).
         rule(ResetSchoolDayRule(TimePoint(7))).
         rule(GoToAndBackTimeAtRule(t_at_attr='t@school')).
-        rule(AttrRule()).
+        # rule(AttrRule()).
         probe(probe_grp_size_schools).
         done().
     gen_groups_from_db(

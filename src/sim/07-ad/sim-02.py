@@ -13,7 +13,7 @@ from scipy.stats import poisson
 from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
 from pram.rule   import Rule, TimeAlways
 from pram.sim    import Simulation
-from pram.util   import Time as TimeU
+from pram.util   import Time
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -23,7 +23,7 @@ class DoubleIncidenceADRule(Rule):
     Poisson distribution.
     '''
 
-    T_UNIT_MS = TimeU.MS.y
+    T_UNIT_MS = Time.MS.y
 
     AGE_0 = 65       # cutoff age for getting AD
     LAMBDA_0 = 0.01  # base Poisson rate (i.e., at cutoff age and until the first increase)

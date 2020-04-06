@@ -2129,7 +2129,7 @@ class SimpleFluProgressRule(Rule):
     def apply(self, pop, group, iter, t):
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
-            p_infection = group.get_site_at().get_groups_mass(GroupQry(attr={ 'flu': 'i' }))
+            p_infection = group.get_site_at().get_mass_prop(GroupQry(attr={ 'flu': 'i' }))
             return [
                 GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'i' }),
                 GroupSplitSpec(p=1 - p_infection, attr_set={ 'flu': 's' })
@@ -2208,7 +2208,7 @@ class SimpleFluProgressMoodRule(Rule):
     def apply(self, pop, group, iter, t):
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
-            p_infection = group.get_site_at().get_groups_mass(GroupQry(attr={ 'flu': 'i' }))
+            p_infection = group.get_site_at().get_mass_prop(GroupQry(attr={ 'flu': 'i' }))
 
             return [
                 GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'i', 'mood': 'annoyed' }),
@@ -2230,6 +2230,7 @@ class SimpleFluProgressMoodRule(Rule):
                 GroupSplitSpec(p=0.9)
             ]
 
+        print(group.ga('flu'))
         raise ValueError('Unknown flu state')
 
 

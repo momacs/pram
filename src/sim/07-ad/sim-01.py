@@ -9,7 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
 from pram.rule   import Rule, TimeAlways
 from pram.sim    import Simulation
-from pram.util   import Time as TimeU
+from pram.util   import Time
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ class GetADDetRule(Rule):
     Deterministic AD rule (i.e., after certain age an agent has AD and below that age they don't).
     '''
 
-    T_UNIT_MS = TimeU.MS.y
+    T_UNIT_MS = Time.MS.y
 
     AGE = 65 - 1  # cutoff age for getting AD
 
@@ -47,7 +47,7 @@ class GetADProbRule(Rule):
     healthy).
     '''
 
-    T_UNIT_MS = TimeU.MS.y
+    T_UNIT_MS = Time.MS.y
 
     AGE = 65 - 1  # cutoff age for getting AD
     P = 0.5       # the prob of getting AD after the cutoff age

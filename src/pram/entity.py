@@ -10,7 +10,6 @@ import hashlib
 import inspect
 import itertools
 import json
-import jsonpickle
 import math
 import numpy as np
 import os
@@ -1249,11 +1248,14 @@ class Group(Entity):
             inf(f'        Relations  from table : {[r.col for r in rel_db]}')
 
         # (2) Contruct the query:
-        qry = 'SELECT COUNT(*) AS m{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
+        cols = ', '.join(attr_db_keep + [r.col for r in rel_db])
+        cols_where = ' AND '.join([c + ' IS NOT NULL' for c in attr_db_keep + [r.col for r in rel_db]])
+        qry = 'SELECT COUNT(*) AS m{comma}{cols} FROM {tbl} {where} {group_by}{limit}'.format(
             tbl=tbl,
-            cols=', '.join(attr_db_keep + [r.col for r in rel_db]),
-            cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr_db_keep + [r.col for r in rel_db]]),
-            comma='' if len(attr_db_keep + [r.col for r in rel_db]) == 0 else ', ',
+            comma=', ' if len(cols) > 0 else '',
+            cols=cols,
+            where=f'WHERE {cols_where}' if len(cols_where) > 0 else '',
+            group_by=f'GROUP BY {cols}' if len(cols) > 0 else '',
             limit='' if limit <= 0 else f' LIMIT {limit}'
         )
 

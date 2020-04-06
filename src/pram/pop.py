@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Contains PRAM group and agent populations code."""
 
-import jsonpickle
 import math
 import xxhash
 
@@ -104,7 +103,7 @@ class GroupPopulation(object):
         self.is_frozen = False  # the simulation freezes the population on first run
 
         self.last_iter = DotMap(    # the most recent iteration info
-            mass_flow_tot = 0,      # total mass flow
+            mass_flow_tot = 0,      # total mass transferred
             mass_flow_specs = None  # a list of MassFlowSpec objects (i.e., the full picture of mass flow)
         )
 
@@ -286,7 +285,7 @@ class GroupPopulation(object):
         This method iterates through groups and for each applies all rules (that step is handled by the Group class
         itself in the :meth:`~pram.entity.Group.apply_rules` method).  The result of those rules applications is a list
         of new groups the original group should be split into.  When all the groups have been processed in this way,
-        and consequently all resulting groups have been defined, those resulting groups are used for mass distribution
+        and consequently all resulting groups have been defined, those resulting groups are used for mass transfer
         (which updates existing groups and creates new ones).  Note that "resulting" is different from "new" because a
         group might have been split into resulting groups of which one or more already exists in the group population.
         In other words, not all resulting groups (local scope) need to be new (global scope).
@@ -312,10 +311,10 @@ class GroupPopulation(object):
                 mass_flow_specs.append(MassFlowSpec(self.get_mass(), g, dst_groups_g))
                 src_group_hashes.add(g.get_hash())
 
-        if len(mass_flow_specs) == 0:  # no mass to distribute
+        if len(mass_flow_specs) == 0:  # no mass to transfer
             return self
 
-        return self.distribute_mass(src_group_hashes, mass_flow_specs, iter, t, is_sim_setup)
+        return self.transfer_mass(src_group_hashes, mass_flow_specs, iter, t, is_sim_setup)
 
     def archive(self):
         if self.hist_len == 0:
@@ -335,72 +334,6 @@ class GroupPopulation(object):
         """
 
         self.groups = { k:v for k,v in self.groups.items() if v.m > 0 }
-        return self
-
-    def distribute_mass(self, src_group_hashes, mass_flow_specs, iter, t, is_sim_setup):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
-        '''
-        Distributes the mass as described by the list of "destination" groups.  "Source" groups (i.e., those that
-        participate in mass distribution) have their masses reset before the distribution mass is tallied up.
-
-        Because this method is called only once per simulation iteration, it is a good place to put simulation-
-        wide computations that should happen after the iteration-specific computations have concluded.
-        '''
-
-        m_flow_tot = 0  # total mass flow
-
-        # Reset the mass of the groups being updated:
-        for h in src_group_hashes:
-            self.groups[h].m       = 0.0
-            # if not is_sim_setup:
-            #     # self.groups[h].m_delta = -self.groups[h].m
-            #     self.groups[h].archive()
-
-        # if not is_sim_setup:
-        #     for mfs in mass_flow_specs:
-        #         for g01 in mfs.dst:
-        #             g01.m_delta = -g01.m
-
-        for mfs in mass_flow_specs:
-            for g01 in mfs.dst:
-                g02 = self.groups.get(g01)
-
-                if g02 is not None:  # group already exists
-                    g02.m       += g01.m
-                    # g02.m_delta += g01.m
-                    # print(g02.m_delta)
-                else:                # group not found
-                    self.add_group(g01)
-                    # g01.m_delta = -g01.m
-
-                m_flow_tot += g01.m
-
-        # Save last iteration info:
-        self.last_iter.m_flow_tot = m_flow_tot
-        if self.do_keep_mass_flow_specs:
-            self.last_iter.mass_flow_specs = mass_flow_specs
-
-        # Save the trajectory state:
-        if self.sim.traj is not None:
-            self.sim.traj.save_state(mass_flow_specs)
-
-        # Relink groups to the sites they are currently at:
-        for s in self.sites.values():
-            s.reset_group_links()
-        for g in self.groups.values():
-            g.link_to_site_at()
-
-        # Finish up:
-        self.reset_cache()
-        self.archive()
-
         return self
 
     def do_post_iter(self):
@@ -651,6 +584,72 @@ class GroupPopulation(object):
 
         self.cache.qry_to_groups = {}
         self.cache.qry_to_m = {}
+        return self
+
+    def transfer_mass(self, src_group_hashes, mass_flow_specs, iter, t, is_sim_setup):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        '''
+        Transfers the mass as described by the list of "destination" groups.  "Source" groups (i.e., those that
+        participate in mass transfer) have their masses reset before the most-transfer mass is tallied up.
+
+        Because this method is called only once per simulation iteration, it is a good place to put simulation-
+        wide computations that should happen after the iteration-specific computations have concluded.
+        '''
+
+        m_flow_tot = 0  # total mass transferred
+
+        # Reset the mass of the groups being updated:
+        for h in src_group_hashes:
+            self.groups[h].m       = 0.0
+            # if not is_sim_setup:
+            #     # self.groups[h].m_delta = -self.groups[h].m
+            #     self.groups[h].archive()
+
+        # if not is_sim_setup:
+        #     for mfs in mass_flow_specs:
+        #         for g01 in mfs.dst:
+        #             g01.m_delta = -g01.m
+
+        for mfs in mass_flow_specs:
+            for g01 in mfs.dst:
+                g02 = self.groups.get(g01)
+
+                if g02 is not None:  # group already exists
+                    g02.m       += g01.m
+                    # g02.m_delta += g01.m
+                    # print(g02.m_delta)
+                else:                # group not found
+                    self.add_group(g01)
+                    # g01.m_delta = -g01.m
+
+                m_flow_tot += g01.m
+
+        # Save last iteration info:
+        self.last_iter.m_flow_tot = m_flow_tot
+        if self.do_keep_mass_flow_specs:
+            self.last_iter.mass_flow_specs = mass_flow_specs
+
+        # Save the trajectory state:
+        if self.sim.traj is not None:
+            self.sim.traj.save_state(mass_flow_specs)
+
+        # Relink groups to the sites they are currently at:
+        for s in self.sites.values():
+            s.reset_group_links()
+        for g in self.groups.values():
+            g.link_to_site_at()
+
+        # Finish up:
+        self.reset_cache()
+        self.archive()
+
         return self
 
 

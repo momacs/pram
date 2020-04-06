@@ -39,11 +39,9 @@ def signal_handler(signal, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 
-dpath_res    = os.path.join(os.sep, 'Volumes', 'd', 'pitt', 'sci', 'pram', 'res', 'fred')
-dpath_cwd    = os.path.dirname(__file__)
-fpath_db     = os.path.join(dpath_res, 'allegheny.sqlite3')
-fpath_sites  = os.path.join(dpath_cwd, 'allegheny-sites.pickle.gz')
-fpath_groups = os.path.join(dpath_cwd, 'allegheny-groups.pickle.gz')
+fpath_db     = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data', 'allegheny-county', 'allegheny.sqlite3')
+fpath_sites  = os.path.join(os.path.dirname(__file__), 'allegheny-sites.pickle.gz')
+fpath_groups = os.path.join(os.path.dirname(__file__), 'allegheny-groups.pickle.gz')
 
 do_remove_file_sites  = False
 do_remove_file_groups = False

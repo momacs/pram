@@ -2,7 +2,7 @@
 #
 # BSD 3-Clause License
 #
-# Copyright (c) 2018-2019, momacs, University of Pittsburgh
+# Copyright (c) 2018-2020, momacs, University of Pittsburgh
 #
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -399,6 +399,7 @@ import os
 import pickle
 import psutil
 import random
+import ray
 import sqlite3
 import statistics
 import time
@@ -892,7 +893,7 @@ class SimulationDBI(object):
     def done(self):
         return self.sim
 
-    def gen_groups(self, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, is_verbose=False):
+    def gen_groups(self, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0, is_verbose=False):
         """
         Usage example:
 
@@ -915,7 +916,7 @@ class SimulationDBI(object):
             )
         """
 
-        self.sim.gen_groups_from_db(self.fpath, tbl, attr_db, rel_db, attr_fix, rel_fix, rel_at, limit, is_verbose)
+        self.sim.gen_groups_from_db(self.fpath, tbl, attr_db, rel_db, attr_fix, rel_fix, attr_rm, rel_rm, rel_at, limit, is_verbose)
         return self
 
 
@@ -1034,6 +1035,7 @@ class SimulationSetter(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+@ray.remote
 class Simulation(object):
     '''
     A PRAM simulation.

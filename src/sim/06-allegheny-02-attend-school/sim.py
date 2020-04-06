@@ -42,11 +42,9 @@ def signal_handler(signal, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 
-dpath_res    = os.path.join(os.sep, 'Volumes', 'd', 'pitt', 'sci', 'pram', 'res', 'fred')
-dpath_cwd    = os.path.dirname(__file__)
-fpath_db_in  = os.path.join(dpath_res, 'allegheny.sqlite3')
-fpath_sites  = os.path.join(dpath_cwd, 'allegheny-sites.pickle.gz')
-fpath_groups = os.path.join(dpath_cwd, 'allegheny-groups.pickle.gz')
+fpath_db_in  = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data', 'allegheny-county', 'allegheny.sqlite3')
+fpath_sites  = os.path.join(os.path.dirname(__file__), 'allegheny-sites.pickle.gz')
+fpath_groups = os.path.join(os.path.dirname(__file__), 'allegheny-groups.pickle.gz')
 
 do_remove_file_sites  = False
 do_remove_file_groups = False
@@ -79,7 +77,7 @@ site_home = Site('home')
 # ----------------------------------------------------------------------------------------------------------------------
 # (2) Probes:
 
-fpath_db_out = os.path.join(dpath_cwd, 'out.sqlite3')
+fpath_db_out = os.path.join(os.path.dirname(__file__), 'out.sqlite3')
 
 if os.path.isfile(fpath_db_out):
     os.remove(fpath_db_out)
@@ -105,7 +103,7 @@ probe_school_pop_size = GroupSizeProbe(
     add_rule(GoToAndBackTimeAtRule(t_at_attr='t@school')).
     add_probe(probe_school_pop_size).
     gen_groups_from_db(
-        fpath_db_in,
+        fpath_db=fpath_db_in,
         tbl='people',
         attr_db=[],
         rel_db=[
@@ -114,8 +112,7 @@ probe_school_pop_size = GroupSizeProbe(
         ],
         attr_fix={},
         rel_fix={ 'home': site_home },
-        rel_at='home',
-        fpath=fpath_groups
+        rel_at='home'
     ).
     summary().
     run(3, do_disp_t=True)

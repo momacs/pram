@@ -118,7 +118,7 @@ import pram.util as util
 
 from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistenceDB
 from pram.entity import Group, GroupDBRelSpec, GroupQry, Site
-from pram.rule   import FluLocationRule, FluLocationAlleghenyRule, ProgressFluSimpleRule, ProgressFluSimpleAlleghenyRule
+from pram.rule   import SimpleFluLocationRule, SimpleFluProgressRule  #, FluLocationAlleghenyRule, ProgressFluSimpleAlleghenyRule
 from pram.sim    import Simulation
 
 
@@ -136,7 +136,7 @@ rand_seed = 1928
 pragma_live_info = True
 pragma_live_info_ts = False
 
-fpath_db_in  = os.path.join(os.path.dirname(__file__), 'allegheny-students.sqlite3')
+fpath_db_in = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data', 'allegheny-county', 'allegheny-students.sqlite3')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -211,11 +211,10 @@ probe_grp_size_flu_school_m03 = probe_grp_size_flu_school('school-m03', school_m
         pragma_rule_analysis_for_db_gen(True).
         done().
     add().
-        # rule(ProgressFluSimpleRule()).
-        # rule(FluLocationRule()).
-        rule(ProgressFluSimpleAlleghenyRule()).
-        rule(FluLocationAlleghenyRule()).
-        # probe(probe_grp_size_few_schools).
+        rule(SimpleFluProgressRule()).
+        # rule(ProgressFluSimpleAlleghenyRule()).
+        # rule(FluLocationAlleghenyRule()).
+            # probe(probe_grp_size_few_schools).
         probe(probe_grp_size_flu_school_l01).
         probe(probe_grp_size_flu_school_l02).
         probe(probe_grp_size_flu_school_l03).
