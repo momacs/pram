@@ -16,7 +16,7 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     url='https://github.com/momacs/pram',
     keywords=['agent-based', 'probabilistic', 'relational', 'model', 'simulation'],
-    packages=['pram', 'pram.models'],
+    packages=['pram', 'pram.model'],
     package_dir={'': 'src'},
     python_requires='>=3.6',
     install_requires=requires,
