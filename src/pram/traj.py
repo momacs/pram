@@ -26,6 +26,8 @@ from .signal import Signal
 from .sim    import Simulation
 from .util   import DB
 
+__all__ = ['TrajectoryError', 'Trajectory', 'TrajectoryEnsemble']
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 class TrajectoryError(Exception): pass

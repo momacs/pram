@@ -399,7 +399,6 @@ import os
 import pickle
 import psutil
 import random
-import ray
 import sqlite3
 import statistics
 import time
@@ -415,6 +414,8 @@ from .model.model import Model
 from .pop         import GroupPopulation, GroupPopulationHistory
 from .rule        import Rule, SimRule, IterAlways, IterPoint, IterInt
 from .util        import Err, FS, Size, Time
+
+__all__ = ['SimulationConstructionError', 'SimulationConstructionWarning', 'Simulation']
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1035,7 +1036,6 @@ class SimulationSetter(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-@ray.remote
 class Simulation(object):
     '''
     A PRAM simulation.

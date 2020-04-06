@@ -8,7 +8,9 @@ from attr        import attrs, attrib
 from collections import deque
 from dotmap      import DotMap
 
-from .entity import Group, GroupQry, Resource, Site, EntityJSONEncoder
+from .entity import Group, GroupQry, Resource, Site
+
+__all__ = ['MassFlowSpec', 'GroupPopulation', 'GroupPopulationHistory']
 
 
 # ----------------------------------------------------------------------------------------------------------------------

@@ -16,6 +16,8 @@ from dotmap import DotMap
 from .model import Model, ModelConstructionError, MCSolver, ODESolver
 from ..rule import TimeAlways, IterAlways, DiscreteInvMarkovChain, ODEDerivatives, ODESystemMass
 
+__all__ = ['SISModel', 'SIRModel', 'SIRSModel', 'SEIRModel', 'SEQIHRModel']
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # ODE models deriavatives:
