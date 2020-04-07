@@ -15,8 +15,8 @@ import numpy as np
 
 from attr                          import attrs, attrib
 from pandas.plotting               import autocorrelation_plot
-from statsmodels.tsa.stattools     import acf, pacf
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+# from statsmodels.tsa.stattools     import acf, pacf
+# from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
 
 # ----------------------------------------------------------------------------------------------------------------------

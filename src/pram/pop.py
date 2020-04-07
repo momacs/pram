@@ -9,7 +9,7 @@ from collections import deque
 from dotmap      import DotMap
 from functools   import lru_cache
 
-from .entity import Group, GroupQry, Resource, Site
+from .entity import Entity, Group, GroupQry, Resource, Site
 
 __all__ = ['MassFlowSpec', 'GroupPopulation', 'GroupPopulationHistory']
 
@@ -159,14 +159,18 @@ class GroupPopulation(object):
             #       an explicit indication of which dict the object is stored in.
             #       Important: Also look in GroupQry.__init__().
             for k,v in group.rel.items():
-                if isinstance(v, Site):
+                # if isinstance(v, Site):
+                #     self.add_site(v)
+                #     group.rel[k] = v.get_hash()
+                #     # group.rel[k] = self.add_site(v)
+                # if isinstance(v, Resource):
+                #     self.add_resource(v)
+                #     group.rel[k] = v.get_hash()
+                #     # group.rel[k] = self.add_resource(v)
+
+                if isinstance(v, Entity):
                     self.add_site(v)
                     group.rel[k] = v.get_hash()
-                    # group.rel[k] = self.add_site(v)
-                if isinstance(v, Resource):
-                    self.add_resource(v)
-                    group.rel[k] = v.get_hash()
-                    # group.rel[k] = self.add_resource(v)
 
             group.pop = self
             group.freeze()

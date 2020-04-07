@@ -22,7 +22,7 @@ import numpy as np
 
 from enum import IntEnum
 
-from pram.entity import GroupSplitSpec, Resource
+from pram.entity import GroupSplitSpec, Site
 from pram.rule   import Rule, TimeAlways
 from pram.sim    import HourTimer, Simulation
 
@@ -45,8 +45,8 @@ class TERule(Rule):
     def __init__(self, p_think=0.5, p_eat=0.5, is_verbose=False, memo=None):
         super().__init__('think-and-eat', memo=memo)
 
-        self.p_think = p_think
-        self.p_eat   = p_eat
+        self.p_think    = p_think
+        self.p_eat      = p_eat
         self.is_verbose = is_verbose
 
     def apply(self, pop, group, iter, t):
@@ -97,11 +97,11 @@ class TERule(Rule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 forks = {
-    'f1'  : Resource('f1'),
-    'f4'  : Resource('f4'),
-    'f6'  : Resource('f6'),
-    'f8'  : Resource('f8'),
-    'f11' : Resource('f11'),
+    'f1'  : Site('f1'),
+    'f4'  : Site('f4'),
+    'f6'  : Site('f6'),
+    'f8'  : Site('f8'),
+    'f11' : Site('f11'),
 }
 
 (Simulation().

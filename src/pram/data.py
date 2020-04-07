@@ -21,8 +21,9 @@ from enum        import IntEnum, Flag, auto
 from .entity import GroupQry
 from .util   import DB
 
-__all__ = ['ProbePersistenceMode', 'ProbePersistenceDB', 'ProbePersistenceFS', 'ProbePersistenceMem', 'ProbeMsgMode',
-    'Var', 'Const', 'Probe', 'GroupProbe', 'GroupAttrProbe', 'GroupSizeProbe'
+__all__ = [
+    'ProbePersistenceMode', 'ProbePersistenceDB', 'ProbePersistenceFS', 'ProbePersistenceMem', 'ProbeMsgMode', 'Var',
+    'Const', 'Probe', 'GroupProbe', 'GroupAttrProbe', 'GroupSizeProbe'
 ]
 
 

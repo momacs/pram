@@ -87,11 +87,12 @@ class Entity(ABC):
         Remove the ``id`` argument
     """
 
-    __slots__ = ('type', 'id')
+    __slots__ = ('type', 'id', 'pop')
 
-    def __init__(self, type, id):
+    def __init__(self, type, id, pop=None):
         self.type = type
         self.id   = id
+        self.pop  = pop
 
     def __repr__(self):
         return '{}()'.format(self.__class__.__name__)
@@ -99,9 +100,22 @@ class Entity(ABC):
     def __str__(self):
         return '{}  type: {}   id: {}'.format(self.__class__, self.type.name, self.id)
 
+    def set_pop(self, pop):
+        """Sets the group population.
+
+        Args:
+            pop (GroupPopulation): The group population.
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.pop = pop
+        return self
+
 
 # ----------------------------------------------------------------------------------------------------------------------
-class Resource(Entity):
+class Resource(Entity, ABC):
     """A resource entity.
 
     A resource is shared by multiple agents (e.g., a public bus).
@@ -122,8 +136,8 @@ class Resource(Entity):
 
     __slots__ = ('name', 'capacity', 'capacity_max')
 
-    def __init__(self, name, capacity_max=1):
-        super().__init__(EntityType.RESOURCE, '')
+    def __init__(self, name, capacity_max=1, pop=None):
+        super().__init__(EntityType.RESOURCE, '', pop)
 
         self.name = name
         self.capacity = 0
@@ -311,15 +325,14 @@ class Site(Resource):
 
     AT = '@'  # relation name for the group's current site
 
-    __slots__ = ('name', 'attr', 'rel_name', 'pop', 'm', 'groups', 'hash')
+    __slots__ = ('name', 'attr', 'rel_name', 'm', 'groups', 'hash')
 
     def __init__(self, name, attr=None, rel_name=AT, pop=None, capacity_max=1):
-        super().__init__(name, capacity_max)  # previously called as: (EntityType.SITE, '')
+        super().__init__(name, capacity_max, pop)  # previously called as: (EntityType.SITE, '')
 
         self.name     = name
         self.rel_name = rel_name    # name of the relation the site is the object of
         self.attr     = attr or {}
-        self.pop      = pop         # pointer to the population (can be set elsewhere too)
         self.m        = 0.0
         self.groups   = set()
 
@@ -451,7 +464,10 @@ class Site(Resource):
         #         #         groups.append(g)
         #         self.cache_qry_to_groups[qry.__hash__()] = groups
 
-        groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+        if not qry:
+            groups = self.groups
+        else:
+            groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
 
         if non_empty_only:
             return [g for g in groups if g.m > 0]
@@ -507,19 +523,6 @@ class Site(Resource):
 
         m = self.get_mass(qry)
         return (m, m / self.m if self.m > 0 else 0)
-
-    def set_pop(self, pop):
-        """Sets the group population.
-
-        Args:
-            pop (GroupPopulation): The group population.
-
-        Returns:
-            self: For method call chaining.
-        """
-
-        self.pop = pop
-        return self
 
     def reset_group_links(self):
         """Resets the groups located at the site and other cache and memoization data structures.
