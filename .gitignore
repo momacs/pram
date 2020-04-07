@@ -13,8 +13,6 @@
 /logic
 /notebooks
 /out
-/pram-vc
-/pramity
 /res
 /share
 /src-full-backup
@@ -28,6 +26,7 @@
 /is-root
 /mk-src-backup
 /pip-selfcheck.json
+/preamble.txt
 /pyvenv.cfg
 /setup.cfg
 /todo.txt
