@@ -1171,6 +1171,9 @@ class Simulation(object):
             self: For method call chaining.
         """
 
+        if probe.name in [p.name for probe in self.probes]:
+            raise SimulationConstructionError(f'Probe with that name ({probe.name}) already exists.')
+
         self.probes.append(probe)
         probe.set_pop(self.pop)
         return self
@@ -1752,6 +1755,15 @@ class Simulation(object):
 
     def get_pragma_rule_analysis_for_db_gen(self):
         return self.pragma.rule_analysis_for_db_gen
+
+    def get_probe(self, name):
+        for p in self.probes:
+            if p.name == name:
+                return p
+        return None
+
+    def get_probes(self):
+        return self.probes
 
     def get_state(self, do_camelize=True):
         """
