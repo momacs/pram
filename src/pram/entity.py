@@ -21,6 +21,7 @@ from abc             import ABC
 from attr            import attrs, attrib, converters, validators
 from collections.abc import Iterable
 from enum            import auto, unique, IntEnum
+from functools       import lru_cache
 from iteround        import saferound
 from scipy.stats     import rv_continuous
 
@@ -310,7 +311,7 @@ class Site(Resource):
 
     AT = '@'  # relation name for the group's current site
 
-    __slots__ = ('name', 'attr', 'rel_name', 'pop', 'm', 'groups', 'hash', 'cache_qry_to_groups', 'cache_qry_to_m')
+    __slots__ = ('name', 'attr', 'rel_name', 'pop', 'm', 'groups', 'hash')
 
     def __init__(self, name, attr=None, rel_name=AT, pop=None, capacity_max=1):
         super().__init__(name, capacity_max)  # previously called as: (EntityType.SITE, '')
@@ -324,12 +325,8 @@ class Site(Resource):
 
         self.hash = None  # computed lazily
 
-        # self.cache = DotMap(      # reset by the GroupPopulation object (that manages sites and groups) after mass transfer that crowns each iteration
-        #     qry_to_groups = {},   # groups currently at this site
-        #     qry_to_m      = {}    # mass of population at this site
-        # )
-        self.cache_qry_to_groups = {}   # groups currently at this site
-        self.cache_qry_to_m      = {}   # mass of population at this site
+        # self.cache_qry_to_groups = {}   # groups currently at this site
+        # self.cache_qry_to_m      = {}   # mass of population at this site
 
     def __eq__(self, other):
         return isinstance(self, type(other)) and (self.name == other.name) and (self.rel_name == other.rel_name) and (self.attr == other.attr)
@@ -408,25 +405,6 @@ class Site(Resource):
 
         return sites
 
-    @classmethod
-    def gen_from_db_tmp1(cls, sim, db_fpath, tbl, name_col, rel_name=AT, attr=[], limit=0):
-        """A legacy method pending non-immediate removal.
-
-        Goes together with Group.gen_from_db_tmp1().  See the comment :meth:`therein pram.entity.Group.gen_from_db_tmp1`.
-        """
-
-        if not os.path.isfile(db_fpath):
-            raise ValueError(f'The database does not exist: {db_fpath}')
-
-        # sites = {}
-        with DB.open_conn(db_fpath) as c:
-            for row in c.execute('SELECT {} FROM {}{}'.format(','.join(attr + [name_col]), tbl, '' if limit <= 0 else f' LIMIT {limit}')).fetchall():
-                s = cls(row[name_col], { a: row[a] for a in attr }, rel_name=rel_name)
-                # sites[s.get_hash()] = s
-                sim.pop.add_site(s)
-
-        # return sites
-
     def get_attr(self, name=None):
         """Retrieves attribute's value.
 
@@ -439,6 +417,7 @@ class Site(Resource):
 
         return self.attr.get(name) if name is not None else self.attr
 
+    @lru_cache(maxsize=None)
     def get_groups(self, qry=None, non_empty_only=False):
         """Returns groups which currently are at this site.
 
@@ -459,54 +438,27 @@ class Site(Resource):
             Implement memoization (probably of only all the groups, i.e., without accounting for the ``qry``).
         """
 
-        # No optimization:
-        # qry = qry or GroupQry()
-        # # qry.rel.update({ self.rel_name: self.get_hash() })
-        # qry.rel.update({ self.rel_name: self })
-        # groups = self.pop.get_groups(qry)
-        #
-        # if non_empty_only:
-        #     return [g for g in groups if g.m > 0]
+        # if not qry:
+        #     groups = self.groups
         # else:
-        #     return groups
+        #     groups = self.cache_qry_to_groups.get(qry.__hash__())
+        #     if groups is None:
+        #         groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+        #         # groups = []
+        #         # for gh in self.groups:
+        #         #     g = self.pop.groups[gh]
+        #         #     if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond]):
+        #         #         groups.append(g)
+        #         self.cache_qry_to_groups[qry.__hash__()] = groups
 
-        # Cache results by GroupQry (currently doesn't work with attrs and looses groups with regular class due to a bug somewhere):
-        # qry = qry or GroupQry()
-        # qry.rel.update({ self.rel_name: self })
-        #
-        # # if not qry in self.groups.keys():
-        # #     self.groups[qry] = self.pop.get_groups(qry)
-        # groups = self.cache_qry_to_groups.get(qry)
-        # if groups is None:
-        #     groups = self.pop.get_groups(qry)
-        #     self.cache_qry_to_groups[qry] = groups
-        #
-        # if non_empty_only:
-        #     return [g for g in groups if g.m > 0]
-        # else:
-        #     return groups
-
-        # Current attempt:
-        # groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
-
-        if not qry:
-            groups = self.groups
-        else:
-            groups = self.cache_qry_to_groups.get(qry.__hash__())
-            if groups is None:
-                groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
-                # groups = []
-                # for gh in self.groups:
-                #     g = self.pop.groups[gh]
-                #     if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond]):
-                #         groups.append(g)
-                self.cache_qry_to_groups[qry.__hash__()] = groups
+        groups = [g for g in self.groups if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
 
         if non_empty_only:
             return [g for g in groups if g.m > 0]
         else:
             return groups
 
+    @lru_cache(maxsize=None)
     def get_mass(self, qry=None):
         """Get the mass of groups that match the query specified.  Only groups currently residing at the site are
         searched.
@@ -518,16 +470,16 @@ class Site(Resource):
             float: Mass
         """
 
-        if not qry:
-            return self.m
-        else:
-            m = self.cache_qry_to_m.get(qry)
-            if m is None:
-                m = math.fsum(g.m for g in self.get_groups(qry))
-                self.cache_qry_to_m[qry] = m
-            # else:
-            #     print('hit')
-            return m
+        # if not qry:
+        #     return self.m
+        # else:
+        #     m = self.cache_qry_to_m.get(qry)
+        #     if m is None:
+        #         m = math.fsum(g.m for g in self.get_groups(qry))
+        #         self.cache_qry_to_m[qry] = m
+        #     return m
+
+        return math.fsum(g.m for g in self.get_groups(qry))
 
     def get_mass_prop(self, qry=None):
         """Get the proportion of the total mass accounted for the groups that match the query specified.  Only groups
@@ -578,15 +530,9 @@ class Site(Resource):
 
         self.groups = set()
         self.m = 0.0
-        # self.cache.qry_to_groups = {}
-        # self.cache.qry_to_m = {}
-        self.cache_qry_to_groups = {}
-        self.cache_qry_to_m = {}
+        self.get_mass.cache_clear()
+        self.get_groups.cache_clear()
         return self
-
-    # def toJson(self):
-    #     # return json.dumps(self, default=lambda o: o.__dict__)
-    #     return json.dumps(self.hash)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

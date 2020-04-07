@@ -7,6 +7,7 @@ import xxhash
 from attr        import attrs, attrib
 from collections import deque
 from dotmap      import DotMap
+from functools   import lru_cache
 
 from .entity import Group, GroupQry, Resource, Site
 
@@ -111,10 +112,10 @@ class GroupPopulation(object):
 
         self.do_keep_mass_flow_specs = do_keep_mass_flow_specs
 
-        self.cache = DotMap(
-            qry_to_groups = {},   # cache for get_groups(qry) calls
-            qry_to_m      = {}    # cache for get_groups_mass(qry) calls
-        )
+        # self.cache = DotMap(
+        #     qry_to_groups = {},   # cache for get_groups(qry) calls
+        #     qry_to_m      = {}    # cache for get_groups_mass(qry) calls
+        # )
 
     def __repr__(self):
         pass
@@ -434,6 +435,7 @@ class GroupPopulation(object):
         else:
             return len(self.groups)
 
+    @lru_cache(maxsize=None)
     def get_groups(self, qry=None):
         """Get groups that match the group query specified, or all groups if no query is specified.
 
@@ -448,41 +450,18 @@ class GroupPopulation(object):
             [Group]: List of groups (can be empty)
         """
 
-        # qry = qry or GroupQry()
-        # attr_set = set(qry.attr.items())
-        # rel_set  = set(qry.rel.items())
-        #
-        # ret = []
-        # for g in self.groups.values():
-        #     if (set(g.attr.items()) & attr_set == attr_set) and (set(g.rel.items()) & rel_set == rel_set):
-        #         ret.append(g)
-        #
-        # return ret
-
         if qry is None:
             return self.groups.values()
 
-        # return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items())]  # before 'qry.cond' got added
-        # return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+        # groups = self.cache.qry_to_groups.get(qry)
+        # if groups is None:
+        #     groups = [g for g in self.groups.values() if g.matches_qry(qry)]
+        #     self.cache.qry_to_groups[qry] = groups
+        # return groups
 
-        # if qry.full:
-        #     return [g for g in self.groups.values() if (qry.attr.items() == g.attr.items()) and (qry.rel.items() == g.rel.items()) and all([fn(g) for fn in qry.cond])]
-        # else:
-        #     return [g for g in self.groups.values() if (qry.attr.items() <= g.attr.items()) and (qry.rel.items() <= g.rel.items()) and all([fn(g) for fn in qry.cond])]
+        return [g for g in self.groups.values() if g.matches_qry(qry)]
 
-        # qry_hash = jsonpickle.encode(qry)
-        # qry_hash = xxhash.xxh64(json.dumps((attr, rel, cond, full), sort_keys=True, cls=EntityJSONEncoder)).intdigest()  # .hexdigest()
-        # qry_hash = qry.__hash__()
-        # print(qry_hash)
-
-        groups = self.cache.qry_to_groups.get(qry)
-        if groups is None:
-            groups = [g for g in self.groups.values() if g.matches_qry(qry)]
-            self.cache.qry_to_groups[qry] = groups
-        # else:
-        #     print('hit')
-        return groups
-
+    @lru_cache(maxsize=None)
     def get_groups_mass(self, qry=None, hist_delta=0):
         """Get the mass of groups that match the query specified.
 
@@ -575,19 +554,6 @@ class GroupPopulation(object):
         # return sum([g.m for g in self.groups.values()])
         return self.m
 
-    def reset_cache(self):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
-        self.cache.qry_to_groups = {}
-        self.cache.qry_to_m = {}
-        return self
-
     def transfer_mass(self, src_group_hashes, mass_flow_specs, iter, t, is_sim_setup):
         """
         Args:
@@ -649,7 +615,8 @@ class GroupPopulation(object):
             g.link_to_site_at()
 
         # Finish up:
-        self.reset_cache()
+        self.get_groups.cache_clear()
+        self.get_groups_mass.cache_clear()
         self.archive()
 
         return self
