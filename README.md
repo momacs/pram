@@ -1,4 +1,4 @@
-# Probabilistic Relational Agent-Based Modeling (PRAM) Framework
+# Probabilistic Relational Agent-Based Models (PRAMs)
 
 Probabilistic Relational Agent-based Models (PRAMs) is a modeling and simulation framework that puts agent-based models (ABMs) on a sound probabilistic foundation. When compared to equivalent ABMs, PRAMs are:
 
@@ -55,45 +55,35 @@ Front-end:
 
 
 ## Setup
+
+You can install PyPRAM like so:
+
+```
+pip install git+https://github.com/momacs/pram.git
+```
+
+To install all extra dependencies instead, do:
+
+```
+pip install git+https://github.com/momacs/pram.git#egg=pram[all]
+```
+
+Remember to activate your `venv` of choice unless you want to go system-level.
+
+### The `momacs` Utility
+
+To create a new `venv` and install PyPRAM inside of it, use the [`momacs`](https://github.com/momacs/misc) command-line utility like so:
+
+```
+momacs app-pram setup
+```
+
 ### Ubuntu
 
-The [`setup-ubuntu.sh`](https://github.com/momacs/pram/blob/master/script/setup-ubuntu.sh) script is the preferred method of deploying the package onto a fresh installation of the Ubuntu Server/Desktop (tested with 18.04 LTS).  The `do_env` variable controls whether the package and its dependencies are installed inside a Python `venv` (yes by default).  The setup script can be downloaded and run like so:
+The [`setup-ubuntu.sh`](https://github.com/momacs/pram/blob/master/script/setup-ubuntu.sh) script is the preferred method of deploying the package and all its dependencies (including the system-level ones) onto a fresh installation of the Ubuntu Server/Desktop (tested with 18.04 LTS).  This is ideal for initializing virtual machine images.  The `do_env` variable controls whether the package and its dependencies are installed inside a Python `venv` (yes by default).  The setup script can be downloaded and executed like so:
 
 ```
 sh -c "$(wget https://raw.githubusercontent.com/momacs/pram/master/script/setup-ubuntu.sh -O -)"
-```
-
-### Python Package Only (`venv`)
-
-The following shell script creates a Python virtual environment (`venv`), activates it, downloads the source code of PRAM into it, and installs all Python dependencies.  It does not however install the system-level dependencies (e.g., [`graph-tool`](https://graph-tool.skewed.de/)).
-
-```
-#!/bin/sh
-
-name=pram
-
-[[ -d $name ]] && echo "Directory '$name' already exists." && exit 1
-
-python3 -m venv $name
-cd $name
-source ./bin/activate
-
-git init
-git remote add origin https://github.com/momacs/$name
-git pull origin master
-
-[ -f requirements.txt ] && python -m pip install -r requirements.txt
-```
-
-The same result can be achieved with one of the commands of the [`momacs`](https://github.com/momacs/misc) command-line utility.  Another command can be used subsequently to update an existing PRAM `venv` with the latest version of the source code from the present repository.  These two commands are, respectively:
-```
-momacs app-pram setup
-momacs app-pram update
-```
-
-Once a PRAM `venv` has been activated, running the following will display results of a simple simulation:
-```
-python src/sim/01-simple/sim.py
 ```
 
 
