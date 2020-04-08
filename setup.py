@@ -1,8 +1,8 @@
 import setuptools
 
-requires = ['attrs', 'cloudpickle', 'dotmap', 'iteround', 'matplotlib', 'numpy', 'psutil', 'scipy', 'xxhash']
+requires = ['attrs', 'cloudpickle', 'dotmap', 'iteround', 'matplotlib', 'networkx', 'numpy', 'psutil', 'scipy', 'xxhash']
 extras = {
-    'vis': ['altair', 'selenium', 'PyRQA']
+    'vis': ['altair', 'altair-saver', 'selenium', 'pycairo', 'PyRQA']
 }
 extras['all'] = [set(i for j in extras.values() for i in j)]
 
