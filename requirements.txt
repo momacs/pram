@@ -12,4 +12,5 @@ pycairo==1.19.1
 PyRQA==5.1.0
 scipy==1.4.1
 selenium==3.141.0
+sortedcontainers==2.1.0
 xxhash==1.4.3
