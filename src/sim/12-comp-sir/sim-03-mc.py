@@ -20,7 +20,7 @@ from scipy.stats import truncnorm, uniform
 from pram.entity      import Group, GroupSplitSpec
 from pram.model.model import MCSolver
 from pram.model.epi   import SIRSModel
-from pram.rule        import ODESystemMass, GammaDistributionProcess, IterAlways, IterInt, TimeAlways
+from pram.rule        import GammaDistributionProcess, IterAlways, IterInt, TimeAlways
 from pram.sim         import Simulation
 from pram.traj        import Trajectory, TrajectoryEnsemble
 
