@@ -2,11 +2,6 @@
 A simulation implementing the SIRS model of infectious disease spread in a population.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from pram.data        import ProbePersistenceDB, ProbeMsgMode, GroupSizeProbe
 from pram.entity      import Group, GroupQry, GroupSplitSpec
 from pram.model.model import MCSolver

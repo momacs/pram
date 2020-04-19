@@ -2,10 +2,6 @@
 A simulation testing a group-state-aware school attending system.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from pram.data   import GroupSizeProbe, ProbeMsgMode
 from pram.entity import Site
 from pram.rule   import GoToAndBackTimeAtRule, ResetSchoolDayRule, TimePoint

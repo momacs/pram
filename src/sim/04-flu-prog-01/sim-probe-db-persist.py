@@ -2,13 +2,6 @@
 A simulation implementing the flu progression model.  This version tests probe database persistence.
 '''
 
-import os
-import sys
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from pram.sim    import Simulation
 from pram.entity import GroupQry, GroupSplitSpec
 from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistenceDB

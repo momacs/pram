@@ -3,10 +3,6 @@ A simulation of agents going from home to work and then, sometimes, to a store a
 testing the mechanics of a simulation, this module mainly tests the GoToRule rule.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from pram.data   import GroupSizeProbe, ProbeMsgMode
 from pram.entity import GroupQry, Site
 from pram.rule   import GoToRule, TimeInt, TimePoint

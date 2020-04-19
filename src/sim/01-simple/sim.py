@@ -2,11 +2,6 @@
 Several simple simulations testing various early-development aspects of PRAM.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))  # 'rules' module
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from pram.data   import GroupSizeProbe, ProbeMsgMode
 from pram.entity import Group, GroupQry, GroupSplitSpec, Site
 from pram.rule   import GoToRule, DiscreteInvMarkovChain, TimeInt

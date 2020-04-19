@@ -3,11 +3,6 @@ A simulation implementing the SIRS model of infectious disease spread in a popul
 probe plotting.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from pram.data      import ProbePersistenceMem, GroupSizeProbe
 from pram.entity    import Group
 from pram.model.epi import SIRSModel
@@ -25,10 +20,19 @@ p = GroupSizeProbe.by_attr('flu', 'flu', ['s', 'i', 'r'], persistence=ProbePersi
 )
 
 series = [
-    { 'var': 'p0', 'lw': 0.75, 'linestyle': '-',  'marker': 'o', 'color': 'red',   'markersize': 0, 'lbl': 'S' },
-    { 'var': 'p1', 'lw': 0.75, 'linestyle': '--', 'marker': '+', 'color': 'blue',  'markersize': 0, 'lbl': 'I' },
-    { 'var': 'p2', 'lw': 0.75, 'linestyle': ':',  'marker': 'x', 'color': 'green', 'markersize': 0, 'lbl': 'R' }
+    { 'var': 'p0', 'lw': 0.75, 'ls': 'solid',  'marker': 'o', 'color': 'red',   'ms': 0, 'lbl': 'S' },
+    { 'var': 'p1', 'lw': 0.75, 'ls': 'dashed', 'marker': '+', 'color': 'blue',  'ms': 0, 'lbl': 'I' },
+    { 'var': 'p2', 'lw': 0.75, 'ls': 'dotted', 'marker': 'x', 'color': 'green', 'ms': 0, 'lbl': 'R' }
 ]
-p.plot(series, figsize=(16,3))
+p.plot(series)
+
+    # series = [
+    #     { 'var': f'{quantity}_S', 'lw': 1.50, 'ls': 'solid', 'dashes': (4,8), 'marker': '+', 'color': 'blue',   'ms': 0, 'lbl': 'S' },
+    #     { 'var': f'{quantity}_E', 'lw': 1.50, 'ls': 'solid', 'dashes': (1,0), 'marker': '+', 'color': 'orange', 'ms': 0, 'lbl': 'E' },
+    #     { 'var': f'{quantity}_I', 'lw': 1.50, 'ls': 'solid', 'dashes': (5,1), 'marker': '*', 'color': 'red',    'ms': 0, 'lbl': 'I' },
+    #     { 'var': f'{quantity}_R', 'lw': 1.50, 'ls': 'solid', 'dashes': (5,6), 'marker': '|', 'color': 'green',  'ms': 0, 'lbl': 'R' },
+    #     { 'var': f'{quantity}_X', 'lw': 1.50, 'ls': 'solid', 'dashes': (1,2), 'marker': 'x', 'color': 'black',  'ms': 0, 'lbl': 'X' }
+    # ]
+    # sim.probes[0].plot(series, ylabel='Population mass', figsize=(12,4), subplot_b=0.15)
 
 # print(p.get_data())
