@@ -308,6 +308,9 @@ class GroupPopulation(object):
 
         Returns:
             self: For method call chaining.
+
+        Todo:
+            Optimize by using hashes if groups already exist and Group objects if they don't.
         """
 
         mass_flow_specs = []
@@ -393,8 +396,9 @@ class GroupPopulation(object):
         # self.groups = { g.get_hash(): g for g in self.groups.values() }
 
         self.is_frozen = True
-        if self.sim.traj is not None and not self.sim.timer.i > 0:  # we check timer not to save initial state of a simulation that's been run already
-            self.sim.traj.save_state(None)
+        # if self.sim.traj is not None and not self.sim.timer.i > 0:  # we check timer not to save initial state of a simulation that's been run before
+        #     self.sim.traj.save_state(None)
+        self.sim.save_state(None)
 
         return self
 
@@ -609,8 +613,10 @@ class GroupPopulation(object):
             self.last_iter.mass_flow_specs = mass_flow_specs
 
         # Save the trajectory state:
-        if self.sim.traj is not None:
-            self.sim.traj.save_state(mass_flow_specs)
+        # if self.sim.traj is not None:
+        #     self.sim.traj.save_state(mass_flow_specs)
+        self.sim.save_state(mass_flow_specs)
+        # self.sim.save_state([mfs.m_pop for mfs in mass_flow_specs])
 
         # Relink groups to the sites they are currently at:
         for s in self.sites.values():

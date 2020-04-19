@@ -575,6 +575,18 @@ class SimulationSetter(object):
         self.sim.set_cb_before_iter(fn)
         return self
 
+    def cb_check_work(self, fn):
+        self.sim.set_cb_check_work(fn)
+        return self
+
+    def cb_save_state(self, fn):
+        self.sim.set_cb_save_state(fn)
+        return self
+
+    def cb_upd_progress(self, fn):
+        self.sim.set_cb_upd_progress(fn)
+        return self
+
     def done(self):
         return self.sim
 
@@ -1293,6 +1305,17 @@ class Simulation(object):
         self.add_groups(groups)
         return self
 
+    def get_iter_reg_init(self):
+        """
+        A simulation iteration can be regular or initial-condition which depends on the simulation timer running or
+        not.
+
+        Returns:
+            int: If the iteration is regular, it is returned (i.e., >= 0); -1 otherwise.
+        """
+
+        return self.timer.i if self.timer.is_running else -1
+
     @staticmethod
     def gen_sites_from_db(fpath_db, fn_gen=None, fpath=None, is_verbose=False, pragma_live_info=False, pragma_live_info_ts=False):
         """
@@ -1634,8 +1657,11 @@ class Simulation(object):
         """
 
         self.cb = DotMap(
-            after_iter  = None,
-            before_iter = None
+            after_iter   = None,
+            before_iter  = None,
+            check_work   = None,
+            save_state   = None,
+            upd_progress = None
         )
         return self
 
@@ -1798,7 +1824,8 @@ class Simulation(object):
             self.compact()
 
         # Save last-iter info:
-        self.comp_hist.mem_iter.append(psutil.Process(self.pid).memory_full_info().uss)
+        # self.comp_hist.mem_iter.append(psutil.Process(self.pid).memory_full_info().uss)  # TODO: ray doesn't work with memory_full_info() (access denied)
+        self.comp_hist.mem_iter.append(0)
         self.comp_hist.t_iter.append(Time.ts() - ts_sim_0)
 
         # Force probes to capture the initial state:
@@ -1845,7 +1872,8 @@ class Simulation(object):
                 r.apply(self, self.timer.get_i(), self.timer.get_t())
 
             # Save last-iter info:
-            self.comp_hist.mem_iter.append(psutil.Process(self.pid).memory_full_info().uss)
+            # self.comp_hist.mem_iter.append(psutil.Process(self.pid).memory_full_info().uss)  # TODO: ray doesn't work with memory_full_info() (access denied)
+            self.comp_hist.mem_iter.append(0)
             self.comp_hist.t_iter.append(Time.ts() - ts_iter_0)
 
             # Run probes:
@@ -1884,8 +1912,16 @@ class Simulation(object):
                 self._inf(f'    Compacting the model')
                 self.compact()
 
-            if self.cb.after_iter is not None:
+            # Callbacks:
+            if self.cb.after_iter:
                 self.cb.after_iter(self)
+
+            if self.cb.upd_progress:
+                self.cb.upd_progress(i, iter_or_dur)
+
+            if self.cb.check_work:
+                while not self.cb.check_work():
+                    time.sleep(0.1)
 
         self.timer.stop()
 
@@ -1923,13 +1959,15 @@ class Simulation(object):
 
         self.comp_hist.t_sim = Time.ts() - ts_sim_0
 
-        if self.pragma.comp_summary:
-            self.run__comp_summary()
+        self.run__comp_summary()
 
         return self
 
     def run__comp_summary(self):
         """Called by run() to display computational summary."""
+
+        if not self.pragma.comp_summary:
+            return
 
         if len(self.comp_hist.mem_iter) == 0:
             print('No computational summary to display')
@@ -1996,6 +2034,20 @@ class Simulation(object):
         self._pickle(fpath, gzip.GzipFile)
         return self
 
+    def save_state(self, mass_flow_specs=None):
+        if self.cb.save_state and mass_flow_specs:
+            self.cb.save_state(mass_flow_specs)
+
+        if self.traj is None:
+            return self
+
+        if self.timer.i > 0:  # we check timer not to save initial state of a simulation that's been run before
+            self.traj.save_state(None)
+        else:
+            self.traj.save_state(mass_flow_specs)
+
+        return self
+
     def set(self):
         return SimulationSetter(self)
 
@@ -2021,6 +2073,42 @@ class Simulation(object):
         """
 
         self.cb.before_iter = fn
+        return self
+
+    def set_cb_check_work(self, fn):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.cb.check_work = fn
+        return self
+
+    def set_cb_save_state(self, fn):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.cb.save_state = fn
+        return self
+
+    def set_cb_upd_progress(self, fn):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.cb.upd_progress = fn
         return self
 
     def set_fn_group_setup(self, fn):
@@ -2343,3 +2431,9 @@ class Simulation(object):
         print('\n' * end_line_cnt[1], end='')
 
         return self
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# @ray.remote
+# class SimulationRemote(Simulation):
+#     pass

@@ -9,24 +9,42 @@
 
 import altair as alt
 import gc
+import json
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+# import pickle
+# import dill as pickle
+import cloudpickle as pickle
 import random
+import ray
+import socket
 import sqlite3
+import time
+import tqdm
 
 from dotmap              import DotMap
 from pyrqa.neighbourhood import FixedRadius
 from scipy.fftpack       import fft
 from scipy               import signal
+from sortedcontainers    import SortedDict
 
 from .data   import ProbePersistenceDB
 from .graph  import MassGraph
 from .signal import Signal
 from .sim    import Simulation
-from .util   import DB
+from .util   import DB, Size, Time
 
-__all__ = ['TrajectoryError', 'Trajectory', 'TrajectoryEnsemble']
+__all__ = ['ClusterInf', 'TrajectoryError', 'Trajectory', 'TrajectoryEnsemble']
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class ClusterInf(object):
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def get_args(self):
+        return self.kwargs
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -81,7 +99,7 @@ class Trajectory(object):
         return (f, fft)
 
     def compact(self):
-        self.rem_mass_graph()
+        self.mass_graph = None
         return self
 
     def gen_agent(self, n_iter=-1):
@@ -102,6 +120,9 @@ class Trajectory(object):
     def get_signal(self, do_prob=False):
         self._check_ens()
         return self.ens.get_signal(self, do_prob)
+
+    def get_sim(self):
+        return self.sim
 
     def get_time_series(self, group_hash):
         self._check_ens()
@@ -170,10 +191,6 @@ class Trajectory(object):
         plot = self.ens.plot_mass_locus_streamgraph(self, size, filepath, iter_range, do_sort, do_ret_plot)
         return plot if do_ret_plot else self
 
-    def rem_mass_graph(self):
-        self.mass_graph = None
-        return self
-
     def run(self, iter_or_dur=1):
         if self.sim is not None:
             self.sim.set_pragma_analyze(False)
@@ -185,7 +202,7 @@ class Trajectory(object):
         self.ens.save_sim(self)
         return self
 
-    def save_state(self, mass_flow_specs):
+    def save_state(self, mass_flow_specs=None):
         self._check_ens()
         self.ens.save_state(self, mass_flow_specs)
         return self
@@ -225,11 +242,12 @@ class TrajectoryEnsemble(object):
         );
 
         CREATE TABLE iter (
-        id      INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        traj_id INTEGER,
-        i       INTEGER NOT NULL,
-        host    TEXT NOT NULL,
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        traj_id   INTEGER,
+        i         INTEGER NOT NULL,
+        host_name TEXT,
+        host_ip   TEXT,
         UNIQUE (traj_id, i),
         CONSTRAINT fk__iter__traj FOREIGN KEY (traj_id) REFERENCES traj (id) ON UPDATE CASCADE ON DELETE CASCADE
         );
@@ -259,7 +277,7 @@ class TrajectoryEnsemble(object):
 
         CREATE TABLE grp (
         id      INTEGER PRIMARY KEY AUTOINCREMENT,
-        hash    TEXT NOT NULL UNIQUE,
+        hash    INTEGER NOT NULL UNIQUE,
         attr    BLOB,
         rel     BLOB
         );
@@ -299,10 +317,10 @@ class TrajectoryEnsemble(object):
     FLUSH_EVERY = 16  # frequency of flushing data to the database
     WEBDRIVER = 'chrome'  # 'firefox'
 
-    def __init__(self, fpath_db=None, do_load_sims=True, flush_every=FLUSH_EVERY):
+    def __init__(self, fpath_db=None, do_load_sims=True, cluster_inf=None, flush_every=FLUSH_EVERY):
+        self.cluster_inf = cluster_inf
         self.traj = {}  # index by DB ID
         self.conn = None
-        self.hosts = []  # hostnames of machines that will run trajectories
 
         self.pragma = DotMap(
             memoize_group_ids = False  # keep group hash-to-db-id map in memory (faster but increases memory utilization)
@@ -1164,19 +1182,69 @@ class TrajectoryEnsemble(object):
 
         return self
 
-    def run(self, iter_or_dur=1, do_memoize_group_ids=False):
-        '''
-        Parallelization
-            https://docs.python.org/2/library/multiprocessing.html
-            https://pyfora.readthedocs.io
-        '''
-
+    def run(self, iter_or_dur=1):
         if iter_or_dur < 1:
             return
 
+        if not self.cluster_inf:
+            return self.run__seq(iter_or_dur)
+        else:
+            return self.run__par(iter_or_dur)
+
+    def run__seq(self, iter_or_dur=1):
+        ts_sim_0 = Time.ts()
+        traj_col = len(str(len(self.traj)))
         for i,t in enumerate(self.traj.values()):
-            print(f'Running trajectory {i+1} of {len(self.traj)} (iter count: {iter_or_dur}): {t.name or "unnamed simulation"}')
-            t.run(iter_or_dur)
+            # print(f'Running trajectory {i+1} of {len(self.traj)} (iter count: {iter_or_dur}): {t.name or "unnamed simulation"}')
+            with TqdmUpdTo(total=iter_or_dur, miniters=1, desc=f'traj: {i+1:>{traj_col}} of {len(self.traj):>{traj_col}},  iters:{Size.b2h(iter_or_dur, False)}', bar_format='{desc}  |{bar}| {percentage:3.0f}% [{elapsed}<{remaining}, {rate_fmt}{postfix}]', dynamic_ncols=True, ascii=' 123456789.') as pbar:
+                t.sim.set_cb_upd_progress(lambda i,n: pbar.update_to(i+1))
+                t.run(iter_or_dur)
+                t.sim.set_cb_upd_progress(None)
+        print(f'Total time: {Time.tsdiff2human(Time.ts() - ts_sim_0)}')
+        self.save_sims()
+        self.is_db_empty = False
+        return self
+
+    def run__par(self, iter_or_dur=1):
+        # TODO: Make sure probe persistance is present in no simulation.
+
+        ts_sim_0 = Time.ts()
+        try:
+            ray.init(**self.cluster_inf.get_args())
+
+            n_nodes = len(ray.nodes())
+            n_cpu   = int(ray.cluster_resources()['CPU'])
+            n_traj  = len(self.traj)
+            n_iter  = n_traj * iter_or_dur
+
+            work_collector = WorkCollector.remote(500)
+            progress_mon = ProgressMonitor.remote()
+
+            for t in self.traj.values():
+                t.sim.traj = None  # sever the link
+                    # TODO: Do we need to restore this link later?  The Worker severs this link as well BTW
+
+            workers = [Worker(i, t.id, t.sim, iter_or_dur, work_collector, progress_mon) for (i,t) in enumerate(self.traj.values())]
+
+            wait_ids = [start_worker.remote(w) for w in workers]
+            time.sleep(1)
+            with TqdmUpdTo(total=n_iter, miniters=1, desc=f'nodes:{n_nodes}  cpus:{n_cpu}  trajs:{n_traj}  iters:{n_traj}×{iter_or_dur}={Size.b2h(n_iter, False)}', bar_format='{desc}  |{bar}| {percentage:3.0f}% [{elapsed}<{remaining}, {rate_fmt}{postfix}]', dynamic_ncols=True, ascii=' 123456789.') as pbar:
+                while len(wait_ids) > 0:
+                    done_id, wait_ids = ray.wait(wait_ids, timeout=0.1)
+                    self.save_state__par(ray.get(work_collector.get.remote()))
+                    pbar.update_to(ray.get(progress_mon.get_i.remote()))
+
+            #     sys.stdout.write('\r')
+            #     sys.stdout.write(ray.get(progress_mon.get_rep.remote()))
+            #     sys.stdout.flush()
+            # sys.stdout.write('\n')
+
+            progress_mon.rem_all_workers.remote()
+            time.sleep(random.random() * 2)  # lower the chance of simulations ending at the exact same time
+        finally:
+            if self.cluster_inf.get_args().get('address') is None:
+                ray.shutdown()
+            print(f'Total time: {Time.tsdiff2human(Time.ts() - ts_sim_0)}')
 
         self.save_sims()
         self.is_db_empty = False
@@ -1195,7 +1263,7 @@ class TrajectoryEnsemble(object):
         # print(dir(traj.sim))
         # print(traj.sim.db)
         # self._db_upd('UPDATE traj SET sim = ? WHERE id = ?', [DB.obj2blob(traj.sim), traj.id])
-            # TODO: Uncomment the above line and fix (if at all possible) in Python 37 (works in 36...)
+            # TODO: Uncomment the above line and fix for in Python 3.8 (works in 3.6)
         traj.sim.traj = traj  # restore the link
 
         return self
@@ -1205,52 +1273,81 @@ class TrajectoryEnsemble(object):
             self.save_sim(t)
         return self
 
-    def save_state(self, traj, mass_flow_specs):
+    def save_state(self, traj, mass_flow_specs=None):
         ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
 
         with self.conn as c:
-            self.curr_iter_id = self.save_iter(traj, c)  # remember so that probe persistence can use it (yeah... nasty solution)
+            self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
             # self.save_groups(traj, iter_id, c)
-            self.save_mass_locus(traj, self.curr_iter_id, c)
-            self.save_mass_flow(traj, self.curr_iter_id, mass_flow_specs, c)
+            self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
+            self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
 
         return self
 
-    def save_iter(self, traj, conn):
-        if traj.sim.timer.is_running:
-            iter = traj.sim.timer.i  # regular iteration
-        else:
-            iter = -1                # initial condition
+    def save_state__par(self, states):
+        # json = json.loads(payload.decode('utf-8'))  # bytes --> str
+        # for s in states:  # [{ 'host_name': '...', 'host_ip': '...', 'traj_id': 0, 'mass_flow_specs': pickle.dumps(MassFlowSpecs) }]
+        #     # mfs = json.loads(s.decode('utf-8'))
+        #     host_name = s['host_name']
+        #     host_ip = s['host_ip']
+        #     traj_id = s['traj_id']
+        #     mfs = pickle.loads(s['mass_flow_specs'])
+        #     # print(mfs.m)
+        #     # print(mfs)
+        #     print(f'{host_name} {host_ip} {traj_id} {len(mfs)}')
+        # print('----')
 
-        return self._db_ins('INSERT INTO iter (traj_id, i, host) VALUES (?,?,?)', [traj.id, iter, 'localhost'], conn)
+        with self.conn as c:
+            for s in states:  # [{ 'host_name': '...', 'host_ip': '...', 'traj_id': 0, 'mass_flow_specs': pickle.dumps(MassFlowSpecs) }]
+                host_name       = s['host_name']
+                host_ip         = s['host_ip']
+                traj_id         = s['traj_id']
+                iter            = s['iter']
+                pop_m           = s['pop_m']
+                groups          = s['groups']
+                mass_flow_specs = pickle.loads(s['mass_flow_specs'])
 
-    def save_groups(self, traj, iter_id, conn):
+                curr_iter_id = self.save_iter(traj_id, iter, host_name, host_ip, c)
+                self.save_mass_locus__par(pop_m, groups, curr_iter_id, c)
+                self.save_mass_flow(curr_iter_id, mass_flow_specs, c)
+
+        return self
+
+    def save_iter(self, traj_id, iter, host_name, host_ip, conn):
+        return self._db_ins('INSERT INTO iter (traj_id, i, host_name, host_ip) VALUES (?,?,?,?)', [traj_id, iter, host_name, host_ip], conn)
+
+    def save_groups(self, sim, iter_id, conn):
         '''
         Inserts all groups for the given iteration and trajectory.  This captures the current simulation state (at
         least to the degree that we care about for the time being).
 
         https://stackoverflow.com/questions/198692/can-i-pickle-a-python-dictionary-into-a-sqlite3-text-field
+
+        Note:
+            Currently unused; check implementation when needed.
         '''
 
-        m_pop = traj.sim.pop.get_mass()  # to get proportion of mass flow
-        for g in traj.sim.pop.groups.values():
-            for s in g.rel.values():  # sever the 'pop.sim.traj.traj_ens._conn' link (or pickle error)
-                s.pop = None
-
-            conn.execute(
-                'INSERT INTO grp (iter_id, hash, m, m_p, attr, rel) VALUES (?,?,?,?,?,?)',
-                [iter_id, str(g.get_hash()), g.m, g.m / m_pop, DB.obj2blob(g.attr), DB.obj2blob(g.rel)]
-            )
-
-            for s in g.rel.values():  # restore the link
-                s.pop = traj.sim.pop
+        # m_pop = traj.sim.pop.get_mass()  # to get proportion of mass flow
+        # for g in traj.sim.pop.groups.values():
+        #     for s in g.rel.values():  # sever the 'pop.sim.traj.traj_ens._conn' link (or pickle error)
+        #         s.pop = None
+        #
+        #     conn.execute(
+        #         'INSERT INTO grp (iter_id, hash, m, m_p, attr, rel) VALUES (?,?,?,?,?,?)',
+        #         [iter_id, str(g.get_hash()), g.m, g.m / m_pop, DB.obj2blob(g.attr), DB.obj2blob(g.rel)]
+        #     )
+        #
+        #     for s in g.rel.values():  # restore the link
+        #         s.pop = traj.sim.pop
 
         return self
 
-    def save_mass_flow(self, traj, iter_id, mass_flow_specs, conn):
+    def save_mass_flow(self, iter_id, mass_flow_specs, conn):
         '''
         Inserts the mass flow among all groups for the given iteration and trajectory.  Mass flow is present for all
         but the initial state of a simulation.
+
+        Has to be called after self.save_mass_locus() which adds all the groups to the DB.
         '''
 
         if mass_flow_specs is None:
@@ -1268,19 +1365,21 @@ class TrajectoryEnsemble(object):
 
         return self
 
-    def save_mass_locus(self, traj, iter_id, conn):
+    def save_mass_locus__seq(self, pop, iter_id, conn):
         '''
         Persists all new groups and masses of all groups participating in the current iteration and trajectory.  The
         attributes and relations of all groups are saved in the database which enables restoring the state of the
         simulation at any point in time.
 
+        Has to be called before self.save_mass_flow() so that all groups are added to the DB.
+
         https://stackoverflow.com/questions/198692/can-i-pickle-a-python-dictionary-into-a-sqlite3-text-field
         '''
 
-        m_pop = traj.sim.pop.get_mass()  # to get proportion of mass flow
-        for g in traj.sim.pop.groups.values():
-            # Persist the group if new:
-            if self._db_get_one('SELECT COUNT(*) FROM grp WHERE hash = ?', [str(g.get_hash())], conn) == 0:
+        m_pop = pop.get_mass()  # to get proportion of mass flow
+        for g in pop.groups.values():
+            # New group -- persist:
+            if self._db_get_one('SELECT COUNT(*) FROM grp WHERE hash = ?', [g.get_hash()], conn) == 0:
                 for s in g.rel.values():  # sever the 'pop.sim.traj.traj_ens._conn' link (or pickle error)
                     s.pop = None
 
@@ -1293,11 +1392,13 @@ class TrajectoryEnsemble(object):
                     self.cache.group_hash_to_id[g.get_hash()] = group_id
 
                 for s in g.rel.values():  # restore the link
-                    s.pop = traj.sim.pop
+                    s.pop = pop
+
+            # Extant group:
             else:
                 if self.pragma.memoize_group_ids:
                     group_id = self.cache.group_hash_to_id.get(g.get_hash())
-                    if group_id is None:  # precaution
+                    if group_id is None:  # just a precaution
                         group_id = self._db_get_id('grp', f'hash = "{g.get_hash()}"', conn=conn)
                         self.cache.group_hash_to_id[g.get_hash()] = group_id
                 else:
@@ -1307,6 +1408,49 @@ class TrajectoryEnsemble(object):
             conn.execute(
                 'INSERT INTO mass_locus (iter_id, grp_id, m, m_p) VALUES (?,?,?,?)',
                 [iter_id, group_id, g.m, g.m / m_pop]
+            )
+
+        return self
+
+    def save_mass_locus__par(self, pop_m, groups, iter_id, conn):
+        '''
+        Persists all new groups and masses of all groups participating in the current iteration and trajectory.  The
+        attributes and relations of all groups are saved in the database which enables restoring the state of the
+        simulation at any point in time.
+
+        Has to be called before self.save_mass_flow() so that all groups are added to the DB.
+
+        TODO:
+            - Currently, group attributes and relations aren't added to the DB.  This is to increase the bandwidth.
+              Should there be another actor responsible for collecting all group info and adding them to the DB at the
+              end of a TrajEns run?
+
+        https://stackoverflow.com/questions/198692/can-i-pickle-a-python-dictionary-into-a-sqlite3-text-field
+        '''
+
+        for g in groups:
+            group_hash = g['hash']
+            # New group -- persist:
+            if self._db_get_one('SELECT COUNT(*) FROM grp WHERE hash = ?', [group_hash], conn) == 0:
+                group_id = conn.execute('INSERT INTO grp (hash, attr, rel) VALUES (?,?,?)', [group_hash, None, None]).lastrowid
+
+                if self.pragma.memoize_group_ids:
+                    self.cache.group_hash_to_id[group_hash] = group_id
+
+            # Extant group:
+            else:
+                if self.pragma.memoize_group_ids:
+                    group_id = self.cache.group_hash_to_id.get(group_hash)
+                    if group_id is None:  # just a precaution
+                        group_id = self._db_get_id('grp', f'hash = "{group_hash}"', conn=conn)
+                        self.cache.group_hash_to_id[group_hash] = group_id
+                else:
+                    group_id = self._db_get_id('grp', f'hash = "{group_hash}"', conn=conn)
+
+            # Persist the group's mass:
+            conn.execute(
+                'INSERT INTO mass_locus (iter_id, grp_id, m, m_p) VALUES (?,?,?,?)',
+                [iter_id, group_id, g['m'], g['m'] / pop_m]
             )
 
         return self
@@ -1326,10 +1470,6 @@ class TrajectoryEnsemble(object):
             self.set_group_name(o,n,h)
         return self
 
-    def set_hosts(self, hosts):
-        self.hosts = hosts
-        return self
-
     def set_pragma_memoize_group_ids(self, value):
         self.pragma.memoize_group_ids = value
         return self
@@ -1345,3 +1485,149 @@ class TrajectoryEnsemble(object):
         print(f'        stdev: {np.std(iter)}')
 
         return self
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class TqdmUpdTo(tqdm.tqdm):
+    def update_to(self, to, total=None):
+        if total is not None:
+            self.total = total
+        self.update(to - self.n)  # will also set self.n = blocks_so_far * block_size
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+@ray.remote
+class WorkCollector(object):
+    def __init__(self, max=0):
+        self.work = []
+        self.max = max
+
+    def do_wait(self):
+        if self.max > 0 and len(self.work) >= self.max:
+            return True
+        return False
+
+    def get(self, do_clear=True):
+        if do_clear:
+            ret = self.work
+            self.work = []
+            return ret
+        else:
+            return self.work
+
+    def submit(self, payload):
+        self.work.append(payload)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+@ray.remote
+class ProgressMonitor(object):
+    def __init__(self):
+        self.workers = SortedDict()
+
+    def add_worker(self, w_id, n, host_ip, host_name):
+        self.workers[w_id] = { 'n': n, 'i': 0, 'host_ip': host_ip, 'host_name': host_name }
+
+    def get_i(self, w_id=None):
+        if w_id is not None:
+            return self.workers[w_id]['i']
+        else:
+            return sum([w['i'] for w in self.workers.values()])
+
+    def get_n(self, w_id=None):
+        if w_id is not None:
+            return self.workers[w_id]['n']
+        else:
+            return sum([w['n'] for w in self.workers.values()])
+
+    def get_rep(self):
+        return '    '.join([f'{k:>3}: {v["i"]:>2} of {v["n"]:>2}' for (k,v) in self.workers.items()])
+
+    def rem_all_workers(self):
+        self.workers.clear()
+
+    def rem_worker(self, w_id):
+        del self.workers[w_id]
+
+    def upd_worker(self, w_id, i):
+        self.workers[w_id]['i'] = i
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class Worker(object):
+    def __init__(self, id, traj_id, sim, n, work_collector=None, progress_mon=None):
+        self.id             = id
+        self.traj_id        = traj_id
+        self.sim            = sim
+        self.n              = n
+        self.work_collector = work_collector
+        self.progress_mon   = progress_mon
+
+        self.host_name = None  # set in self.run()
+        self.host_ip   = None  # ^
+
+    def do_wait_work(self):
+        ''' Wait until work can continue. '''
+
+        if not self.work_collector:
+            return False
+        return self.work_collector.do_wait.remote()
+
+    def submit_work(self, mass_flow_specs):  # TODO: Change name to save_mass_flow_specs()?
+        # json = json.dumps(mass_flow_specs).encode('utf-8')  # str -> bytes
+
+        # compressedFile = StringIO.StringIO()
+        # compressedFile.write(response.read(json))
+
+        if self.work_collector:
+            # self.work_collector.submit.remote(json.dumps(mass_flow_specs).encode('utf-8'))
+            self.work_collector.submit.remote({
+                'host_name'       : self.host_name,
+                'host_ip'         : self.host_ip,
+                'traj_id'         : self.traj_id,
+                'iter'            : self.sim.get_iter_reg_init(),
+                'pop_m'           : self.sim.pop.m,
+                'groups'          : [{ 'hash': g.get_hash(), 'm': g.m } for g in self.sim.pop.groups.values()],
+                'mass_flow_specs' : pickle.dumps(mass_flow_specs)
+            })
+
+    def upd_progress(self, i, n):
+        if self.progress_mon:
+            self.progress_mon.upd_worker.remote(self.id, i+1)
+
+    def run(self):
+        # (1) Initialize:
+        self.host_name = socket.gethostname()
+        self.host_ip   = socket.gethostbyname(self.host_name)
+
+        if self.progress_mon:
+            self.progress_mon.add_worker.remote(self.id, self.n, self.host_ip, self.host_name)
+
+        # (2) Do work:
+        t = self.sim.traj
+        self.sim.traj = None
+        self.sim.set_cb_upd_progress(self.upd_progress)
+        self.sim.set_cb_save_state(self.submit_work)
+        self.sim.set_cb_check_work(self.do_wait_work)
+        self.sim.run(self.n)
+        self.sim.traj = t
+
+        # if self.work_collector:
+        #     self.work_collector.put.remote(pickle.dumps(f'...'))
+
+        # (3) Finish up:
+        self.sim.set_cb_save_state(None)
+        self.sim.set_cb_upd_progress(None)
+        self.sim.set_cb_check_work(None)
+
+        # if self.work_collector:
+        #     self.work_collector.put.remote(pickle.dumps(f'done'))
+        # if self.progress_mon:
+        #     self.progress_mon.rem_worker.remote(self.id)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+@ray.remote
+def start_worker(w):
+    w.run()
+    return w

@@ -51,7 +51,20 @@ class SIRModelDerivatives(ODEDerivatives):
 
 
 class SIRSModelDerivatives(ODEDerivatives):
-    pass
+    def __init__(self, beta, gamma, alpha):
+        self.params = DotMap(beta=beta, gamma=gamma, alpha=alpha)
+
+    def get_fn(self):
+        p = self.params
+        def fn(t, state):
+            S,I,R = state
+            N = sum(state)
+            return [
+                -p.beta * S * I / N               + p.alpha * R,  # dS/dt
+                 p.beta * S * I / N - p.gamma * I,                # dI/dt
+                                      p.gamma * I - p.alpha * R   # dR/dt
+            ]
+        return fn
 
 
 class SEIRModelDerivatives(ODEDerivatives):

@@ -13,7 +13,7 @@ import gzip
 import math
 import multiprocessing
 import os
-import pickle
+# import pickle
 # import dill as pickle
 import cloudpickle as pickle
 import random
@@ -358,6 +358,9 @@ class MPCounter(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Size(object):
+    PREFIX_BIN = { 'K': 1024, 'M': 1048576, 'G': 1073741824, 'T': 1099511627776, 'P': 1125899906842624, 'E': 1152921504606846976, 'Z': 1180591620717411303424, 'Y': 1208925819614629174706176 }
+    PREFIX_DEC = { 'K': 1000, 'M': 1000000, 'G': 1000000000, 'T': 1000000000000, 'P': 1000000000000000, 'E': 1000000000000000000, 'Z': 1000000000000000000000, 'Y': 1000000000000000000000000 }
+
     @staticmethod
     def get_size(obj0):
         ''' https://stackoverflow.com/questions/449560/how-do-i-determine-the-size-of-an-object-in-python/30316760#30316760 '''
@@ -389,29 +392,55 @@ class Size(object):
         return inner(obj0)
 
     @staticmethod
-    def b2h(b, do_ret_tuple=False):
-        return __class__.bytes2human(b, do_ret_tuple)
+    def b2h(b, do_bin=True, dec_places=1, do_ret_tuple=False):
+        return __class__.bytes2human(b, do_bin, dec_places, do_ret_tuple)
 
     @staticmethod
-    def bytes2human(b, do_ret_tuple=False):
-        symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
-        prefix = {}
+    def bytes2human(b, do_bin=True, dec_places=1, do_ret_tuple=False):
+        if do_bin:
+            prefix = __class__.PREFIX_BIN
+            unit   = 'B'
+        else:
+            prefix = __class__.PREFIX_DEC
+            unit   = ''
 
-        for i, s in enumerate(symbols):
-            prefix[s] = 1 << (i + 1) * 10
-
-        for s in reversed(symbols):
-            if b >= prefix[s]:
-                value = float(b) / prefix[s]
+        for p in reversed(prefix.keys()):
+            if b >= prefix[p]:
+                value = float(b) / prefix[p]
                 if do_ret_tuple:
-                    return (value, s)
+                    return (value, p)
                 else:
-                    return '{:.1f}{}'.format(value, s)
+                    return f'{value:.{dec_places}f}{p}'
 
         if do_ret_tuple:
-            return (b, 'B')
+            return (b, unit)
         else:
-            return '{}B'.format(b)
+            return f'{b}{unit}'
+
+    # @staticmethod
+    # def b2h(b, do_ret_tuple=False):
+    #     return __class__.bytes2human(b, do_ret_tuple)
+    #
+    # @staticmethod
+    # def bytes2human(b, base=do_ret_tuple=False):
+    #     symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
+    #     prefix = {}
+    #
+    #     for (i,s) in enumerate(symbols):
+    #         prefix[s] = 1 << (i + 1) * 10
+    #
+    #     for s in reversed(symbols):
+    #         if b >= prefix[s]:
+    #             value = float(b) / prefix[s]
+    #             if do_ret_tuple:
+    #                 return (value, s)
+    #             else:
+    #                 return '{:.1f}{}'.format(value, s)
+    #
+    #     if do_ret_tuple:
+    #         return (b, 'B')
+    #     else:
+    #         return '{}B'.format(b)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -626,7 +655,7 @@ class Time(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
-    print('--- Size ---')
+    print('--- Size: Binary ---')
     print(Size.b2h(154))
     print(Size.b2h(1540))
     print(Size.b2h(15400))
@@ -638,9 +667,26 @@ if __name__ == '__main__':
     print(Size.b2h(15400000000))
     print(Size.b2h(154000000000))
     print(Size.b2h(1540000000000))
+    print(Size.b2h(1540000000000, dec_places=0))
+    print(Size.b2h(1540000000000, dec_places=2))
 
     print(*Size.b2h(154, True))
-    print('{:.1f}{}'.format(*Size.b2h(154, True)))
+    print('{:.1f}{}'.format(*Size.b2h(154, do_ret_tuple=True)))
+
+    print('--- Size: Decimal (SI) ---')
+    print(Size.b2h(154, False))
+    print(Size.b2h(1540, False))
+    print(Size.b2h(15400, False))
+    print(Size.b2h(154000, False))
+    print(Size.b2h(1540000, False))
+    print(Size.b2h(15400000, False))
+    print(Size.b2h(154000000, False))
+    print(Size.b2h(1540000000, False))
+    print(Size.b2h(15400000000, False))
+    print(Size.b2h(154000000000, False))
+    print(Size.b2h(1540000000000, False))
+    print(Size.b2h(1540000000000, False, dec_places=0))
+    print(Size.b2h(1540000000000, False, dec_places=2))
 
     print('\n--- DB ---')
     print(DB.str_to_name('one fine column name'))
