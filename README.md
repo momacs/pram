@@ -15,7 +15,7 @@ This software is in the pre-release stage.
 
 - [Python 3.6](https://python.org)
 - [altair](https://altair-viz.github.io)
-- [altair-saver](https://pypi.org/project/altair-saver/)
+- [altair-saver](https://pypi.org/project/altair-saver)
 - [attrs](https://github.com/python-attrs/attrs)
 - [cloudpickle](https://github.com/cloudpipe/cloudpickle)
 - [dotmap](https://pypi.org/project/dotmap)
@@ -27,6 +27,7 @@ This software is in the pre-release stage.
 - [PyRQA](https://pypi.org/project/PyRQA)
 - [scipy](https://www.scipy.org)
 - [sortedcontainers](http://www.grantjenks.com/docs/sortedcontainers/index.html)
+- [tqdm](https://tqdm.github.io)
 - [xxhash](https://pypi.org/project/xxhash)
 - [selenium](https://selenium-python.readthedocs.io) (for saving `altair` graphs)
 - [Gecko Driver](https://github.com/mozilla/geckodriver/releases) or [Chrome Driver](https://sites.google.com/a/chromium.org/chromedriver) and a recent version of either of the respective Web browser (i.e., Firefox or Chrome; for saving `altair` graphs)

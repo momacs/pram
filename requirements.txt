@@ -13,4 +13,5 @@ PyRQA==5.1.0
 scipy==1.4.1
 selenium==3.141.0
 sortedcontainers==2.1.0
+tqdm==4.45.0
 xxhash==1.4.3
