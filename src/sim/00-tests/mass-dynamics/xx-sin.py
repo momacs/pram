@@ -2,10 +2,6 @@
 A test of the mass transfer graph.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-
-
 from scipy.stats import beta
 
 from pram.entity import Group, GroupSplitSpec

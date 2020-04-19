@@ -1,15 +1,9 @@
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-
-
 import entropy
 import math
 import numpy as np
 
-from scipy.stats import beta
-
 from dotmap      import DotMap
-from scipy.stats import gamma as gamma
+from scipy.stats import beta, gamma
 
 from pram.entity import Group, GroupSplitSpec
 from pram.rule   import Process, ODESystemMass, TimeAlways

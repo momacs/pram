@@ -1,7 +1,3 @@
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from pram.entity import Group, GroupQry
 from pram.rule   import Noop
 from pram.sim    import Simulation
@@ -15,8 +11,7 @@ def ls_grp(name, sim, qry):
     print()
 
 
-s = (
-    Simulation().
+s = (Simulation().
     add([
         Noop(),
         Group(m=1, attr={ 'x': 100, 'y':  200 }),

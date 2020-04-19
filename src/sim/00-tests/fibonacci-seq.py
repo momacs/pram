@@ -1,14 +1,9 @@
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from pram.entity import Group
 from pram.rule   import FibonacciSeq
 from pram.sim    import Simulation
 
 
-(
-    Simulation().
+(Simulation().
     add([
         FibonacciSeq('fib'),
         Group(m=1, attr={ 'fib': 0 })

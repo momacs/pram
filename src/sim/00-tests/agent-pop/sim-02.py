@@ -13,10 +13,6 @@ relationship with mass dynamics and should therefore be ignored by a mechanism e
 ignored, then the algorithm can likely be improved.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-
-
 import numpy as np
 
 from pram.entity      import Group, GroupQry, GroupSplitSpec, Site

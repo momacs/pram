@@ -1,14 +1,9 @@
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from pram.entity import Group
 from pram.rule   import CompoundInterstSeq
 from pram.sim    import Simulation
 
 
-(
-    Simulation().
+(Simulation().
     add([
         CompoundInterstSeq('x', 0.043, 4),
         Group(m=1, attr={ 'x': 1500 })

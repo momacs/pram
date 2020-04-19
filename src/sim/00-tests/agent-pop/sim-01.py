@@ -5,10 +5,6 @@ For simplicity, a one-rule simulation with no relations and only three groups is
 model implemented as a Markov chain.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-
-
 import numpy as np
 
 from pram.entity      import Group

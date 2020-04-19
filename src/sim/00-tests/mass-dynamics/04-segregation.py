@@ -2,9 +2,6 @@
 A test of the mass transfer graph for the segregation model.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-
 import math
 import random
 
