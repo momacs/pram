@@ -396,6 +396,87 @@ class System(Rule, ABC):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+class GroupMassDecByNumRule(Rule):
+    """Decreases the mass of a group by number.
+
+    Args:
+        m (float): The mass to remove.
+        Other argument from :class:`~pram.data.Rule`.
+    """
+
+    def __init__(self, m, name='grp-mass-dec-by-num', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
+        self.m = m
+
+    def apply(self, pop, group, iter, t):
+        p = min(max(self.m / group.m, 0), 1)
+        return [
+            GroupSplitSpec(p=    p, attr_set=Group.VOID),
+            GroupSplitSpec(p=1 - p)
+        ]
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class GroupMassDecByPropRule(Rule):
+    """Decreases the mass of a group by a proportion/probability.
+
+    Args:
+        p (float): The proportion of mass to remove.
+        All argument from :class:`~pram.data.Rule`.
+    """
+
+    def __init__(self, p, name='grp-mass-dec-by-prop', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
+        self.p = p
+
+    def apply(self, pop, group, iter, t):
+        return [
+            GroupSplitSpec(p=    self.p, attr_set=Group.VOID),
+            GroupSplitSpec(p=1 - self.p)
+        ]
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class GroupMassIncByNumRule(Rule):
+    """Increases the mass of a group by number.
+
+    Args:
+        m (float): The mass to remove.
+        Other argument from :class:`~pram.data.Rule`.
+    """
+
+    def __init__(self, m, name='grp-mass-inc-by-num', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
+        self.m = m
+
+    def apply(self, pop, group, iter, t):
+        g = group.copy()
+        g.m = self.m
+        pop.add_vita_group(g)
+        return None
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class GroupMassIncByPropRule(Rule):
+    """Increases the mass of a group by a proportion/probability.
+
+    Args:
+        p (float): The proportion of mass to remove.
+        All argument from :class:`~pram.data.Rule`.
+    """
+
+    def __init__(self, p, name='grp-mass-inc-by-prop', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
+        self.p = p
+
+    def apply(self, pop, group, iter, t):
+        g = group.copy()
+        g.m = group.m * self.p
+        pop.add_vita_group(g)
+        return None
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class StochasticProcess(Rule, ABC):
     '''
     A stochastic process is a collection of random variables indexed by time or space.
