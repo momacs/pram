@@ -25,6 +25,7 @@ This software is in the pre-release stage.
 - [pybind11](https://pybind11.readthedocs.io/en/stable) (for `PyRQA`)
 - [PyOpenCL](https://documen.tician.de/pyopencl) (for `PyRQA`)
 - [PyRQA](https://pypi.org/project/PyRQA)
+- [ray](https://docs.ray.io)
 - [scipy](https://www.scipy.org)
 - [sortedcontainers](http://www.grantjenks.com/docs/sortedcontainers/index.html)
 - [tqdm](https://tqdm.github.io)

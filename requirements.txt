@@ -10,6 +10,7 @@ numpy==1.18.2
 psutil==5.7.0
 pycairo==1.19.1
 PyRQA==5.1.0
+ray==0.8.4
 scipy==1.4.1
 selenium==3.141.0
 sortedcontainers==2.1.0
