@@ -415,7 +415,7 @@ class GroupPopulation(object):
 
         pass
 
-    def get_group(self, attr, rel):
+    def get_group(self, attr, rel={}):
         """
         Returns the group with the all attributes and relations as specified; or None if such a group does not exist.
 
