@@ -4,10 +4,6 @@ population.  These events disturb the size of the two populations at a specific 
 dynamics process is affected directly).
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import matplotlib.pyplot as plt
 
 from pram.entity import Group, GroupSplitSpec

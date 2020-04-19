@@ -16,10 +16,6 @@ considered (e.g., sex and age).
 Based on: sim/06-allegheny-01-db-school
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import gc
 import gzip
 import os

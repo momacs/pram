@@ -2,9 +2,6 @@
 Resource transformation simulation modeling the following process: trees --> wood --> lumber
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
 from pram.entity import Group, GroupSplitSpec
 from pram.rule   import Rule, TimeAlways
 from pram.sim    import Simulation
@@ -83,12 +80,12 @@ class WoodToLumberRule(Rule):
 (Simulation().
     set().
         pragma_autocompact(False).
-        pragma_live_info(True).
+        pragma_live_info(False).
         done().
     add().
         rule(TreeToWoodRule()).
         rule(WoodToLumberRule()).
-        group(Group(n=1, attr={ 'type': 'resource', 'tree': 100 })).
+        group(Group(m=1, attr={ 'type': 'resource', 'tree': 100 })).
         done().
     # run(1).
     # run(10).

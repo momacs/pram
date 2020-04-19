@@ -5,10 +5,6 @@ This is the simulation of two overlapping and time-unbounded SIR models, A and B
 delay and one of its parameters (gamma) random.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import matplotlib.pyplot as plt
 
 from dotmap import DotMap

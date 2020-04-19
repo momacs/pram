@@ -4,10 +4,6 @@ Multiple composite SIR models.
 This simulation builds up a more a more complicated example of two SIR models interacting.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import matplotlib.pyplot as plt
 
 from dotmap import DotMap

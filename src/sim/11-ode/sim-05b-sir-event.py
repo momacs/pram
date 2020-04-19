@@ -19,10 +19,6 @@ The diminishing effect might represent the response of a boosted immune system (
 the immune system eventually out-adapts the fast-mutating virus leading to lasting herd immunity.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import math
 import matplotlib.pyplot as plt
 

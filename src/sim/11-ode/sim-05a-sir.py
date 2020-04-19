@@ -2,10 +2,6 @@
 The SIR model implemented as an ODE system driving population mass flow.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import matplotlib.pyplot as plt
 
 from dotmap import DotMap

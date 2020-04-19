@@ -5,10 +5,6 @@ reducing the number of infected; the sooner it is undertaken the lower the infec
 This system uses ordinary differential equations solver to implement the SEQIHR model.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from scipy.stats import truncnorm, uniform
 
 from pram.entity      import Group

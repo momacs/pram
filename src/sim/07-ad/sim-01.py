@@ -3,9 +3,6 @@ An Alzheimer's Disease simulation that comes in two flavors depending on which o
 deterministic one or a probabilistic one.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
 from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
 from pram.rule   import Rule, TimeAlways
 from pram.sim    import Simulation

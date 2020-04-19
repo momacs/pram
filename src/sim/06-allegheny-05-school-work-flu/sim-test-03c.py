@@ -110,10 +110,6 @@ n     school_id   income_mean         i   age_mean            lat lon
 451    450102519    109135.521064302    m    6.74944567627494    40.46877    -79.917847
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import pram.util as util
 
 from pram.data   import GroupSizeProbe, ProbeMsgMode, ProbePersistenceDB

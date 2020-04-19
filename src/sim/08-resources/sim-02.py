@@ -74,11 +74,11 @@ class TreeToLumberRule(Rule):
 (Simulation().
     set().
         pragma_autocompact(False).
-        pragma_live_info(True).
+        pragma_live_info(False).
         done().
     add().
         rule(TreeToLumberRule()).
-        group(Group(n=1, attr={ 'type': 'resource', 'quantity': { 'tree': 100, 'wood': 0, 'lumber': 0 }})).
+        group(Group(m=1, attr={ 'type': 'resource', 'quantity': { 'tree': 100, 'wood': 0, 'lumber': 0 }})).
         done().
     # run(1).
     # run(9).

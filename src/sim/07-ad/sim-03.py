@@ -2,9 +2,6 @@
 An Alzheimer's Disease simulation which models the following scenario: "AD incidence doubles every 5 years after 65 yo."
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
 from pram.data   import GroupSizeProbe, ProbeMsgMode
 from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site
 from pram.rule   import PoissonIncidenceProcess

@@ -3,9 +3,6 @@ An Alzheimer's Disease simulation which models the following scenario: "AD incid
 65 yo."
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
 import math
 
 from scipy.stats import poisson

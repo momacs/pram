@@ -2,10 +2,6 @@
 A test simulation involving the SEIR flu model in isolation.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from pram.data   import GroupSizeProbe, ProbeMsgMode
 from pram.entity import Group, Site
 from pram.rule   import SEIRFluRule

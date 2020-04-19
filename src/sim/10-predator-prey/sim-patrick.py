@@ -34,7 +34,7 @@ class MiceBirthRule(Rule):
 
             mouse_group = pop.get_group(GroupQry({'form' : "m"}))
 
-            p = (mouse_group.n*MICE_REPRODUCTION_RATE)/group.n #mice_group_size/pop_size
+            p = (mouse_group.m*MICE_REPRODUCTION_RATE)/group.m #mice_group_size/pop_size
 
             p = p * TIME_COEFFICIENT
 
@@ -47,7 +47,7 @@ class MiceBirthRule(Rule):
             return [GroupSplitSpec(p=1)]
 
     def is_applicable(self, group, iter, t):
-        return super().is_applicable(group, iter, t) and group.n > 0
+        return super().is_applicable(group, iter, t) and group.m > 0
 
 
 class PredationRule(Rule):
@@ -58,10 +58,10 @@ class PredationRule(Rule):
 
     def apply(self, pop, group, iter, t):
         mouse_group = pop.get_group(GroupQry({'form' : "m"}))
-        mouse_population = mouse_group.n
+        mouse_population = mouse_group.m
 
         hawk_group = pop.get_group(GroupQry({'form' : 'h'}))
-        hawk_population = hawk_group.n/5
+        hawk_population = hawk_group.m/5
 
         appetite = mouse_population*hawk_population*PREDATION_COEFFICIENT
 
@@ -91,7 +91,7 @@ class PredationRule(Rule):
             return [GroupSplitSpec(p=1)]
 
     def is_applicable(self, group, iter, t):
-        return super().is_applicable(group, iter, t) and group.n > 0 and (group.attr['form'] == 'h' or group.attr['form'] == 'm')
+        return super().is_applicable(group, iter, t) and group.m > 0 and (group.attr['form'] == 'h' or group.attr['form'] == 'm')
 
 
 
@@ -103,10 +103,10 @@ class CompetingPredationRule(Rule):
 
     def apply(self, pop, group, iter, t):
         mouse_group = pop.get_group(GroupQry({'form' : "m"}))
-        mouse_population = mouse_group.n
+        mouse_population = mouse_group.m
 
         snake_group = pop.get_group(GroupQry({'form' : 's'}))
-        snake_population = snake_group.n/5
+        snake_population = snake_group.m/5
 
         appetite = mouse_population*snake_population*PREDATION_COEFFICIENT
 
@@ -136,7 +136,7 @@ class CompetingPredationRule(Rule):
             return [GroupSplitSpec(p=1)]
 
     def is_applicable(self, group, iter, t):
-        return super().is_applicable(group, iter, t) and group.n > 0 and (group.attr['form'] == 's' or group.attr['form'] == 'm')
+        return super().is_applicable(group, iter, t) and group.m > 0 and (group.attr['form'] == 's' or group.attr['form'] == 'm')
 
 
 class HuntingInterventionRule(Rule):
@@ -147,7 +147,7 @@ class HuntingInterventionRule(Rule):
     def apply(self, pop, group, iter, t):
         p = 0
 
-        if group.n >= pop.get_group(GroupQry({'form' : "m"})).n/4:
+        if group.m >= pop.get_group(GroupQry({'form' : "m"})).m/4:
             p = 0.1
 
         return [
@@ -156,7 +156,7 @@ class HuntingInterventionRule(Rule):
         ]
 
     def is_applicable(self, group, iter, t):
-        return super().is_applicable(group, iter, t) and group.n > 0 and group.attr['form'] == 's'
+        return super().is_applicable(group, iter, t) and group.m > 0 and group.attr['form'] == 's'
 
 
 #probe including snakes

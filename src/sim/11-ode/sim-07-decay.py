@@ -9,10 +9,6 @@ undecayed substance, in PRAM we need to privide two derivatives because we move 
 resulting equations are inverts of one another.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import matplotlib.pyplot as plt
 
 from dotmap import DotMap

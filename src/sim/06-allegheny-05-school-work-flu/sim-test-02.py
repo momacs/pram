@@ -3,10 +3,6 @@ A test simulation involving the SEIR flu model that is run on an hourly basis (i
 basis).
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import pram.util as util
 
 from pram.data   import GroupSizeProbe, ProbeMsgMode

@@ -14,10 +14,6 @@ the model parameters have not been validated biologically nor ecologically, the 
 80 years and the prey population goes extinct in about 140 years.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import matplotlib.pyplot as plt
 
 from pram.entity import Group, GroupSplitSpec

@@ -1,6 +1,3 @@
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
 import random
 
 from pram.entity import Group, GroupDBRelSpec, GroupQry, GroupSplitSpec, Site

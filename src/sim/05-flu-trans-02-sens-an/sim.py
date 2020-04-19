@@ -6,11 +6,6 @@ following simultation parameters:
 - The agent density based formula for infection
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import numpy as np
 
 from collections import namedtuple

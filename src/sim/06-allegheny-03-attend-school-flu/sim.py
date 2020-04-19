@@ -11,10 +11,6 @@ Based on:
   sim/06-allegheny-02-db-school-large/
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import gc
 import gzip
 import os

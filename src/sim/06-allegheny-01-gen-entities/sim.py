@@ -6,10 +6,6 @@ demonstrate that they scale to this more realistic scenario.
 Based on: sim/03-attend-school
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 import gc
 import gzip
 import os

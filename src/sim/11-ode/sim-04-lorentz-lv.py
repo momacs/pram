@@ -2,10 +2,6 @@
 Two ODE systems (i.e., Lorenz and Lotka-Volterra) implemented on group attributes.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
-
 from pram.entity import Group
 from pram.rule   import ODESystemAttr
 from pram.sim    import Simulation

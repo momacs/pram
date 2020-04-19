@@ -1,6 +1,3 @@
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
 from pram.rule import Rule, TimeAlways
 from pram.sim  import Simulation
 
