@@ -71,9 +71,12 @@ class AgentPopulation(object):
 class AttrRelEncoder(object):
     """Encoder and decoder of Group and GroupQry attributes and relations.
 
-    Before:
+    Before encoding:
+
         group.attr = { 'flu': 's', 'age-group': '10-19' }
-    After:
+
+    After encoding:
+
         group.attr = ((0,0), (1,1))  # a set of tuples (hashable as opposed to a dictionary and much smaller)
 
         self.attr_k2i = {'flu': 0, 'age-group': 1}
@@ -82,8 +85,12 @@ class AttrRelEncoder(object):
         self.attr_i2v = [['s', 'i', 'r'], ['10-19', '20-29']]
 
     Possible future extension invonling bit-wise operations:
+
         group.attr_keys = [0,1]
         group.attr_keys_bin = 0b00000011  # for simplicity, assuming 8-bit architecture
+
+    Currently, decoding isn't necessary and therefore it is not implemented.  Consequently, the ``i2k`` and ``i2v``
+    iterables (i.e., the decoding ones) aren't used, but are still populated.
     """
 
     def __init__(self):
@@ -99,14 +106,54 @@ class AttrRelEncoder(object):
 
     @staticmethod
     def _prep_obj(obj, is_enc=True):
+        """Prepare the object to be encoded/decoded.
+
+        If a single object is passed, it is turned into a list.  Only elements that are congruent with encoding/decoding
+        are left in the list.  The list of conditions is:
+
+        - Object is not None.
+        - Object has ``attr`` and ``rel`` instance variables.
+        - Object is (for decoding) or is not (for encoding) already encoded.
+
+        Args:
+            obj (object): The object (currently, an instance of Group or GroupQry).
+            is_enc (bool): Flag: Should the object be already encoded?
+
+        Returns:
+            Iterable[object]: The list of objects that meet the criteria specified above.
+        """
+
         if not isinstance(obj, Iterable):
             obj = [obj]
         return [o for o in obj if o is not None and hasattr(o, 'attr') and hasattr(o, 'rel') and o.is_enc == is_enc]
 
     def decode(self, obj):
-        pass
+        """Decodes an object passed or a list of objects.
+
+        Args:
+            obj (object): The object (currently, an instance of Group or GroupQry).
+
+        Returns:
+            self: For method call chaining.
+
+        Todo:
+            Currently unused and unneeded.  Implement if that changes.
+        """
+
+        return self
 
     def encode(self, obj):
+        """Encodes an object passed or a list of objects.
+
+        The object encoded will have two new instance variables set: ``attr_enc`` and ``rel_enc``.
+
+        Args:
+            obj (object): The object (currently, an instance of Group or GroupQry).
+
+        Returns:
+            self: For method call chaining.
+        """
+
         for o in self.__class__._prep_obj(obj, False):
             o.attr_enc = self.encode_attr(o.attr)
             o.rel_enc  = self.encode_rel(o.rel)
@@ -114,9 +161,33 @@ class AttrRelEncoder(object):
         return self
 
     def encode_attr(self, attr):
+        """Encodes an attributes dictionary.
+
+        Args:
+            attr (dict): Attributes to be encoded.
+
+        Returns:
+            set(tuple(int, int)): A set of tuples with two indices per tuple: The key and the value of the attribute.
+        """
+
         return self.encode_dict(attr, self.attr_k2i, self.attr_v2i, self.attr_i2k, self.attr_i2v)
 
     def encode_dict(self, d, k2i, v2i, i2k, i2v):
+        """Encodes a dictionary.
+
+        Currently used only internally by the class to encode both attributes and relations dictionaries.
+
+        Args:
+            d (dict): Dictionary to be encoded.
+            k2i (dict): Key-to-index.
+            v2i (Iterable): Value-to-index.
+            i2k (Iterable): Index-to-key.
+            i2v (Iterable): Index-to-value.
+
+        Returns:
+            set(tuple(int, int)): A set of tuples with two indices per tuple: The key and the value of the dict.
+        """
+
         enc = []
         for (k,v) in sorted(d.items()):  # sorting not necessary for sets, necessary for tuples
             if isinstance(v, Entity):
@@ -141,12 +212,30 @@ class AttrRelEncoder(object):
         return set(enc)
 
     def encode_probe(self, p):
+        """Encodes GroupQry objects from the Probe instance.
+
+        Args:
+            p (Probe): Probe to be encoded.
+
+        Returns:
+            self: For method call chaining.
+        """
+
         if isinstance(p, GroupProbe):
             self.encode(p.queries)
             self.encode(p.qry_tot)
         return self
 
     def encode_rel(self, rel):
+        """Encodes a relations dictionary.
+
+        Args:
+            rel (dict): Relations to be encoded.
+
+        Returns:
+            set(tuple(int, int)): A set of tuples with two indices per tuple: The key and the value of the relation.
+        """
+
         return self.encode_dict(rel, self.rel_k2i, self.rel_v2i, self.rel_i2k, self.rel_i2v)
 
 
