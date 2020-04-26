@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 """Contains PRAM group and agent populations code."""
 
+import json
 import math
 import xxhash
 
-from attr        import attrs, attrib
-from collections import deque
-from dotmap      import DotMap
-from functools   import lru_cache
+from attr            import attrs, attrib
+from collections     import deque
+from collections.abc import Iterable
+from dotmap          import DotMap
+from functools       import lru_cache
 
-from .entity import Entity, Group, GroupQry, Resource, Site
+from .data   import GroupProbe
+from .entity import Entity, Group, GroupQry, Resource, Site, EntityJSONEncoder
 
 __all__ = ['MassFlowSpec', 'GroupPopulation', 'GroupPopulationHistory']
 
@@ -65,6 +68,88 @@ class AgentPopulation(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+class AttrRelEncoder(object):
+    """Encoder and decoder of Group and GroupQry attributes and relations.
+
+    Before:
+        group.attr = { 'flu': 's', 'age-group': '10-19' }
+    After:
+        group.attr = ((0,0), (1,1))  # a set of tuples (hashable as opposed to a dictionary and much smaller)
+
+        self.attr_k2i = {'flu': 0, 'age-group': 1}
+        self.attr_v2i = [{'s': 0, 'i': 1, 'r': 2}, {'10-19': 0, '20-29': 1}]
+        self.attr_i2k = ['flu', 'age-group']
+        self.attr_i2v = [['s', 'i', 'r'], ['10-19', '20-29']]
+
+        group.attr_keys = [0,1]
+        group.attr_keys_bin = 0b00000011  # for simplicity, assuming 8-bit architecture
+    """
+
+    def __init__(self):
+        self.attr_k2i = {}  # encoding
+        self.attr_v2i = []  # ^
+        self.attr_i2k = []  # decoding
+        self.attr_i2v = []  # ^
+
+        self.rel_k2i  = {}  # encoding
+        self.rel_v2i  = []  # ^
+        self.rel_i2k  = []  # decoding
+        self.rel_i2v  = []  # ^
+
+    @staticmethod
+    def _prep_obj(obj, is_enc=True):
+        if not isinstance(obj, Iterable):
+            obj = [obj]
+        return [o for o in obj if o is not None and hasattr(o, 'attr') and hasattr(o, 'rel') and o.is_enc == is_enc]
+
+    def decode(self, obj):
+        pass
+
+    def encode(self, obj):
+        for o in self.__class__._prep_obj(obj, False):
+            o.attr_enc = self.encode_attr(o.attr)
+            o.rel_enc  = self.encode_rel(o.rel)
+            o.is_enc   = True
+        return self
+
+    def encode_attr(self, attr):
+        return self.encode_dict(attr, self.attr_k2i, self.attr_v2i, self.attr_i2k, self.attr_i2v)
+
+    def encode_dict(self, d, k2i, v2i, i2k, i2v):
+        enc = []
+        for (k,v) in sorted(d.items()):  # sorting not necessary for sets, necessary for tuples
+            if isinstance(v, Entity):
+                v = v.get_hash()
+
+            ki = k2i.get(k)
+            if ki is None:
+                ki = len(k2i)
+                k2i[k] = ki
+                v2i.append({})
+                i2k.append(k)
+                i2v.append([])
+
+            v2i_k = v2i[ki]
+            vi = v2i_k.get(v)
+            if vi is None:
+                vi = len(v2i_k)
+                v2i_k[v] = vi
+                i2v[ki].append(v)
+
+            enc.append((ki,vi))
+        return set(enc)
+
+    def encode_probe(self, p):
+        if isinstance(p, GroupProbe):
+            self.encode(p.queries)
+            self.encode(p.qry_tot)
+        return self
+
+    def encode_rel(self, rel):
+        return self.encode_dict(rel, self.rel_k2i, self.rel_v2i, self.rel_i2k, self.rel_i2v)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class GroupPopulation(object):
     """Population of groups of agents.
 
@@ -93,6 +178,7 @@ class GroupPopulation(object):
         self.groups = {}
         self.sites = {}
         self.resources = {}  # TODO: doesn't seem to be used
+        self.ar_enc = AttrRelEncoder()
 
         self.vita_groups = {}  # all VITA groups for the current iteration
 
@@ -146,34 +232,20 @@ class GroupPopulation(object):
         if not self.is_frozen:
             self.m += group.m
 
+        rels = {}
+        for (k,v) in group.rel.items():
+            if isinstance(v, Entity):
+                self.add_site(v)
+                rels[k] = v.get_hash()
+        group.set_rels(rels, True)
+
         group_hash = group.get_hash()
         if group_hash in self.groups.keys():
             self.groups.get(group_hash).m += group.m
         else:
-            # Old vay to handle sites:
-            # self.add_sites    ([v for (_,v) in group.get_rel().items() if isinstance(v, Site)])
-            # self.add_resources([v for (_,v) in group.get_rel().items() if isinstance(v, Resource)])
-
-            # Add Site and Resource objects to self and replace them with their hashes in the group object:
-            # TODO: Do we actually need to distuinguish between Site and Resource?  If we do, it might be better to use
-            #       an explicit indication of which dict the object is stored in.
-            #       Important: Also look in GroupQry.__init__().
-            for k,v in group.rel.items():
-                # if isinstance(v, Site):
-                #     self.add_site(v)
-                #     group.rel[k] = v.get_hash()
-                #     # group.rel[k] = self.add_site(v)
-                # if isinstance(v, Resource):
-                #     self.add_resource(v)
-                #     group.rel[k] = v.get_hash()
-                #     # group.rel[k] = self.add_resource(v)
-
-                if isinstance(v, Entity):
-                    self.add_site(v)
-                    group.rel[k] = v.get_hash()
-
+            self.ar_enc.encode(group)
+            group_hash = group.get_hash()
             group.pop = self
-            group.freeze()
             group.link_to_site_at()
             self.groups[group_hash] = group
 
@@ -231,9 +303,7 @@ class GroupPopulation(object):
         return self
 
     def add_site(self, site):
-        """Adds a site to the population.
-
-        Only adds if the site doesn't exist yet.
+        """Adds a site to the population if it doesn't exist.
 
         Args:
             site (Site): The site to be added.
@@ -246,8 +316,7 @@ class GroupPopulation(object):
         if h not in self.sites.keys():
             self.sites[h] = site
             site.set_pop(self)
-        # return self
-        return self.sites[h]
+        return site
 
     def add_sites(self, sites):
         """Adds multiple sites to the population.
@@ -583,7 +652,7 @@ class GroupPopulation(object):
 
         # Reset the mass of the groups being updated:
         for h in src_group_hashes:
-            self.groups[h].m       = 0.0
+            self.groups[h].m = 0.0
             # if not is_sim_setup:
             #     # self.groups[h].m_delta = -self.groups[h].m
             #     self.groups[h].archive()
@@ -635,6 +704,10 @@ class GroupPopulation(object):
 # ----------------------------------------------------------------------------------------------------------------------
 class GroupPopulationHistory(object):
     """History of the GroupPopulation object's states.
+
+    For efficiency, this class operates on a group's hash (i.e., a integer) and a group's mass (i.e., a float) and does
+    not store any actual Group objects.  GroupPopulation object's groups dict is necessary for recovery of full group
+    definition.
 
     Args:
         pop (GroupPopulation): Group population to be archived.

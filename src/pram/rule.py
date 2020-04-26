@@ -18,7 +18,7 @@ from enum            import IntEnum
 from scipy.stats     import gamma, lognorm, norm, poisson, rv_discrete
 from scipy.integrate import ode, solve_ivp
 
-from .entity import GroupQry, GroupSplitSpec, Site
+from .entity import Group, GroupQry, GroupSplitSpec, Site
 from .util   import Err, Time as TimeU
 
 
@@ -223,9 +223,7 @@ class Rule(ABC):
         elif isinstance(self.i, IterPoint):
             return self.i.i == iter
         elif isinstance(self.i, IterInt):
-            # is_i_ok = is_i_ok and self.i.i0 <= iter <= self.i.i1
-            return self.i.i0 <= iter
-            return iter <= self.i.i1 or self.i.i1 <= 0
+            return self.i.i0 <= iter <= self.i.i1
         elif isinstance(self.i, IterSet):
             return iter in self.i.i
         else:

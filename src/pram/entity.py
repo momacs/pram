@@ -4,7 +4,9 @@
 The three types of entities which can comprise a PRAM model are *groups*, *sites*, and *resources*.
 """
 
+import pickle
 import copy
+import functools
 import gc
 import hashlib
 import inspect
@@ -15,19 +17,62 @@ import numpy as np
 import os
 import xxhash
 
-from dotmap import DotMap
+from dotmap           import DotMap
+from numba            import jit
 
 from abc             import ABC
 from attr            import attrs, attrib, converters, validators
 from collections.abc import Iterable
 from enum            import auto, unique, IntEnum
-from functools       import lru_cache
+from functools       import lru_cache, reduce
 from iteround        import saferound
 from scipy.stats     import rv_continuous
 
 from .util import DB, Err, FS
 
 __all__ = ['GroupFrozenError', 'Resource', 'Site', 'GroupQry', 'GroupSplitSpec', 'GroupDBRelSpec', 'Group']
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+from collections import Mapping
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
+import operator
+
+
+class FrozenOrderedDict(Mapping):
+    """ Source: https://github.com/wsmith323/frozenordereddict/blob/master/frozenordereddict/__init__.py """
+
+    def __init__(self, *args, **kwargs):
+        self.__dict = OrderedDict(*args, **kwargs)
+        self.__hash = None
+
+    def __getitem__(self, item):
+        return self.__dict[item]
+
+    def __iter__(self):
+        return iter(self.__dict)
+
+    def __len__(self):
+        return len(self.__dict)
+
+    def __hash__(self):
+        if self.__hash is None:
+            self.__hash = reduce(operator.xor, map(hash, self.items()), 0)
+
+        return self.__hash
+
+    def __repr__(self):
+        return '{}({!r})'.format(self.__class__.__name__, self.items())
+
+    def copy(self, *args, **kwargs):
+        new_dict = self.__dict.copy()
+        if args or kwargs:
+            new_dict.update(OrderedDict(*args, **kwargs))
+        return self.__class__(new_dict)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -297,6 +342,13 @@ class EntityJSONEncoder(json.JSONEncoder):
             return { '__Resource__': o.get_hash() }  # return { '__Resource__': o.name }
         if callable(o):
             return { '__function__': xxhash.xxh64(str(inspect.getsource(o))).hexdigest() }
+        if isinstance(o, set):
+            # return pickle.dumps(o)
+            return list(o)
+        # if isinstance(o, frozendict):
+        #     return o.__hash__()
+        # if isinstance(o, FrozenOrderedDict):
+        #     return o.__hash__()
         return json.JSONEncoder.default(self, o)
 
 
@@ -376,11 +428,6 @@ class Site(Resource):
         # self.groups.add(group.get_hash())
         self.m += group.m
         return self
-
-    def freeze(self):
-        """Freezes the site thus disallowing any direct changes to it."""
-
-        self.is_frozen = True
 
     def ga(self, name=None):
         """See :meth:`~pram.entity.Site.get_attr` method."""
@@ -694,13 +741,16 @@ class GroupQry(object):
             match requires that a group's attributes _contain_ the query's attributes (and same for relations).
     """
 
-    __slots__ = ('attr', 'rel', 'cond', 'full', 'hash')
+    __slots__ = ('attr', 'rel', 'attr_enc', 'rel_enc', 'cond', 'full', 'is_enc', 'hash')
 
     def __init__(self, attr={}, rel={}, cond=[], full=False):
-        self.attr = attr
-        self.rel  = rel
-        self.cond = cond
-        self.full = full
+        self.attr     = attr
+        self.rel      = rel
+        self.attr_enc = None
+        self.rel_enc  = None
+        self.cond     = cond
+        self.full     = full
+        self.is_enc   = False  # Flag: Have the attributes and relations been encoded by pop.Encoder?
 
         self.hash = None  # computed lazily
 
@@ -715,14 +765,21 @@ class GroupQry(object):
 
     def __hash__(self):
         if self.hash is None:
-            self.hash = GroupQry.gen_hash(self.attr, self.rel, self.cond, self.full)
+            if self.is_enc:
+                self.hash = GroupQry.gen_hash(self.attr_enc, self.rel_enc, self.cond, self.full)
+            else:
+                self.hash = GroupQry.gen_hash(self.attr, self.rel, self.cond, self.full)
         return self.hash
 
     @staticmethod
     def gen_hash(attr={}, rel={}, cond=[], full=False):
         # hash = xxhash.xxh64(json.dumps((attr, rel, cond, full), sort_keys=True, cls=EntityJSONEncoder)).intdigest()
         # hash = xxhash.xxh64(jsonpickle.encode((attr, rel, str([inspect.getsource(i) for i in cond], full))).intdigest()
-        return xxhash.xxh64(json.dumps((attr, rel, str([inspect.getsource(i) for i in cond]), full), sort_keys=True)).intdigest()
+
+        # return xxhash.xxh64(json.dumps((attr, rel, str([inspect.getsource(i) for i in cond]), full), sort_keys=True)).intdigest()  # when using non-encoded attr and rel
+
+        return xxhash.xxh64(pickle.dumps((attr, rel, str([inspect.getsource(i) for i in cond]), full))).intdigest()  # when using encoded attr and rel
+        # return xxhash.xxh64(json.dumps((attr, rel, str([inspect.getsource(i) for i in cond]), full), cls=EntityJSONEncoder)).intdigest()  # when using encoded attr and rel
 
     # def toJson(self):
     #     # return json.dumps(self, default=lambda o: o.__dict__)
@@ -761,7 +818,7 @@ class GroupSplitSpec(object):
     def is_prob(self, attribute, value):
         if not isinstance(value, float):
             raise TypeError(Err.type('p', 'float'))
-        if not (0 <= value <= 1):
+        if value < 0 or value > 1:
             raise ValueError("The probability 'p' must be in [0,1] range.")
 
 
@@ -779,6 +836,30 @@ class GroupDBRelSpec(object):
     name  : str  = attrib()
     col   : str  = attrib()
     sites : dict = attrib(default=None)  # if None it will be generated from the DB
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def freezeargs(fn):
+    """
+    Transform a mutable dictionary into an immutable one to make it compatible with cache.
+
+    https://stackoverflow.com/questions/6358481/using-functools-lru-cache-with-dictionary-arguments
+    """
+
+    class HDict(dict):
+        def __hash__(self):
+            return hash(frozenset(self.items()))
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        args = tuple([frozendict(arg) if isinstance(arg, dict) else arg for arg in args])
+        kwargs = {k: frozendict(v) if isinstance(v, dict) else v for k, v in kwargs.items()}
+        return fn(*args, **kwargs)
+
+    wrapper.cache_info  = fn.cache_info   # for @lru_cache
+    wrapper.cache_clear = fn.cache_clear  # ^
+
+    return wrapper
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -837,7 +918,7 @@ class Group(Entity):
             :meth:`Group.done() pram.entity.Group.done`.  See usage examples above.
     """
 
-    __slots__ = ('name', 'm', 'attr', 'rel', 'pop', 'is_frozen', 'hash', 'callee')
+    __slots__ = ('name', 'm', 'attr', 'rel', 'attr_enc', 'rel_enc', 'pop', 'is_enc', 'hash', 'callee')
 
     VOID = { '__void__': True }  # all groups with this attribute are removed at the end of every iteration
 
@@ -853,9 +934,11 @@ class Group(Entity):
         self.m        = float(m)
         self.attr     = attr or {}
         self.rel      = rel  or {}
+        self.attr_enc = None
+        self.rel_enc  = None
         self.pop      = pop
+        self.is_enc   = False  # Flag: Have the group query's attributes and relations been encoded by pop.GroupEncoder?
 
-        self.is_frozen = False
         self.hash = None      # computed lazily
         self.callee = callee  # used only throughout the process of creating group; unset by done()
 
@@ -878,7 +961,10 @@ class Group(Entity):
 
     def __hash__(self):
         if self.hash is None:
-            self.hash = Group.gen_hash(self.attr, self.rel)
+            if self.is_enc:
+                self.hash = Group.gen_hash(self.attr_enc, self.rel_enc)
+            else:
+                self.hash = Group.gen_hash(self.attr, self.rel)
         return self.hash
 
     def __repr__(self):
@@ -888,50 +974,160 @@ class Group(Entity):
         return '{}  name: {:16}  m: {:8}  attr: {}  rel: {}'.format(self.__class__.__name__, self.name or '.', round(self.m, 2), self.attr, self.rel)
 
     # @staticmethod
-    def _has(self, d, qry, used_set):
-        """Checks if a dictionary has keys or key-value pairs specified.
+    # def _has(self, d, qry, used_set):
+    #     """Checks if a dictionary has keys or key-value pairs specified.
+    #
+    #     This method compares the dictionary ``d`` against ``qry`` which can be a mapping, an iterable, and a string.
+    #     Depending on the type of ``qry``, the method returns True only if (and False otherwise):
+    #
+    #     - string: ``qry`` must be a key in ``d``
+    #     - iterable: all items in ``qry`` must be keys in ``d``
+    #     - mapping: all items in ``qry`` must exist in ``d``
+    #
+    #     Args:
+    #         d (Mapping[str, Any]): The original mapping.
+    #         qry (Union[str, Iterable[str], Mapping[str, Any]]): The required content that ``d`` will be queried
+    #             against.
+    #         used_set (Set[Any]): A set of attributes or relations that stores the ones that have been conditioned upon
+    #             by the simulation rules.  This is used internally by PyPRAM.
+    #
+    #     Returns:
+    #         bool: True if (False otherwise):
+    #             - ``qry`` is a string and is a key in ``d``
+    #             - ``qry`` is an iterable and all items in ``qry`` are keys in ``d``
+    #             - ``qry`` is a mapping and all items in ``qry`` exist in ``d``
+    #     """
+    #
+    #     if isinstance(qry, dict):
+    #         if used_set is not None:
+    #             used_set.update(qry.keys())
+    #         if self.pop:
+    #             qry = { k:v.__hash__() if isinstance(v, Site) else v for (k,v) in qry.items() }  # TODO: Double-check this line
+    #         return qry.items() <= d.items()
+    #
+    #     if isinstance(qry, str):  # needs to be above the Iterable check because a string is an Iterable
+    #         if used_set is not None:
+    #             used_set.add(qry)
+    #         return qry in d.keys()
+    #
+    #     if isinstance(qry, Iterable):
+    #         if used_set is not None:
+    #             used_set.update(qry)
+    #         if self.pop:
+    #             qry = [q.__hash__() if isinstance(q, Site) else q for q in qry]
+    #         return all(i in d.keys() for i in qry)
+    #
+    #     raise TypeError(Err.type('qry', 'dictionary, Iterable, or string'))
 
-        This method compares the dictionary ``d`` against ``qry`` which can be a mapping, an iterable, and a string.
-        Depending on the type of ``qry``, the method returns True only if (and False otherwise):
+    def _has_attr(self, qry):
+        """Checks if ``self.attr`` has keys or key-value pairs specified.
 
-        - string: ``qry`` must be a key in ``d``
-        - iterable: all items in ``qry`` must be keys in ``d``
-        - mapping: all items in ``qry`` must exist in ``d``
+        This method compares the dictionary ``self.attr`` against ``qry`` which can be a mapping, an iterable, and a
+        string.  Depending on the type of ``qry``, the method returns True only if (and False otherwise):
+
+        - string: ``qry`` must be a key in ``self.attr``
+        - iterable: all items in ``qry`` must be keys in ``self.attr``
+        - mapping: all items in ``qry`` must exist in ``self.attr``
 
         Args:
-            d (Mapping[str, Any]): The original mapping.
-            qry (Union[str, Iterable[str], Mapping[str, Any]]): The required content that ``d`` will be queried
+            qry (Union[str, Iterable[str], Mapping[str, Any]]): The required content that ``self.attr`` will be queried
                 against.
-            used_set (Set[Any]): A set of attributes or relations that stores the ones that have been conditioned upon
-                by the simulation rules.  This is used internally by PyPRAM.
 
         Returns:
             bool: True if (False otherwise):
-                - ``qry`` is a string and is a key in ``d``
-                - ``qry`` is an iterable and all items in ``qry`` are keys in ``d``
-                - ``qry`` is a mapping and all items in ``qry`` exist in ``d``
+                - ``qry`` is a string and is a key in ``self.attr``
+                - ``qry`` is an iterable and all items in ``qry`` are keys in ``self.attr``
+                - ``qry`` is a mapping and all items in ``qry`` exist in ``self.attr``
         """
 
         if isinstance(qry, dict):
-            if used_set is not None:
-                used_set.update(qry.keys())
+            if self.attr_used is not None:
+                self.attr_used.update(qry.keys())
             if self.pop:
-                qry = { k:v.__hash__() if isinstance(v, Site) else v for (k,v) in qry.items() }  # TODO: Double-check this line
-            return qry.items() <= d.items()
+                qry = { k:v.get_hash() if isinstance(v, Site) else v for (k,v) in qry.items() }
+            if self.is_enc:
+                qry = self.pop.ar_enc.encode_attr(qry)
+                return qry <= self.attr_enc
+            else:
+                return qry.items() <= self.attr.items()
 
-        if isinstance(qry, str):  # needs to be above the Iterable check because a string itself is an Iterable
-            if used_set is not None:
-                used_set.add(qry)
-            return qry in d.keys()
+        if isinstance(qry, str):  # needs to be above the Iterable check because a string is an Iterable
+            if self.attr_used is not None:
+                self.attr_used.add(qry)
+            if self.is_enc:
+                ki = self.pop.ar_enc.attr_k2i.get(qry)
+                return ki is not None and len([t for t in self.attr_enc if t[0] == ki]) > 0
+            else:
+                return qry in self.attr.keys()
 
         if isinstance(qry, Iterable):
-            if used_set is not None:
-                used_set.update(qry)
+            if self.attr_used is not None:
+                self.attr_used.update(qry)
             if self.pop:
                 qry = [q.__hash__() if isinstance(q, Site) else q for q in qry]
-            return all(i in d.keys() for i in qry)
+            if self.is_enc:
+                # return set(qry) <= self.attr.keys()
+                kis = [self.pop.ar_enc.attr_k2i.get(q) for q in qry]
+                return len(kis) > 0 and len([t for t in self.attr_enc if t[0] in kis]) > 0
+            else:
+                return all(i in self.attr.keys() for i in qry)
 
-        raise TypeError(Err.type('qry', 'dictionary, Iterable, or string'))
+        raise Err.type('qry', 'dictionary, Iterable, or string')
+
+    def _has_rel(self, qry):
+        """Checks if ``self.rel`` has keys or key-value pairs specified.
+
+        This method compares the dictionary ``self.rel`` against ``qry`` which can be a mapping, an iterable, and a
+        string.  Depending on the type of ``qry``, the method returns True only if (and False otherwise):
+
+        - string: ``qry`` must be a key in ``self.rel``
+        - iterable: all items in ``qry`` must be keys in ``self.rel``
+        - mapping: all items in ``qry`` must exist in ``self.rel``
+
+        Args:
+            qry (Union[str, Iterable[str], Mapping[str, Any]]): The required content that ``self.rel`` will be queried
+                against.
+
+        Returns:
+            bool: True if (False otherwise):
+                - ``qry`` is a string and is a key in ``self.rel``
+                - ``qry`` is an iterable and all items in ``qry`` are keys in ``self.rel``
+                - ``qry`` is a mapping and all items in ``qry`` exist in ``self.rel``
+        """
+
+        if isinstance(qry, dict):
+            if self.rel_used is not None:
+                self.rel_used.update(qry.keys())
+            if self.pop:
+                qry = { k:v.get_hash() if isinstance(v, Site) else v for (k,v) in qry.items() }
+            if self.is_enc:
+                ary = self.pop.ar_enc.encode_rel(qry)
+                return qry <= self.rel_enc
+            else:
+                return qry.items() <= self.rel.items()
+
+        if isinstance(qry, str):  # needs to be above the Iterable check because a string is an Iterable
+            if self.rel_used is not None:
+                self.rel_used.add(qry)
+            if self.is_enc:
+                ki = self.pop.ar_enc.rel_k2i.get(qry)
+                return ki is not None and len([t for t in self.rel_enc if t[0] == ki]) > 0
+            else:
+                return qry in self.rel.keys()
+
+        if isinstance(qry, Iterable):
+            if self.rel_used is not None:
+                self.rel_used.update(qry)
+            if self.pop:
+                qry = [q.__hash__() if isinstance(q, Site) else q for q in qry]
+            if self.is_enc:
+                # return set(qry) <= self.rel.keys()
+                kis = [self.pop.ar_enc.rel_k2i.get(q) for q in qry]
+                return len(kis) > 0 and len([t for t in self.rel_enc if t[0] in kis]) > 0
+            else:
+                return all(i in self.rel.keys() for i in qry)
+
+        raise Err.type('qry', 'dictionary, Iterable, or string')
 
     def apply_rules(self, pop, rules, iter, t, is_rule_setup=False, is_rule_cleanup=False, is_sim_setup=False):
         """Applies all the simulation rules to the group.
@@ -1065,57 +1261,10 @@ class Group(Entity):
         self.callee = None
         return c
 
-    def freeze(self):
-        """Freezes the group.
-
-        No direct changes to the group's identity as seen from the point of view of PRAM's engine operation can be made
-        to a frozen group.  A group's identity is defined by the composition of its attributes and relations.  Groups
-        are automatically frozen when added to the GroupPopulation object to prevent the user from interfering with
-        PyPRAM's operation.
-        """
-
-        self.is_frozen = True
-
     def ga(self, name=None):
         """See :meth:`~pram.entity.Group.get_attr` method."""
 
         return self.get_attr(name)
-
-    @staticmethod
-    def gen_hash(attr={}, rel={}):
-        """Generates the group's hash.
-
-        Generates a hash for the attributes and relations dictionaries.  This sort of hash is desired because groups
-        are judged functionally equivalent based on the content of those two dictionaries alone (i.e., the name and the
-        size of a group does not affect its identity).
-
-        The following non-cryptographic hashing algorithms have been tested:
-
-        - hash()
-        - hashlib.sha1()
-        - xxhash.xxh32()
-        - xxhash.xxh64()
-
-        As is evident from the source code, each of the algorithms required a slightly different treatment of the
-        attribute and relation dictionaries.  All these options are legitimate and they don't differ much in terms of
-        speed.  They do howeve differ in terms of reproducability.  Namely, the results of the built-in hash() function
-        cannot be compared between-runs while the other ones can.  This behavior of the hash() function is to prevent
-        attackers from reusing hashes and it can be disabled by setting 'PYTHONHASHSEED=0'.
-
-        The user can uncomment the desired method to use it, but it is not recommended.
-
-        Args:
-            attr (Mapping[str, Any]): Group's attributes.
-            rel (Mapping[str, Site], optional): Group's relations.
-
-        Returns:
-            int: A hash of the attributes and relations specified.
-        """
-
-        # return hash(tuple([frozenset(attr.items()), frozenset(rel.items())]))
-        # return hashlib.sha1(json.dumps((attr, rel), sort_keys=True, cls=EntityJSONEncoder).encode('utf-8')).hexdigest()
-        # return xxhash.xxh32(json.dumps((attr, rel), sort_keys=True, cls=EntityJSONEncoder)).hexdigest()
-        return xxhash.xxh64(json.dumps((attr, rel), sort_keys=True, cls=EntityJSONEncoder)).intdigest()  # .hexdigest()
 
     @classmethod
     def gen_from_db(cls, db_fpath, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0, fn_live_info=None):
@@ -1421,8 +1570,9 @@ class Group(Entity):
         return groups
 
     @staticmethod
+    # @lru_cache(maxsize=None)
     def gen_dict(d_in, d_upd=None, k_del=None):
-        """Generates a dictionary.
+        """Generates a group's attributes or relations dictionary.
 
         This method is used to create new dictionaries based on existing ones and given changes to those existing ones.
         Specifically, a new dictionary is based on the 'd_in' dictionary with values updated based on the 'd_upd'
@@ -1445,6 +1595,9 @@ class Group(Entity):
             Consider: https://stackoverflow.com/questions/38987/how-to-merge-two-dictionaries-in-a-single-expression
         """
 
+        if (d_upd is None or len(d_upd) == 0) and (k_del is None or len(k_del) == 0):
+            return d_in
+
         ret = d_in.copy()
 
         if d_upd is not None:
@@ -1457,8 +1610,47 @@ class Group(Entity):
 
         return ret
 
-    def get_attr(self, name=None):
-        """Retrieves attribute's value.
+    @staticmethod
+    # @freezeargs
+    # @lru_cache(maxsize=None)
+    def gen_hash(attr={}, rel={}):
+        """Generates the group's hash.
+
+        Generates a hash for the attributes and relations dictionaries.  A hash over those two dictionaries is needed
+        because groups are judged functionally equivalent based on the content of those two dictionaries alone.
+
+        The following non-cryptographic hashing algorithms have been tested:
+
+        - hash()
+        - hashlib.sha1()
+        - xxhash.xxh32()
+        - xxhash.xxh64()
+
+        As is evident from the source code, each of the algorithms required a slightly different treatment of the
+        attribute and relation dictionaries.  All these options are legitimate and they don't differ much in terms of
+        speed.  They do howeve differ in terms of reproducability.  Namely, the results of the built-in hash() function
+        cannot be compared between-runs while the other ones can.  This behavior of the hash() function is to prevent
+        attackers from reusing hashes and it can be disabled by setting 'PYTHONHASHSEED=0'.
+
+        An advanced user can uncomment the desired method to experiment with it.
+
+        Args:
+            attr (Mapping[str, Any]): Group's attributes.
+            rel (Mapping[str, Site or int hash], optional): Group's relations (i.e., site objects or their hashes).
+
+        Returns:
+            int: A hash of the attributes and relations specified.
+        """
+
+        # return hash(tuple([frozenset(attr.items()), frozenset(rel.items())]))
+        # return hashlib.sha1(json.dumps((attr, rel), sort_keys=True, cls=EntityJSONEncoder).encode('utf-8')).hexdigest()
+        # return xxhash.xxh32(json.dumps((attr, rel), sort_keys=True, cls=EntityJSONEncoder)).hexdigest()
+
+        # return xxhash.xxh64(json.dumps((attr, rel), sort_keys=True, cls=EntityJSONEncoder)).intdigest()  # when using non-encoded attr and rel
+        return xxhash.xxh64(pickle.dumps((attr, rel))).intdigest()  # when using encoded attr and rel
+
+    def get_attr(self, name):
+        """Retrieves an attribute's value.
 
         Args:
             name (str): Attribute's name.
@@ -1467,11 +1659,19 @@ class Group(Entity):
             Any: Attribute's value.
         """
 
-        if name and self.attr_used is not None:
+        if self.attr_used is not None:
             self.attr_used.add(name)
 
-        # return self.attr[name] if name is not None else self.attr
-        return self.attr.get(name) if name is not None else self.attr
+        return self.attr.get(name)
+
+    def get_attrs(self):
+        """Retrieves the group's attributes.
+
+        Returns:
+            dict: Attribute.
+        """
+
+        return self.attr
 
     def get_hash(self):
         """Get the group's hash.
@@ -1483,6 +1683,9 @@ class Group(Entity):
         """
 
         return self.__hash__()
+
+    def get_mass(self):
+        return self.m
 
     def get_site_at(self):
         """Get the site the group is currently located at.
@@ -1500,17 +1703,17 @@ class Group(Entity):
         else:
             return self.rel[Site.AT]
 
-    def get_rel(self, name=None):
-        """Retrieves relation's value or all relations if no name is provided.
+    def get_rel(self, name):
+        """Retrieves a relation's value.
 
         Args:
-            name (str, optional): Relation's name.
+            name (str): Relation's name.
 
         Returns:
-            Any: Relation's value or all relations.
+            Any: Relation's value.
         """
 
-        if name and self.rel_used is not None:
+        if self.rel_used is not None:
             self.rel_used.add(name)
 
         # return self.rel[name] if name is not None else self.rel  # old
@@ -1523,8 +1726,14 @@ class Group(Entity):
         else:
             return self.rel[name]
 
-    def get_mass(self):
-        return self.m
+    def get_rels(self):
+        """Retrieves the group's relations.
+
+        Returns:
+            dict: Relations.
+        """
+
+        return self.rel
 
     def gr(self, name=None):
         """See :meth:`~pram.entity.Group.get_rel` method."""
@@ -1545,7 +1754,8 @@ class Group(Entity):
             bool
         """
 
-        return self._has(self.attr, qry, self.attr_used)
+        # return self._has(self.attr, qry, self.attr_used)
+        return self._has_attr(qry)
 
     def has_rel(self, qry):
         """Checks if the group has the specified relations.
@@ -1556,7 +1766,8 @@ class Group(Entity):
             bool
         """
 
-        return self._has(self.rel, qry, self.rel_used)
+        # return self._has(self.rel, qry, self.rel_used)
+        return self._has_rel(qry)
 
     def has_sites(self, sites):
         """Checks if the groups has the sites specified.
@@ -1568,7 +1779,8 @@ class Group(Entity):
             bool
         """
 
-        return self._has(self.rel, sites, self.rel_used)
+        # return self._has(self.rel, sites, self.rel_used)
+        return self._has_rel(qry)
 
     def hr(self, qry):
         """See :meth:`~pram.entity.Group.has_rel` method."""
@@ -1588,7 +1800,8 @@ class Group(Entity):
 
         if self.rel.get(name) is None:
             return False
-        return self.rel.get(Site.AT) and self.rel[Site.AT] == self.rel.get(name)
+        site_at = self.rel.get(Site.AT)
+        return site_at == self.rel.get(name)
 
     def is_void(self):
         """Checks if the group is a VOID group (i.e., it should be removed from the simulation).
@@ -1606,13 +1819,15 @@ class Group(Entity):
             self: For method call chaining.
         """
 
-        at = self.rel.get(Site.AT)
-        if at:
-            # at.add_group_link(self)  # old sites handling
-            if self.pop:
-                self.pop.sites[at].add_group_link(self)
+        if len(self.rel) > 0:
+            at = self.rel.get(Site.AT)
+            if at:
+                # at.add_group_link(self)  # old sites handling
+                if self.pop:
+                    self.pop.sites[at].add_group_link(self)
         return self
 
+    # @lru_cache(maxsize=None)
     def matches_qry(self, qry):
         """Checks if the group matches the group query specified.
 
@@ -1626,22 +1841,31 @@ class Group(Entity):
         if not qry:
             return True
 
-        # if qry.full:
-        #     return qry.attr == self.attr and qry.rel == self.rel and all([fn(self) for fn in qry.cond])
-        # else:
-        #     return qry.attr.items() <= self.attr.items() and qry.rel.items() <= self.rel.items() and all([fn(self) for fn in qry.cond])
+        if self.is_enc:
+            if not qry.is_enc and self.pop:
+                self.pop.ar_enc.encode(qry)
+            if qry.is_enc:
+                if qry.full:
+                    return qry.attr == self.attr and qry.rel == self.rel and all([fn(self) for fn in qry.cond])
+                else:
+                    return qry.attr_enc <= self.attr_enc and qry.rel_enc <= self.rel_enc and all([fn(self) for fn in qry.cond])
+
+        if qry.full:
+            return qry.attr == self.attr and qry.rel == self.rel and all([fn(self) for fn in qry.cond])
+        else:
+            return qry.attr.items() <= self.attr.items() and qry.rel.items() <= self.rel.items() and all([fn(self) for fn in qry.cond])
 
         # Check where most time is spent when evaluating a group-query match:
-        if qry.full:
-            if len(qry.cond) == 0:
-                return self.matches_qry_full_cond0(qry)
-            else:
-                return self.matches_qry_full_cond1(qry)
-        else:
-            if len(qry.cond) == 0:
-                return self.matches_qry_part_cond0(qry)
-            else:
-                return self.matches_qry_part_cond1(qry)
+        # if qry.full:
+        #     if len(qry.cond) == 0:
+        #         return self.matches_qry_full_cond0(qry)
+        #     else:
+        #         return self.matches_qry_full_cond1(qry)
+        # else:
+        #     if len(qry.cond) == 0:
+        #         return self.matches_qry_part_cond0(qry)
+        #     else:
+        #         return self.matches_qry_part_cond1(qry)
 
     def matches_qry_full_cond0(self, qry):
         return qry.attr == self.attr and qry.rel == self.rel
@@ -1655,88 +1879,78 @@ class Group(Entity):
     def matches_qry_part_cond1(self, qry):
         return self.matches_qry_part_cond0(qry) and all([fn(self) for fn in qry.cond])
 
-    def set_attr(self, name, value, do_force=True):
+    def set_attr(self, name, value, do_force=False):
         """Sets a group's attribute.
 
         Args:
             name (str): Attribute's name.
             value (Any): Attribute's value.
-            do_force (bool): Flag: Force despite the group being frozen? Currently unused and pending possible removal.
+            do_force (bool): Flag: Force despite the group being frozen? Don't set to True unless you like pain.
 
         Raises:
             GroupFrozenError
 
         Returns:
             self: For method call chaining.
-
-        Todo:
-            Remove the ``do_force`` argument?
         """
 
-        if self.is_frozen:
+        if self.pop and not do_force:
             raise GroupFrozenError('Attempting to set an attribute of a frozen group.')
-
-        # if self.attr.get(name) is not None and not do_force:
-        #     raise ValueError("Group '{}' already has the attribute '{}'.".format(self.name, name))
 
         self.attr[name] = value
         self.hash = None
 
         return self
 
-    def set_attrs(self, attr, do_force=True):
+    def set_attrs(self, attrs, do_force=False):
         """Sets multiple group's attributes.
 
         This method is not implemented yet.
 
         Args:
             attr (Mapping[str, Any]): Attributes.
-            do_force (bool): Flag: Force despite the group being frozen? Currently unused and pending possible removal.
+            do_force (bool): Flag: Force despite the group being frozen?  Don't set to True unless you like pain.
 
         Raises:
             GroupFrozenError
 
         Returns:
             self: For method call chaining.
-
-        Todo:
-            - Implement method.
-            - Remove the ``do_force`` argument?
         """
 
-        if self.is_frozen:
-            raise GroupFrozenError('Attempting to set attributes of a frozen group.')
+        if len(attrs) == 0:
+            return self
 
-        raise Error('Not implemented yet')
+        if self.pop and not do_force:
+            raise GroupFrozenError('Attempting to set a relation of a frozen group.')
 
-    def set_rel(self, name, value, do_force=True):
+        self.attr.update(attrs)
+        self.hash = None
+
+        return self
+
+    def set_rel(self, name, value, do_force=False):
         """Sets a group's relation.
 
         Args:
             name (str): Relation's name.
             value (Any): Relation's value.
-            do_force (bool): Flag: Force despite the group being frozen? Currently unused and pending possible removal.
+            do_force (bool): Flag: Force despite the group being frozen? Don't set to True unless you like pain.
 
         Raises:
             GroupFrozenError
 
         Returns:
             self: For method call chaining.
-
-        Todo:
-            Remove the ``do_force`` argument?
         """
 
-        if self.is_frozen:
+        if self.pop and not do_force:
             raise GroupFrozenError('Attempting to set a relation of a frozen group.')
 
         # if name == Site.AT:
         #     raise ValueError("Relation name '{}' is restricted for internal use.".format(Site.AT))
 
-        if self.rel.get(name) and not do_force:
-            raise ValueError("Group '{}' already has the relation '{}'.".format(self.name or '.', name))
-
-        self.rel[name] = value
+        self.rel[name] = value if not isinstance(value, Entity) else value.get_hash()
         self.hash = None
 
         if self.pop and name == Site.AT:
@@ -1744,31 +1958,37 @@ class Group(Entity):
 
         return self
 
-    def set_rels(self, rel, do_force=True):
+    def set_rels(self, rels, do_force=False):
         """Sets multiple group's relation.
 
         This method is not implemented yet.
 
         Args:
-            rel (Mapping[str, Site]): Relations.
-            do_force (bool): Flag: Force despite the group being frozen? Currently unused and pending possible removal.
+            rels (Mapping[str, Entity]): Relations.
+            do_force (bool): Flag: Force despite the group being frozen? Don't set to True unless you like pain.
 
         Raises:
             GroupFrozenError
 
         Returns:
             self: For method call chaining.
-
-        Todo:
-            - Implement method.
-            - Remove the ``do_force`` argument?
         """
 
-        if self.is_frozen:
-            raise GroupFrozenError('Attempting to set relations of a frozen group.')
+        if len(rels) == 0:
+            return self
 
-        raise Error('Not implemented yet')
+        if self.pop and not do_force:
+            raise GroupFrozenError('Attempting to set a relation of a frozen group.')
 
+        self.rel.update(rels)
+        self.hash = None
+
+        if self.pop and Site.AT in rel_tmp.keys():
+            self.link_to_site_at()
+
+        return self
+
+    # @jit(parallel=True)
     def split(self, specs):
         """Splits the group into new groups according to the split specs.
 
@@ -1819,8 +2039,18 @@ class Group(Entity):
             if m == 0:  # don't instantiate empty groups
                 continue
 
+            # Substitute Site object references with their hashes and add the objects themselves to the pop object:
+            rel_set = {}
+            for (k,v) in s.rel_set.items():
+                if isinstance(v, Entity):
+                    self.pop.add_site(v)
+                    rel_set[k] = v.get_hash()
+                else:
+                    rel_set[k] = v
+
+            # Instantiate the new group:
             attr = Group.gen_dict(self.attr, s.attr_set, s.attr_del)
-            rel  = Group.gen_dict(self.rel,  s.rel_set,  s.rel_del)
+            rel  = Group.gen_dict(self.rel,  rel_set,    s.rel_del)  # add is_rel=False
 
             # g = Group('{}.{}'.format(self.name, i), m, attr, rel)
             # if g == self:
@@ -1831,15 +2061,6 @@ class Group(Entity):
             groups.append(Group(self.name, m, attr, rel))  # use the same group name
 
         return groups
-
-    def unfreeze(self):
-        """Makes the group ammenable to changes via its API.
-
-        Warnings:
-            Unless you're doing something low level, you do not want to call this method.
-        """
-
-        self.is_frozen = False
 
 
 # ----------------------------------------------------------------------------------------------------------------------

@@ -390,19 +390,35 @@ class ProbePersistenceDB(ProbePersistence):
 
         probe_item = self.probes[DB.str_to_name(probe.name)]
 
+        # data = { s['var']:[] for s in series }
+        # data['i'] = []
+        # with self.conn as c:
+        #     for r in c.execute(probe_item.sel_qry).fetchall():
+        #         data['i'].append(r['i'])
+        #         for s in series:
+        #             data[s['var']].append(r[s['var']])
+
         data = { s['var']:[] for s in series }
+        if series[0].get('var-ci') is not None:
+            data.update({ s['var-ci']:[] for s in series })
         data['i'] = []
         with self.conn as c:
             for r in c.execute(probe_item.sel_qry).fetchall():
                 data['i'].append(r['i'])
                 for s in series:
                     data[s['var']].append(r[s['var']])
+                    if s.get('var-ci') is not None:
+                        data[s['var-ci']].append(r[s['var-ci']])
 
         # Plot:
         fig = plt.figure(figsize=figsize, dpi=dpi)
         # plt.title('SIR Model')
         for s in series:
             plt.plot(data['i'], data[s['var']], lw=s.get('lw'), ls=s.get('ls'), dashes=s.get('dashes', []), marker=s.get('marker'), color=s.get('color'), ms=s.get('ms'), mfc='none', antialiased=True)
+            if s.get('var-ci') is not None:
+                lb = [i - j for i, j in zip(data[s['var']], data[s['var-ci']])]
+                ub = [i + j for i, j in zip(data[s['var']], data[s['var-ci']])]
+                plt.fill_between(data['i'], lb, ub, facecolor=s.get('color'), alpha=0.35, interpolate=True)
         plt.legend([s['lbl'] for s in series], loc=legend_loc)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
@@ -666,7 +682,7 @@ class Probe(ABC):
 
         self.set_persistence(persistence)
 
-    def plot(self, series, ylabel, xlabel='Iteration', fig_fpath=None, figsize=(8,8), legend_loc='upper right', dpi=150, subplot_l=0.08, subplot_r=0.98, subplot_t=0.95, subplot_b=0.25):
+    def plot(self, series, ylabel, xlabel='Iteration', figpath=None, figsize=(8,8), legend_loc='upper right', dpi=150, subplot_l=0.08, subplot_r=0.98, subplot_t=0.95, subplot_b=0.25):
         """Plots data associated with a probe.
 
         This method calls :meth:`~pram.data.ProbePersistence.plot`.
@@ -675,7 +691,7 @@ class Probe(ABC):
         if not self.persistence:
             return print('Plotting error: The probe is not associated with a persistence backend')
 
-        return self.persistence.plot(self, series, ylabel, xlabel, fig_fpath, figsize, legend_loc, dpi, subplot_l, subplot_r, subplot_t, subplot_b)
+        return self.persistence.plot(self, series, ylabel, xlabel, figpath, figsize, legend_loc, dpi, subplot_l, subplot_r, subplot_t, subplot_b)
 
     @abstractmethod
     def run(self, iter, t):
@@ -777,7 +793,7 @@ class GroupProbe(Probe, ABC):
 
     @classmethod
     def by_attr(cls, probe_name, attr_name, attr_values, qry_tot=None, var_names=None, consts=None, persistence=None, msg_mode=0, pop=None, memo=None):
-        """Instantiates the probe by attributes.
+        """Instantiates a probe that queries groups by values of one of its attributes.
 
         This constructor generates QueryGrp objects automatically for the attribute name and values specified.  It is a
         convenience method for probes that only use only a single attribute of PRAM groups and do not use relations.
@@ -805,7 +821,7 @@ class GroupProbe(Probe, ABC):
 
     @classmethod
     def by_rel(cls, probe_name, rel_name, rel_values, qry_tot=None, var_names=None, consts=None, persistence=None, msg_mode=0, pop=None, memo=None):
-        """Instantiates the probe by relations.
+        """Instantiates a probe that queries groups by values of one of its relations.
 
         This constructor generates QueryGrp objects automatically for the relation name and values specified.  It is a
         convenience method for probes that only use only a single relation of PRAM groups and do not use attributes.

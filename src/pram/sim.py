@@ -606,8 +606,8 @@ class SimulationSetter(object):
         self.sim.set_pragma(name, value)
         return self
 
-    def pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, comp_summary=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
-        self.sim.set_pragmas(analyze, autocompact, autoprune_groups, autostop, autostop_n, autostop_p, autostop_t, comp_summary, live_info, live_info_ts, probe_capture_init, rule_analysis_for_db_gen)
+    def pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, comp_summary=None, fractional_mass=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
+        self.sim.set_pragmas(analyze, autocompact, autoprune_groups, autostop, autostop_n, autostop_p, autostop_t, comp_summary, fractional_mass, live_info, live_info_ts, probe_capture_init, rule_analysis_for_db_gen)
         return self
 
     def pragma_analyze(self, value):
@@ -814,6 +814,7 @@ class Simulation(object):
         if probe.name in [p.name for probe in self.probes]:
             raise SimulationConstructionError(f'Probe with that name ({probe.name}) already exists.')
 
+        self.pop.ar_enc.encode_probe(probe)
         self.probes.append(probe)
         probe.set_pop(self.pop)
         return self
@@ -1756,7 +1757,7 @@ class Simulation(object):
         self.vars = {}
         return self
 
-    def run(self, iter_or_dur=1, do_disp_t=False):
+    def run(self, iter_or_dur=1, do_disp_t=False, do_disp_iter=False):
         """
         Args:
 
@@ -1847,6 +1848,9 @@ class Simulation(object):
 
         self.timer.start()
         for i in range(self.timer.get_i_left()):
+            if do_disp_iter:
+                print(i)
+
             ts_iter_0 = Time.ts()
 
             if self.cb.before_iter is not None:
@@ -2123,7 +2127,7 @@ class Simulation(object):
         self.fn.group_setup = fn
         return self
 
-    def set_pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, comp_summary=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
+    def set_pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, comp_summary=None, fractional_mass=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
         """Sets multiple pragmas at one time.
 
         Args:
@@ -2141,6 +2145,7 @@ class Simulation(object):
         if autostop_p               is not None: self.set_pragma_autostop_p(autostop_p),
         if autostop_t               is not None: self.set_pragma_autostop_t(autostop_t),
         if comp_summary             is not None: self.set_pragma_comp_summary(comp_summary),
+        if fractional_mass          is not None: self.set_pragma_fractional_mass(fractional_mass),
         if live_info                is not None: self.set_pragma_live_info(live_info),
         if live_info_ts             is not None: self.set_pragma_live_info_ts(live_info_ts),
         if probe_capture_init       is not None: self.set_pragma_probe_capture_init(probe_capture_init),
