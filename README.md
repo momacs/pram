@@ -13,7 +13,7 @@ This software is in the pre-release stage.
 
 ## Dependencies - Core Library ([`src/pram`](src/pram))
 
-- [Python 3.6](https://python.org)
+- [Python 3](https://python.org)
 - [altair](https://altair-viz.github.io)
 - [altair-saver](https://pypi.org/project/altair-saver)
 - [attrs](https://github.com/python-attrs/attrs)
