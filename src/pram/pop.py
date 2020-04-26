@@ -81,6 +81,7 @@ class AttrRelEncoder(object):
         self.attr_i2k = ['flu', 'age-group']
         self.attr_i2v = [['s', 'i', 'r'], ['10-19', '20-29']]
 
+    Possible future extension invonling bit-wise operations:
         group.attr_keys = [0,1]
         group.attr_keys_bin = 0b00000011  # for simplicity, assuming 8-bit architecture
     """
