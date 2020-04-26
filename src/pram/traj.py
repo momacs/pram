@@ -1227,7 +1227,7 @@ class TrajectoryEnsemble(object):
             workers = [Worker(i, t.id, t.sim, iter_or_dur, work_collector, progress_mon) for (i,t) in enumerate(self.traj.values())]
 
             wait_ids = [start_worker.remote(w) for w in workers]
-            time.sleep(1)
+            time.sleep(1)  # give workers time to start
             with TqdmUpdTo(total=n_iter, miniters=1, desc=f'nodes:{n_nodes}  cpus:{n_cpu}  trajs:{n_traj}  iters:{n_traj}×{iter_or_dur}={Size.b2h(n_iter, False)}', bar_format='{desc}  |{bar}| {percentage:3.0f}% [{elapsed}<{remaining}, {rate_fmt}{postfix}]', dynamic_ncols=True, ascii=' 123456789.') as pbar:
                 while len(wait_ids) > 0:
                     done_id, wait_ids = ray.wait(wait_ids, timeout=0.1)
@@ -1240,7 +1240,7 @@ class TrajectoryEnsemble(object):
             # sys.stdout.write('\n')
 
             progress_mon.rem_all_workers.remote()
-            time.sleep(random.random() * 2)  # lower the chance of simulations ending at the exact same time
+            time.sleep(random.random() * 2)  # lower the chance of simulations ending at the exact same time (possible in cases of highly-congruent simulations)
         finally:
             if self.cluster_inf.get_args().get('address') is None:
                 ray.shutdown()
