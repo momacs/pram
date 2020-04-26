@@ -4,15 +4,20 @@ A model of conflict-driven migration.
 This simulation is an extenstion of 'sim-03.py' and adds fluctuations of environmental harshness due to changing
 seasons.  To make these fluctuations more apparent, both the conflict duration (and therefore the simulation duration
 itself) is lengthened.
-'''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+cash before food allows to stockpile cash
+if no stockpiled cash trouble if
+
+grp that stores
+grp that spend
+    same but insured
+'''
 
 from pram.data   import Probe, ProbePersistenceMode, ProbePersistenceDB, ProbePersistenceMem, Var
 from pram.entity import Group, GroupQry, GroupSplitSpec, Site
 from pram.rule   import IterAlways, TimeAlways, Rule, Noop
 from pram.sim    import Simulation
+from pram.util   import Size, Time
 
 import random
 import statistics
@@ -185,7 +190,7 @@ class MigrationRule(Rule):
         migrating_groups = pop.get_groups(GroupQry(cond=[lambda g: g.has_attr({ 'is-migrating': True })]))
         if migrating_groups and len(migrating_groups) > 0:
             migrating_m = sum([g.m for g in migrating_groups])
-            migrating_p = migrating_m / pop.mass * 100
+            migrating_p = migrating_m / pop.m * 100
         else:
             migrating_p = 0
 
@@ -233,7 +238,7 @@ class PopProbe(Probe):
             self.run_iter(iter, t)
 
     def run_init(self):
-        self.pop_m_init = self.pop.mass
+        self.pop_m_init = self.pop.m
 
     def run_iter(self, iter, t):
         # Migrating population:
@@ -242,7 +247,7 @@ class PopProbe(Probe):
             migration_time_lst = [g.get_attr('migration-time') for g in migrating_groups]
 
             migrating_m         = sum([g.m for g in migrating_groups])
-            migrating_p         = migrating_m / self.pop.mass * 100
+            migrating_p         = migrating_m / self.pop.m * 100
             migrating_time_mean = statistics.mean (migration_time_lst)
             migrating_time_sd   = statistics.stdev(migration_time_lst) if len(migration_time_lst) > 1 else 0
         else:
@@ -255,7 +260,7 @@ class PopProbe(Probe):
         settled_groups = self.pop.get_groups(GroupQry(cond=[lambda g: g.has_attr({ 'has-settled': True })]))
         if settled_groups and len(settled_groups) > 0:
             settled_m = sum([g.m for g in settled_groups])
-            settled_p = settled_m / self.pop.mass * 100
+            settled_p = settled_m / self.pop.m * 100
         else:
             settled_m = 0
             settled_p = 0
@@ -263,16 +268,18 @@ class PopProbe(Probe):
         # Print and persist:
         print(
             f'{iter or 0:>4}  ' +
-            f'pop: {self.pop.mass:>9,.0f}    ' +
-            f'dead: {self.pop.mass_out:>9,.0f}|{self.pop.mass_out / self.pop_m_init * 100:>3,.0f}%    ' +
+            f'pop: {self.pop.m:>9,.0f}    ' +
+            f'dead: {self.pop.m_out:>9,.0f}|{self.pop.m_out / self.pop_m_init * 100:>3,.0f}%    ' +
             f'migrating: {migrating_m:>9,.0f}|{migrating_p:>3.0f}%    ' +
             f'migration-time: {migrating_time_mean:>6.2f} ({migrating_time_sd:>6.2f})    ' +
             f'settled: {settled_m:>9,.0f}|{settled_p:>3.0f}%    ' +
-            f'groups: {len(self.pop.groups):>6,d}'
+            f'groups: {len(self.pop.groups):>6,d}    ' +
+            f'{Size.bytes2human(self.pop.sim.comp_hist.mem_iter[-1]):>7}  ' +
+            f'{Time.tsdiff2human(self.pop.sim.comp_hist.t_iter[-1]):>12}'
         )
 
         if self.persistence:
-            self.persistence.persist(self, [self.pop.mass, self.pop.mass_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd, settled_m, settled_p], iter, t)
+            self.persistence.persist(self, [self.pop.m, self.pop.m_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd, settled_m, settled_p], iter, t)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -291,7 +298,7 @@ env = Environment(
 )
 
 sim = (Simulation().
-    set_pragmas(analyze=False, autocompact=True, comp_summary=True).
+    set_pragmas(analyze=False, autocompact=True, comp_summary=True, fractional_mass=False).
     add([
         ConflictRule(severity=0.05, scale=0.2, i=[0, conflict_dur]),
         MigrationRule(env, env_harshness_death_mult=0.1, migration_death_mult=0.0001),  # most deaths due to environment (to show the seasonal effect)

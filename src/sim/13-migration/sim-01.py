@@ -2,9 +2,6 @@
 A model of conflict-driven migration.
 '''
 
-import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-
 from pram.data   import Probe
 from pram.entity import Group, GroupQry, GroupSplitSpec, Site
 from pram.rule   import IterAlways, TimeAlways, Rule, Noop
@@ -71,7 +68,7 @@ class MigrationRule(Rule):
         migrating_groups = pop.get_groups(GroupQry(cond=[lambda g: g.has_attr({ 'is-migrating': True })]))
         if migrating_groups and len(migrating_groups) > 0:
             migrating_m = sum([g.m for g in migrating_groups])
-            migrating_p = migrating_m / pop.mass * 100
+            migrating_p = migrating_m / pop.m * 100
         else:
             migrating_p = 0
 
@@ -97,7 +94,7 @@ class PopProbe(Probe):
             self.run_iter(iter, t)
 
     def run_init(self):
-        self.pop_m_init = self.pop.mass
+        self.pop_m_init = self.pop.m
 
     def run_iter(self, iter, t):
         migrating_groups = self.pop.get_groups(GroupQry(cond=[lambda g: g.has_attr({ 'is-migrating': True })]))
@@ -105,7 +102,7 @@ class PopProbe(Probe):
             migration_time_lst = [g.get_attr('migration-time') for g in migrating_groups]
 
             migrating_m         = sum([g.m for g in migrating_groups])
-            migrating_p         = migrating_m / self.pop.mass * 100
+            migrating_p         = migrating_m / self.pop.m * 100
             migrating_time_mean = statistics.mean (migration_time_lst)
             migrating_time_sd   = statistics.stdev(migration_time_lst) if len(migration_time_lst) > 1 else 0
         else:
@@ -116,8 +113,8 @@ class PopProbe(Probe):
 
         print(
             f'{iter or 0:>4}  ' +
-            f'pop: {self.pop.mass:>9,.0f}    ' +
-            f'dead: {self.pop.mass_out:>9,.0f}|{self.pop.mass_out / self.pop_m_init * 100:>3,.0f}%    ' +
+            f'pop: {self.pop.m:>9,.0f}    ' +
+            f'dead: {self.pop.m_out:>9,.0f}|{self.pop.m_out / self.pop_m_init * 100:>3,.0f}%    ' +
             f'migrating: {migrating_m:>9,.0f}|{migrating_p:>3.0f}%    ' +
             f'migration-time: {migrating_time_mean:>6.2f} ({migrating_time_sd:>6.2f})'
         )
