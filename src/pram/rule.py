@@ -41,7 +41,11 @@ class IterAlways(Iter):
 
 @attrs(slots=True)
 class IterPoint(Iter):
-    i: float = attrib(default=0, converter=int)
+    i: int = attrib(default=0, converter=int)
+
+    def __attrs_post_init__(self):
+        if self.i < 0:
+            raise ValueError(f'Iteration must be non-negative, but {self.i} passed.')
 
 
 @attrs(slots=True)
@@ -49,10 +53,18 @@ class IterInt(Iter):
     i0: int = attrib(default=  0, converter=int)
     i1: int = attrib(default=100, converter=int)
 
+    def __attrs_post_init__(self):
+        if self.i0 < 0 or self.i1 < 0:
+            raise ValueError(f'Iterations must be non-negative, but ({self.i0}, {self.i1}) passed.')
+
 
 @attrs(slots=True)
 class IterSet(Iter):
     i: set = attrib(factory=set, converter=converters.default_if_none(factory=set))
+
+    def __attrs_post_init__(self):
+        if any(map(lambda x: x < 0, self.i)):
+            raise ValueError(f'All iterations must be non-negative, but {self.i} passed.')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -69,16 +81,28 @@ class TimeAlways(Time):
 class TimePoint(Time):
     t: float = attrib(default=0.00, converter=float)
 
+    def __attrs_post_init__(self):
+        if self.i < 0:
+            raise ValueError(f'Time must be non-negative, but {self.i} passed.')
+
 
 @attrs(slots=True)
 class TimeInt(Time):
     t0: float = attrib(default= 0.00, converter=float)
     t1: float = attrib(default=24.00, converter=float)
 
+    def __attrs_post_init__(self):
+        if self.t0 < 0 or self.t1 < 0:
+            raise ValueError(f'Times must be non-negative, but ({self.t0}, {self.t1}) passed.')
+
 
 @attrs(slots=True)
 class TimeSet(Time):
     t: set = attrib(factory=set, converter=converters.default_if_none(factory=set))
+
+    def __attrs_post_init__(self):
+        if any(map(lambda x: x < 0, self.t)):
+            raise ValueError(f'All times must be non-negative, but {self.t} passed.')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -167,12 +191,11 @@ class Rule(ABC):
             self.i = IterAlways()
         elif ii(i, int):
             self.i = IterPoint(i)
-        elif ii(i, float):
-            self.i = IterPoint(round(i))
-        elif (ii(i, list) or ii(i, tuple) or ii(i, np.ndarray)) and len(i) == 2 and (ii(i[0], int) or ii(i[0], float)) and (ii(i[1], int) or ii(i[1], float)):
-            self.i = IterInt(round(max(0, i[0])), round(max(0, i[1])))  # 0 is the smallest sensible number; integers only
-        elif ii(i, Iterable) and not ii(i, str) and len(i) > 2:
-            self.i = IterSet(set(i))
+        elif (ii(i, list) or ii(i, tuple) or ii(i, np.ndarray)) and len(i) == 2 and ii(i[0], int) and ii(i[1], int):
+            self.i = IterInt(i[0], i[1])
+        # elif ii(i, Iterable) and not ii(i, str) and len(i) > 2:
+        elif ii(i, set):
+            self.i = IterSet(i)
         else:
             raise ValueError("Wrong type of the argument 'i' specified.")
 
@@ -184,12 +207,11 @@ class Rule(ABC):
             self.t = TimeAlways()
         elif ii(t, int):
             self.t = TimePoint(t)
-        elif ii(t, float):
-            self.t = TimePoint(round(t))
-        elif (ii(t, list) or ii(t, tuple)) and len(t) == 2 and (ii(t[0], int) or ii(t[0], float)) and (ii(t[1], int) or ii(t[1], float)):
-            self.t = TimeInt(round(max(0, t[0])), round(max(0, t[1])))  # 0 is the smallest sensible number; integers only
-        elif ii(t, Iterable) and not ii(t, str) and len(t) > 2:
-            self.t = TimeSet(set(t))
+        elif (ii(t, list) or ii(t, tuple) or ii(t, np.ndarray)) and len(t) == 2 and ii(t[0], int) and ii(t[1], int):
+            self.t = TimeInt(t[0], t[1])
+        # elif ii(t, Iterable) and not ii(t, str) and len(t) > 2:
+        elif ii(t, set):
+            self.t = TimeSet(t)
         else:
             raise ValueError("Wrong type of the argument 't' specified.")
 
@@ -223,7 +245,10 @@ class Rule(ABC):
         elif isinstance(self.i, IterPoint):
             return self.i.i == iter
         elif isinstance(self.i, IterInt):
-            return self.i.i0 <= iter <= self.i.i1
+            if self.i.i1 == 0:
+                return self.i.i0 <= iter
+            else:
+                return self.i.i0 <= iter <= self.i.i1
         elif isinstance(self.i, IterSet):
             return iter in self.i.i
         else:
@@ -242,7 +267,10 @@ class Rule(ABC):
             raise TypeError("Type '{}' used for specifying rule timing not yet implemented (Rule.is_applicable).".format(type(self.t).__name__))
 
     def is_applicable_group(self, group):
-        return True if self.group_qry is None else group.matches_qry(self.group_qry)
+        if not self.group_qry:
+            return True
+        else:
+            return group.matches_qry(self.group_qry)
 
     def set_params(self):
         pass

@@ -695,6 +695,10 @@ class GroupPopulation(object):
         m = self.get_groups_mass(qry)
         return (m, m / self.m if self.m > 0 else 0)
 
+    def get_mass(self):
+        # return sum([g.m for g in self.groups.values()])
+        return self.m
+
     def get_next_group_name(self):
         """
         Args:
@@ -716,10 +720,6 @@ class GroupPopulation(object):
         """
 
         return len(self.sites)
-
-    def get_mass(self):
-        # return sum([g.m for g in self.groups.values()])
-        return self.m
 
     def transfer_mass(self, src_group_hashes, mass_flow_specs, iter, t, is_sim_setup):
         """
@@ -774,7 +774,8 @@ class GroupPopulation(object):
         # Save the trajectory state:
         # if self.sim.traj is not None:
         #     self.sim.traj.save_state(mass_flow_specs)
-        self.sim.save_state(mass_flow_specs)
+        if not is_sim_setup:
+            self.sim.save_state(mass_flow_specs)
         # self.sim.save_state([mfs.m_pop for mfs in mass_flow_specs])
 
         # Relink groups to the sites they are currently at:

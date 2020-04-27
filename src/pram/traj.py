@@ -52,6 +52,16 @@ class TrajectoryError(Exception): pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+class TqdmUpdTo(tqdm.tqdm):
+    """ Progress bar that can be updated to the specified position. """
+
+    def update_to(self, to, total=None):
+        if total is not None:
+            self.total = total
+        self.update(to - self.n)  # will also set self.n = blocks_so_far * block_size
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class Trajectory(object):
     '''
     A time-ordered sequence of system configurations that occur as the system state evolves.
@@ -277,7 +287,8 @@ class TrajectoryEnsemble(object):
 
         CREATE TABLE grp (
         id      INTEGER PRIMARY KEY AUTOINCREMENT,
-        hash    INTEGER NOT NULL UNIQUE,
+        --hash    INTEGER NOT NULL UNIQUE,  -- SQLite3 doesn't support storing 64-bit integers
+        hash    TEXT NOT NULL UNIQUE,
         attr    BLOB,
         rel     BLOB
         );
@@ -1194,12 +1205,14 @@ class TrajectoryEnsemble(object):
     def run__seq(self, iter_or_dur=1):
         ts_sim_0 = Time.ts()
         traj_col = len(str(len(self.traj)))
-        for i,t in enumerate(self.traj.values()):
+        for (i,t) in enumerate(self.traj.values()):
             # print(f'Running trajectory {i+1} of {len(self.traj)} (iter count: {iter_or_dur}): {t.name or "unnamed simulation"}')
             with TqdmUpdTo(total=iter_or_dur, miniters=1, desc=f'traj: {i+1:>{traj_col}} of {len(self.traj):>{traj_col}},  iters:{Size.b2h(iter_or_dur, False)}', bar_format='{desc}  |{bar}| {percentage:3.0f}% [{elapsed}<{remaining}, {rate_fmt}{postfix}]', dynamic_ncols=True, ascii=' 123456789.') as pbar:
+                t.sim.set_cb_save_state(self.save_state__par)
                 t.sim.set_cb_upd_progress(lambda i,n: pbar.update_to(i+1))
                 t.run(iter_or_dur)
                 t.sim.set_cb_upd_progress(None)
+                t.sim.set_cb_save_state(None)
         print(f'Total time: {Time.tsdiff2human(Time.ts() - ts_sim_0)}')
         self.save_sims()
         self.is_db_empty = False
@@ -1217,7 +1230,7 @@ class TrajectoryEnsemble(object):
             n_traj  = len(self.traj)
             n_iter  = n_traj * iter_or_dur
 
-            work_collector = WorkCollector.remote(500)
+            work_collector = WorkCollector.remote(10)
             progress_mon = ProgressMonitor.remote()
 
             for t in self.traj.values():
@@ -1231,16 +1244,21 @@ class TrajectoryEnsemble(object):
             with TqdmUpdTo(total=n_iter, miniters=1, desc=f'nodes:{n_nodes}  cpus:{n_cpu}  trajs:{n_traj}  iters:{n_traj}×{iter_or_dur}={Size.b2h(n_iter, False)}', bar_format='{desc}  |{bar}| {percentage:3.0f}% [{elapsed}<{remaining}, {rate_fmt}{postfix}]', dynamic_ncols=True, ascii=' 123456789.') as pbar:
                 while len(wait_ids) > 0:
                     done_id, wait_ids = ray.wait(wait_ids, timeout=0.1)
-                    self.save_state__par(ray.get(work_collector.get.remote()))
+
+                    states_ids = work_collector.get.remote()
+                    states = ray.get(states_ids)
+                    self.save_state__par(states)
+                    del states
+
                     pbar.update_to(ray.get(progress_mon.get_i.remote()))
 
+            # Code used previously instead of the progress bar:
             #     sys.stdout.write('\r')
             #     sys.stdout.write(ray.get(progress_mon.get_rep.remote()))
             #     sys.stdout.flush()
             # sys.stdout.write('\n')
 
             progress_mon.rem_all_workers.remote()
-            time.sleep(random.random() * 2)  # lower the chance of simulations ending at the exact same time (possible in cases of highly-congruent simulations)
         finally:
             if self.cluster_inf.get_args().get('address') is None:
                 ray.shutdown()
@@ -1273,13 +1291,29 @@ class TrajectoryEnsemble(object):
             self.save_sim(t)
         return self
 
-    def save_state(self, traj, mass_flow_specs=None):
+    # def save_state(self, traj, mass_flow_specs=None):
+    #     ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
+    #
+    #     with self.conn as c:
+    #         self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
+    #         # self.save_groups(traj, iter_id, c)
+    #         self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
+    #         self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
+    #
+    #     return self
+
+    def save_state(self, traj_id, iter, pop_m, groups, mass_flow_specs=None):
         ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
 
         with self.conn as c:
-            self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
+            # self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
+            # # self.save_groups(traj, iter_id, c)
+            # self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
+            # self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
+
+            self.curr_iter_id = self.save_iter(traj_id, iter, None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
             # self.save_groups(traj, iter_id, c)
-            self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
+            self.save_mass_locus__par(pop_m, group, self.curr_iter_id, c)
             self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
 
         return self
@@ -1305,7 +1339,8 @@ class TrajectoryEnsemble(object):
                 iter            = s['iter']
                 pop_m           = s['pop_m']
                 groups          = s['groups']
-                mass_flow_specs = pickle.loads(s['mass_flow_specs'])
+                # mass_flow_specs = pickle.loads(s['mass_flow_specs'])
+                mass_flow_specs = None
 
                 curr_iter_id = self.save_iter(traj_id, iter, host_name, host_ip, c)
                 self.save_mass_locus__par(pop_m, groups, curr_iter_id, c)
@@ -1314,6 +1349,7 @@ class TrajectoryEnsemble(object):
         return self
 
     def save_iter(self, traj_id, iter, host_name, host_ip, conn):
+        # print([traj_id, iter, host_name, host_ip])
         return self._db_ins('INSERT INTO iter (traj_id, i, host_name, host_ip) VALUES (?,?,?,?)', [traj_id, iter, host_name, host_ip], conn)
 
     def save_groups(self, sim, iter_id, conn):
@@ -1379,9 +1415,9 @@ class TrajectoryEnsemble(object):
         m_pop = pop.get_mass()  # to get proportion of mass flow
         for g in pop.groups.values():
             # New group -- persist:
-            if self._db_get_one('SELECT COUNT(*) FROM grp WHERE hash = ?', [g.get_hash()], conn) == 0:
-                for s in g.rel.values():  # sever the 'pop.sim.traj.traj_ens._conn' link (or pickle error)
-                    s.pop = None
+            if self._db_get_one('SELECT COUNT(*) FROM grp WHERE hash = ?', [str(g.get_hash())], conn) == 0:
+                # for s in g.rel.values():  # sever the 'pop.sim.traj.traj_ens._conn' link (or pickle error)
+                #     s.pop = None
 
                 group_id = conn.execute(
                     'INSERT INTO grp (hash, attr, rel) VALUES (?,?,?)',
@@ -1391,8 +1427,8 @@ class TrajectoryEnsemble(object):
                 if self.pragma.memoize_group_ids:
                     self.cache.group_hash_to_id[g.get_hash()] = group_id
 
-                for s in g.rel.values():  # restore the link
-                    s.pop = pop
+                # for s in g.rel.values():  # restore the link
+                #     s.pop = pop
 
             # Extant group:
             else:
@@ -1430,9 +1466,10 @@ class TrajectoryEnsemble(object):
 
         for g in groups:
             group_hash = g['hash']
+
             # New group -- persist:
-            if self._db_get_one('SELECT COUNT(*) FROM grp WHERE hash = ?', [group_hash], conn) == 0:
-                group_id = conn.execute('INSERT INTO grp (hash, attr, rel) VALUES (?,?,?)', [group_hash, None, None]).lastrowid
+            if self._db_get_one('SELECT COUNT(*) FROM grp WHERE hash = ?', [str(group_hash)], conn) == 0:
+                group_id = conn.execute('INSERT INTO grp (hash, attr, rel) VALUES (?,?,?)', [str(group_hash), None, None]).lastrowid
 
                 if self.pragma.memoize_group_ids:
                     self.cache.group_hash_to_id[group_hash] = group_id
@@ -1488,14 +1525,6 @@ class TrajectoryEnsemble(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class TqdmUpdTo(tqdm.tqdm):
-    def update_to(self, to, total=None):
-        if total is not None:
-            self.total = total
-        self.update(to - self.n)  # will also set self.n = blocks_so_far * block_size
-
-
-# ----------------------------------------------------------------------------------------------------------------------
 @ray.remote
 class WorkCollector(object):
     def __init__(self, max=0):
@@ -1503,12 +1532,11 @@ class WorkCollector(object):
         self.max = max
 
     def do_wait(self):
-        if self.max > 0 and len(self.work) >= self.max:
-            return True
-        return False
+        return self.max > 0 and len(self.work) >= self.max
 
     def get(self, do_clear=True):
         if do_clear:
+            gc.collect()
             ret = self.work
             self.work = []
             return ret
@@ -1597,37 +1625,39 @@ class Worker(object):
 
     def run(self):
         # (1) Initialize:
+        # (1.1) Self:
         self.host_name = socket.gethostname()
         self.host_ip   = socket.gethostbyname(self.host_name)
 
         if self.progress_mon:
             self.progress_mon.add_worker.remote(self.id, self.n, self.host_ip, self.host_name)
 
-        # (2) Do work:
+        # (1.2) The simulation object:
         t = self.sim.traj
         self.sim.traj = None
         self.sim.set_cb_upd_progress(self.upd_progress)
         self.sim.set_cb_save_state(self.submit_work)
         self.sim.set_cb_check_work(self.do_wait_work)
-        self.sim.run(self.n)
-        self.sim.traj = t
 
-        # if self.work_collector:
-        #     self.work_collector.put.remote(pickle.dumps(f'...'))
+        # (2) Do work:
+        self.sim.run(self.n)
 
         # (3) Finish up:
+        self.sim.traj = t
         self.sim.set_cb_save_state(None)
         self.sim.set_cb_upd_progress(None)
         self.sim.set_cb_check_work(None)
 
-        # if self.work_collector:
-        #     self.work_collector.put.remote(pickle.dumps(f'done'))
-        # if self.progress_mon:
-        #     self.progress_mon.rem_worker.remote(self.id)
+        # Normally, we'd remove the worker like below, but then the total number of workers goes down which messes up
+        # the progress calculation.  Consequently, workers are removed all at once in TrajectoryEnsemble.run__par().
+        # NBD either way.
+
+        time.sleep(random.random() * 2)  # lower the chance of simulations ending at the exact same time (possible in cases of very similar models)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-@ray.remote
+# @ray.remote
+@ray.remote(max_calls=1)
 def start_worker(w):
     w.run()
     return w

@@ -2039,16 +2039,30 @@ class Simulation(object):
         return self
 
     def save_state(self, mass_flow_specs=None):
-        if self.cb.save_state and mass_flow_specs:
-            self.cb.save_state(mass_flow_specs)
+        # # if self.cb.save_state and mass_flow_specs:
+        # #     self.cb.save_state(mass_flow_specs)
+        #
+        # if self.cb.save_state:
+        #     self.cb.save_state(mass_flow_specs)
+        #
+        # if self.traj is None:
+        #     return self
+        #
+        # if self.timer.i > 0:  # we check timer not to save initial state of a simulation that's been run before
+        #     self.traj.save_state(None)
+        # else:
+        #     self.traj.save_state(mass_flow_specs)
 
-        if self.traj is None:
-            return self
-
-        if self.timer.i > 0:  # we check timer not to save initial state of a simulation that's been run before
-            self.traj.save_state(None)
-        else:
-            self.traj.save_state(mass_flow_specs)
+        if self.cb.save_state:
+            self.cb.save_state([{
+                'host_name'       : None,
+                'host_ip'         : None,
+                'traj_id'         : self.traj.id if self.traj else None,
+                'iter'            : self.timer.i if self.timer.is_running else -1,
+                'pop_m'           : self.pop.get_mass(),
+                'groups'          : [{ 'hash': g.get_hash(), 'm': g.m } for g in self.pop.groups.values()],  # self.pop.get_groups()
+                'mass_flow_specs' : mass_flow_specs if self.timer.i > 0 else None
+            }])
 
         return self
 
