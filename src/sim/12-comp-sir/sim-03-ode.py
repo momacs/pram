@@ -25,6 +25,12 @@ from pram.traj        import Trajectory, TrajectoryEnsemble, ClusterInf
 # ----------------------------------------------------------------------------------------------------------------------
 fpath_db = os.path.join(os.path.dirname(__file__), 'data', 'sir-comp.sqlite3')
 
+def U(a,b, n=None):
+    return uniform(a,a+b).rvs(n)
+
+def TN(a,b, mu, sigma, n=None):
+    return truncnorm((a - mu) / sigma, (b - mu) / sigma, mu, sigma).rvs(n)
+
 group_names = [
     (0, 'S', Group.gen_hash(attr={ 'flu': 's' })),
     (1, 'I', Group.gen_hash(attr={ 'flu': 'i' })),
@@ -44,30 +50,30 @@ class FluProcess(GammaDistributionProcess):
         ]
 
     def is_applicable(self, group, iter, t):
-        return super().is_applicable(group, iter, t) and group.ha({ 'flu': 'r' })
+        return super().is_applicable(group, iter, t) and group.has_attr({ 'flu': 'r' })
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 if os.path.isfile(fpath_db): os.remove(fpath_db)
 
-# te = TrajectoryEnsemble(fpath_db)
-te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(address='auto'))
-# te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(num_cpus=6, memory=500*1024*1024, object_store_memory=500*1024*1024, include_webui=False))
+te = TrajectoryEnsemble(fpath_db)
+# te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(address='auto'))
+# te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(num_cpus=6, memory=500*1024*1024, object_store_memory=500*1024*1024, include_webui=True))
 
-if te.is_db_empty:  # generate simulation data if the trajectory ensemble database is empty
+if te.is_db_empty:
     te.set_pragma_memoize_group_ids(True)
     te.add_trajectories([
         Trajectory(
             (Simulation().
                 add([
                     SIRModel('flu', beta=0.10, gamma=0.05, solver=ODESolver()),
-                    SIRModel('flu', beta=0.50, gamma=uniform(loc=0.01, scale=0.14).rvs(), i=IterInt(900 + truncnorm(0, 600, 100, 100.0).rvs(), 0), solver=ODESolver()),
-                    FluProcess(i=IterInt(2000,0), p_max=None, a=5.0, scale=scale),
+                    SIRModel('flu', beta=0.50, gamma=U(0.01, 0.15), i=[int(900 + TN(0,600, 100,100)), 0], solver=ODESolver()),
+                    FluProcess(i=[2000,0], p_max=None, a=5.0, scale=flu_proc_scale),
                     Group(m=950, attr={ 'flu': 's' }),
                     Group(m= 50, attr={ 'flu': 'i' })
                 ])
             )
-        ) for scale in uniform(loc=40.0, scale=60.0).rvs(5)
+        ) for flu_proc_scale in U(40,60, 3)
     ])
     te.set_group_names(group_names)
     te.run(3000)

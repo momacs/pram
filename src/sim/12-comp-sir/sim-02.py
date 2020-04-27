@@ -5,7 +5,7 @@ This is the simulation of two overlapping and time-unbounded SIR models, A and B
 delay and one of its parameters (gamma) random.
 '''
 
-import matplotlib.pyplot as plt
+import os
 
 from dotmap import DotMap
 from scipy.stats import gamma, uniform
@@ -56,7 +56,10 @@ sir_b = make_sir(0.50, uniform(loc=0.01, scale=0.14).rvs(), i=IterInt(900 + gamm
 class RecurrentFluProcess(GammaDistributionProcess):
     def apply(self, pop, group, iter, t):
         p = self.get_p(iter)
-        return [GroupSplitSpec(p=p, attr_set={ 'flu': 's' }), GroupSplitSpec(p=1-p)]
+        return [
+            GroupSplitSpec(p=p, attr_set={ 'flu': 's' }),
+            GroupSplitSpec(p=1-p)
+        ]
 
     def is_applicable(self, group, iter, t):
         return super().is_applicable(group, iter, t) and group.ha({ 'flu': 'r' })
@@ -103,7 +106,5 @@ te = (
 # ----------------------------------------------------------------------------------------------------------------------
 # Plot:
 
-def get_out_dir(filename): return os.path.join(os.path.dirname(__file__), 'out', filename)
-
-te.plot_mass_locus_line((1200,300), get_out_dir('_plot-line.png'), iter_range=(-1, -1), nsamples=0)
-# te.plot_mass_locus_line_aggr((1200,300), get_out_dir('_plot-iqr.png'), iter_range=(-1, -1))
+te.plot_mass_locus_line     ((1200,300), os.path.join(os.path.dirname(__file__), '_plot-line.png'), iter_range=(-1, -1), nsamples=0)
+te.plot_mass_locus_line_aggr((1200,300), os.path.join(os.path.dirname(__file__), '_plot-iqr.png'),  iter_range=(-1, -1))

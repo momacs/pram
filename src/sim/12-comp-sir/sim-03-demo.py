@@ -54,7 +54,7 @@ class MakeSusceptibleProcess(GammaDistributionProcess):  # extends the GammaDist
         ]
 
     def is_applicable(self, group, iter, t):
-        return super().is_applicable(group, iter, t) and group.ha({ 'flu': 'r' })
+        return super().is_applicable(group, iter, t) and group.has_attr({ 'flu': 'r' })
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -62,8 +62,8 @@ class MakeSusceptibleProcess(GammaDistributionProcess):  # extends the GammaDist
 
 if os.path.isfile(fpath_db): os.remove(fpath_db)
 
-# te = TrajectoryEnsemble(fpath_db)
-te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(address='auto'))
+te = TrajectoryEnsemble(fpath_db)
+# te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(address='auto'))
 # te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(num_cpus=6, memory=500*1024*1024, object_store_memory=500*1024*1024, include_webui=False))
 
 if te.is_db_empty:  # generate simulation data if the trajectory ensemble database is empty
@@ -71,9 +71,9 @@ if te.is_db_empty:  # generate simulation data if the trajectory ensemble databa
     te.add_trajectories([
         (Simulation().
             add([
-                SIRSModel('flu', beta=0.10, gamma=0.05,          solver=MCSolver()),                              # model 1
-                SIRSModel('flu', beta=0.50, gamma=U(0.01, 0.15), solver=MCSolver(), i=[5 + TN(0,50, 5,10), 50]),  # model 2
-                MakeSusceptibleProcess(i=[50,0], a=3.0, scale=flu_proc_scale),                                    # model 3
+                SIRSModel('flu', beta=0.10, gamma=0.05,          solver=MCSolver()),                                   # model 1
+                SIRSModel('flu', beta=0.50, gamma=U(0.01, 0.15), solver=MCSolver(), i=[int(5 + TN(0,50, 5,10)), 50]),  # model 2
+                MakeSusceptibleProcess(i=[50,0], a=3.0, scale=flu_proc_scale),                                         # model 3
                 Group(m=1000, attr={ 'flu': 's' })
             ])
         ) for flu_proc_scale in U(1,5, 20)  # a 20-trajectory ensemble

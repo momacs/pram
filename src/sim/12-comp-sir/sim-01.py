@@ -5,6 +5,7 @@ This simulation builds up a more a more complicated example of two SIR models in
 '''
 
 import matplotlib.pyplot as plt
+import os
 
 from dotmap import DotMap
 from scipy.stats import gamma, uniform

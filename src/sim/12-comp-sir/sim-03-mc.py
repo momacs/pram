@@ -25,8 +25,11 @@ from pram.traj        import Trajectory, TrajectoryEnsemble, ClusterInf
 # ----------------------------------------------------------------------------------------------------------------------
 fpath_db = os.path.join(os.path.dirname(__file__), 'data', 'sir-comp.sqlite3')
 
-def get_out_fpath(filename):
-    return os.path.join(os.path.dirname(__file__), 'out', filename)
+def U(a,b, n=None):
+    return uniform(a,a+b).rvs(n)
+
+def TN(a,b, mu, sigma, n=None):
+    return truncnorm((a - mu) / sigma, (b - mu) / sigma, mu, sigma).rvs(n)
 
 group_names = [
     (0, 'S', Group.gen_hash(attr={ 'flu': 's' })),
@@ -47,35 +50,35 @@ class FluProcess(GammaDistributionProcess):
         ]
 
     def is_applicable(self, group, iter, t):
-        return super().is_applicable(group, iter, t) and group.ha({ 'flu': 'r' })
+        return super().is_applicable(group, iter, t) and group.has_attr({ 'flu': 'r' })
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 if os.path.isfile(fpath_db): os.remove(fpath_db)
 
-# te = TrajectoryEnsemble(fpath_db)
-te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(address='auto'))
-# te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(num_cpus=6, memory=500*1024*1024, object_store_memory=500*1024*1024, include_webui=False))
+te = TrajectoryEnsemble(fpath_db)
+# te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(address='auto'))
+# te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(num_cpus=6, memory=500*1024*1024, object_store_memory=500*1024*1024, include_webui=True))
 
-if te.is_db_empty:  # generate simulation data if the trajectory ensemble database is empty
+if te.is_db_empty:
     te.set_pragma_memoize_group_ids(True)
     te.add_trajectories([
         Trajectory(
             (Simulation().
                 add([
                     SIRModel('flu', beta=0.10, gamma=0.05, solver=MCSolver()),
-                    SIRModel('flu', beta=0.50, gamma=uniform(loc=0.01, scale=0.14).rvs(), i=IterInt(5 + truncnorm(0, 50, 5.0, 10.0).rvs(), 0), solver=MCSolver()),
-                    FluProcess(i=IterInt(50,0), p_max=None, a=3.0, scale=scale),
+                    SIRModel('flu', beta=0.50, gamma=U(0.01, 0.15), i=[int(5 + TN(0,50, 5,10)), 50], solver=MCSolver()),
+                    FluProcess(i=[50,0], p_max=None, a=3.0, scale=flu_proc_scale),
                     Group(m=950, attr={ 'flu': 's' }),
                     Group(m= 50, attr={ 'flu': 'i' })
                 ])
             )
-        ) for scale in uniform(loc=1.0, scale=5.0).rvs(5)
+        ) for flu_proc_scale in U(1,5, 1)
     ])
     te.set_group_names(group_names)
     te.run(120)
 
 
 # Visualize:
-te.plot_mass_locus_line((1200,300), get_out_fpath('_plot-line.png'), opacity_min=0.2)
-# te.plot_mass_locus_line_aggr((1200,300), get_out_fpath('_plot-iqr.png'))
+te.plot_mass_locus_line     ((1200,300), os.path.join(os.path.dirname(__file__), 'out', '_plot-line.png'), opacity_min=0.2)
+te.plot_mass_locus_line_aggr((1200,300), os.path.join(os.path.dirname(__file__), 'out', '_plot-iqr.png'))
