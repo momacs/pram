@@ -40,6 +40,11 @@ __all__ = ['ClusterInf', 'TrajectoryError', 'Trajectory', 'TrajectoryEnsemble']
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ClusterInf(object):
+    """Computational cluster information.
+
+    This info is cluster-specific.
+    """
+
     def __init__(self, **kwargs):
         self.kwargs = kwargs
 
@@ -53,7 +58,8 @@ class TrajectoryError(Exception): pass
 
 # ----------------------------------------------------------------------------------------------------------------------
 class TqdmUpdTo(tqdm.tqdm):
-    """ Progress bar that can be updated to the specified position. """
+    """Progress bar that can be updated to the specified position.
+    """
 
     def update_to(self, to, total=None):
         if total is not None:
@@ -82,11 +88,9 @@ class Trajectory(object):
         self.sim  = sim
         self.name = name
         self.memo = memo
-        self.id   = id
         self.ens  = ensemble  # TrajectoryEnsemble that contains this object
 
-        if self.sim is not None:
-            self.sim.traj = self
+        self.set_id(id)
 
         self.mass_graph = None  # MassGraph object (instantiated when needed)
 
@@ -216,6 +220,11 @@ class Trajectory(object):
         self._check_ens()
         self.ens.save_state(self, mass_flow_specs)
         return self
+
+    def set_id(self, id):
+        self.id = id
+        if self.sim is not None:
+            self.sim.traj_id = id
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -444,7 +453,7 @@ class TrajectoryEnsemble(object):
             return print(f'A trajectory with the name specified already exists: {t.name}')
 
         with self.conn as c:
-            t.id = c.execute('INSERT INTO traj (name, memo) VALUES (?,?)', [t.name, t.memo]).lastrowid
+            t.set_id(c.execute('INSERT INTO traj (name, memo) VALUES (?,?)', [t.name, t.memo]).lastrowid)
             # for (i,r) in enumerate(t.sim.rules):
             #     c.execute('INSERT INTO rule (traj_id, ord, name, src) VALUES (?,?,?,?)', [t.id, i, r.__class__.__name__, inspect.getsource(r.__class__)])
 
@@ -582,7 +591,7 @@ class TrajectoryEnsemble(object):
     def load_sim(self, traj):
         traj.sim = DB.blob2obj(self.conn.execute('SELECT sim FROM traj WHERE id = ?', [traj.id]).fetchone()[0])
         if traj.sim:
-            traj.sim.traj = traj  # restore the link severed at save time
+            traj.sim.traj_id = traj.id  # restore the link severed at save time
         return self
 
     def load_sims(self):
@@ -1000,6 +1009,81 @@ class TrajectoryEnsemble(object):
 
         return plot if do_ret_plot else self
 
+    def plot_mass_locus_line_probe(self, size, filepath, probe_name, series, iter_range=(-1, -1), traj=None, nsamples=0, opacity_min=0.1, stroke_w=1, col_scheme='set1', do_ret_plot=False):
+        '''
+        If 'traj' is not None, only that trajectory is plotted.  Otherwise, 'nsample' determines the number of
+        trajectories plotted.  Specifically, if smaller than or equal to zero, all trajectories are plotted; otherwise,
+        the given number of trajectories is selected randomly.  If the number provided exceeds the number of
+        trajectories present in the ensamble, all of them are plotted.
+        '''
+
+        # (1) Sample trajectories (if necessary) + set title + set line alpha:
+        if traj is not None:
+            traj_sample = [traj]
+            title = f'Trajectory Mass Locus'  #  (Iterations {iter_range[0]+1} to {iter_range[1]+1})
+            opacity = 1.00
+        else:
+            traj_sample = []
+            if nsamples <=0 or nsamples >= len(self.traj):
+                traj_sample = self.traj.values()
+                title = f'Trajectory Ensemble Mass Locus (n={len(self.traj)})'
+            else:
+                traj_sample = random.sample(list(self.traj.values()), nsamples)
+                title = f'Trajectory Ensemble Mass Locus (Random Sample of {len(traj_sample)} from {len(self.traj)})'
+            opacity = max(opacity_min, 1.00 / len(traj_sample))
+
+        # (2) Plot trajectories:
+        plots = []
+        for (ti,t) in enumerate(traj_sample):
+            # (3.1) Normalize iteration bounds:
+            iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [t.id])
+
+            # (3.2) Construct the trajectory data bundle:
+            data = []
+            with self.conn as c:
+                for s in series:
+                    for r in c.execute(f'''
+                            SELECT i.i, p.{s['var']} AS y
+                            FROM {probe_name} p
+                            INNER JOIN iter i ON i.id = p.iter_id
+                            WHERE i.traj_id = ? AND i.i BETWEEN ? AND ?
+                            ORDER BY i.i''', [t.id, iter_range[0], iter_range[1]]):
+                        data.append({ 'i': r['i'] + 1, 'y': r['y'], 'series': s['lbl'] })
+
+            # (3.3) Plot the trajectory:
+            plots.append(
+                alt.Chart(
+                    alt.Data(values=data)
+                ).mark_line(
+                    strokeWidth=stroke_w, opacity=opacity, interpolate='basis', tension=1  # basis, basis-closed, cardinal, cardinal-closed, bundle(tension)
+                ).encode(
+                    alt.X('i:Q', axis=alt.Axis(title='Iteration', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
+                    alt.Y('y:Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
+                    color=(
+                        alt.Color('series:N', scale=alt.Scale(scheme=col_scheme), legend=alt.Legend(title='Series', labelFontSize=15, titleFontSize=15), sort=[s['lbl'] for s in series])
+                        if ti == 0 else
+                        alt.Color('series:N', scale=alt.Scale(scheme=col_scheme), sort=[s['lbl'] for s in series], legend=None)
+                    )
+                    # alt.Order('year(data):O')
+                )
+            )
+
+        plot = alt.layer(
+            *plots
+        ).properties(
+            title=title, width=size[0], height=size[1]
+        ).configure_view(
+            # strokeWidth=1
+        ).configure_title(
+            fontSize=20
+        ).resolve_scale(
+            color='independent'
+        ).save(
+            filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
+        )
+
+        return plot if do_ret_plot else self
+
     def plot_mass_locus_polar(self, size, filepath, iter_range=(-1, -1), nsamples=0, n_iter_per_rot=0, do_sort=False, do_ret_plot=False):
         '''
         Altair does not currently support projections, so we must revert to good old matplotlib.
@@ -1144,7 +1228,7 @@ class TrajectoryEnsemble(object):
         return plot if do_ret_plot else self
 
     def plot_matplotlib(self, size, filepath, iter_range=(-1, -1), do_sort=False):
-        ''' TODO: Remove (a more general version has been implemented). '''
+        ''' TODO: Remove (a more general version has been implemented, albeit one that uses altair). '''
 
         import matplotlib.pyplot as plt
         from .entity  import Group
@@ -1204,11 +1288,12 @@ class TrajectoryEnsemble(object):
 
     def run__seq(self, iter_or_dur=1):
         ts_sim_0 = Time.ts()
+        self.unpersisted_probes = []  # added only for congruency with self.run__par()
         traj_col = len(str(len(self.traj)))
         for (i,t) in enumerate(self.traj.values()):
             # print(f'Running trajectory {i+1} of {len(self.traj)} (iter count: {iter_or_dur}): {t.name or "unnamed simulation"}')
             with TqdmUpdTo(total=iter_or_dur, miniters=1, desc=f'traj: {i+1:>{traj_col}} of {len(self.traj):>{traj_col}},  iters:{Size.b2h(iter_or_dur, False)}', bar_format='{desc}  |{bar}| {percentage:3.0f}% [{elapsed}<{remaining}, {rate_fmt}{postfix}]', dynamic_ncols=True, ascii=' 123456789.') as pbar:
-                t.sim.set_cb_save_state(self.save_state__par)
+                t.sim.set_cb_save_state(self.save_work)
                 t.sim.set_cb_upd_progress(lambda i,n: pbar.update_to(i+1))
                 t.run(iter_or_dur)
                 t.sim.set_cb_upd_progress(None)
@@ -1216,11 +1301,10 @@ class TrajectoryEnsemble(object):
         print(f'Total time: {Time.tsdiff2human(Time.ts() - ts_sim_0)}')
         self.save_sims()
         self.is_db_empty = False
+        del self.unpersisted_probes
         return self
 
     def run__par(self, iter_or_dur=1):
-        # TODO: Make sure probe persistance is present in no simulation.
-
         ts_sim_0 = Time.ts()
         try:
             ray.init(**self.cluster_inf.get_args())
@@ -1234,8 +1318,10 @@ class TrajectoryEnsemble(object):
             progress_mon = ProgressMonitor.remote()
 
             for t in self.traj.values():
-                t.sim.traj = None  # sever the link
-                    # TODO: Do we need to restore this link later?  The Worker severs this link as well BTW
+                t.sim.remote_before()
+            self.probe_persistence.remote_before(work_collector)
+
+            self.unpersisted_probes = []  # probes which have not yet been persisted via self.save_work()
 
             workers = [Worker(i, t.id, t.sim, iter_or_dur, work_collector, progress_mon) for (i,t) in enumerate(self.traj.values())]
 
@@ -1245,10 +1331,9 @@ class TrajectoryEnsemble(object):
                 while len(wait_ids) > 0:
                     done_id, wait_ids = ray.wait(wait_ids, timeout=0.1)
 
-                    states_ids = work_collector.get.remote()
-                    states = ray.get(states_ids)
-                    self.save_state__par(states)
-                    del states
+                    work = ray.get(work_collector.get.remote())
+                    self.save_work(work)
+                    del work
 
                     pbar.update_to(ray.get(progress_mon.get_i.remote()))
 
@@ -1258,10 +1343,18 @@ class TrajectoryEnsemble(object):
             #     sys.stdout.flush()
             # sys.stdout.write('\n')
 
+            self.save_work(self.unpersisted_probes)  # save any remaining to-be-persisted probes
+
             progress_mon.rem_all_workers.remote()
+
+            for t in self.traj.values():
+                t.sim.remote_after()
+            self.probe_persistence.remote_after(self, self.conn)
         finally:
             if self.cluster_inf.get_args().get('address') is None:
                 ray.shutdown()
+            if hasattr(self, 'unpersisted_probes'):
+                del self.unpersisted_probes
             print(f'Total time: {Time.tsdiff2human(Time.ts() - ts_sim_0)}')
 
         self.save_sims()
@@ -1302,54 +1395,56 @@ class TrajectoryEnsemble(object):
     #
     #     return self
 
-    def save_state(self, traj_id, iter, pop_m, groups, mass_flow_specs=None):
-        ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
+    # def save_state(self, traj_id, iter, pop_m, groups, mass_flow_specs=None):
+    #     ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
+    #
+    #     with self.conn as c:
+    #         # self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
+    #         # # self.save_groups(traj, iter_id, c)
+    #         # self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
+    #         # self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
+    #
+    #         self.curr_iter_id = self.save_iter(traj_id, iter, None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
+    #         # self.save_groups(traj, iter_id, c)
+    #         self.save_mass_locus__par(pop_m, group, self.curr_iter_id, c)
+    #         self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
+    #
+    #     return self
 
+    def save_work(self, work):
         with self.conn as c:
-            # self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
-            # # self.save_groups(traj, iter_id, c)
-            # self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
-            # self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
+            for (i,p) in enumerate(self.unpersisted_probes):
+                try:
+                    c.execute(p['qry'], p['vals'])
+                    del self.unpersisted_probes[i]
+                except sqlite3.IntegrityError:
+                    pass
 
-            self.curr_iter_id = self.save_iter(traj_id, iter, None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
-            # self.save_groups(traj, iter_id, c)
-            self.save_mass_locus__par(pop_m, group, self.curr_iter_id, c)
-            self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
+            for w in work:
+                if w['type'] == 'state':
+                    host_name       = w['host_name']
+                    host_ip         = w['host_ip']
+                    traj_id         = w['traj_id']
+                    iter            = w['iter']
+                    pop_m           = w['pop_m']
+                    groups          = w['groups']
+                    # mass_flow_specs = pickle.loads(w['mass_flow_specs'])
+                    mass_flow_specs = None
 
-        return self
-
-    def save_state__par(self, states):
-        # json = json.loads(payload.decode('utf-8'))  # bytes --> str
-        # for s in states:  # [{ 'host_name': '...', 'host_ip': '...', 'traj_id': 0, 'mass_flow_specs': pickle.dumps(MassFlowSpecs) }]
-        #     # mfs = json.loads(s.decode('utf-8'))
-        #     host_name = s['host_name']
-        #     host_ip = s['host_ip']
-        #     traj_id = s['traj_id']
-        #     mfs = pickle.loads(s['mass_flow_specs'])
-        #     # print(mfs.m)
-        #     # print(mfs)
-        #     print(f'{host_name} {host_ip} {traj_id} {len(mfs)}')
-        # print('----')
-
-        with self.conn as c:
-            for s in states:  # [{ 'host_name': '...', 'host_ip': '...', 'traj_id': 0, 'mass_flow_specs': pickle.dumps(MassFlowSpecs) }]
-                host_name       = s['host_name']
-                host_ip         = s['host_ip']
-                traj_id         = s['traj_id']
-                iter            = s['iter']
-                pop_m           = s['pop_m']
-                groups          = s['groups']
-                # mass_flow_specs = pickle.loads(s['mass_flow_specs'])
-                mass_flow_specs = None
-
-                curr_iter_id = self.save_iter(traj_id, iter, host_name, host_ip, c)
-                self.save_mass_locus__par(pop_m, groups, curr_iter_id, c)
-                self.save_mass_flow(curr_iter_id, mass_flow_specs, c)
+                    self.curr_iter_id = self.save_iter(traj_id, iter, host_name, host_ip, c)
+                    self.save_mass_locus__par(pop_m, groups, self.curr_iter_id, c)
+                    self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
+                elif w['type'] == 'probe':
+                    try:
+                        c.execute(w['qry'], w['vals'])
+                    except sqlite3.IntegrityError:
+                        self.unpersisted_probes.append(s)
 
         return self
 
     def save_iter(self, traj_id, iter, host_name, host_ip, conn):
-        # print([traj_id, iter, host_name, host_ip])
+        ''' Returns iter_id. '''
+
         return self._db_ins('INSERT INTO iter (traj_id, i, host_name, host_ip) VALUES (?,?,?,?)', [traj_id, iter, host_name, host_ip], conn)
 
     def save_groups(self, sim, iter_id, conn):
@@ -1543,8 +1638,11 @@ class WorkCollector(object):
         else:
             return self.work
 
-    def submit(self, payload):
-        self.work.append(payload)
+    def save_probe(self, qry, vals):
+        self.work.append({ 'type': 'probe', 'qry': qry, 'vals': vals })
+
+    def save_state(self, state):
+        self.work.append(state)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1601,7 +1699,7 @@ class Worker(object):
             return False
         return self.work_collector.do_wait.remote()
 
-    def submit_work(self, mass_flow_specs):  # TODO: Change name to save_mass_flow_specs()?
+    def save_state(self, mass_flow_specs):  # TODO: Change name to save_mass_flow_specs()?
         # json = json.dumps(mass_flow_specs).encode('utf-8')  # str -> bytes
 
         # compressedFile = StringIO.StringIO()
@@ -1609,7 +1707,8 @@ class Worker(object):
 
         if self.work_collector:
             # self.work_collector.submit.remote(json.dumps(mass_flow_specs).encode('utf-8'))
-            self.work_collector.submit.remote({
+            self.work_collector.save_state.remote({
+                'type'            : 'state',
                 'host_name'       : self.host_name,
                 'host_ip'         : self.host_ip,
                 'traj_id'         : self.traj_id,
@@ -1633,17 +1732,14 @@ class Worker(object):
             self.progress_mon.add_worker.remote(self.id, self.n, self.host_ip, self.host_name)
 
         # (1.2) The simulation object:
-        t = self.sim.traj
-        self.sim.traj = None
         self.sim.set_cb_upd_progress(self.upd_progress)
-        self.sim.set_cb_save_state(self.submit_work)
+        self.sim.set_cb_save_state(self.save_state)
         self.sim.set_cb_check_work(self.do_wait_work)
 
         # (2) Do work:
         self.sim.run(self.n)
 
         # (3) Finish up:
-        self.sim.traj = t
         self.sim.set_cb_save_state(None)
         self.sim.set_cb_upd_progress(None)
         self.sim.set_cb_check_work(None)
@@ -1656,8 +1752,7 @@ class Worker(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# @ray.remote
-@ray.remote(max_calls=1)
+@ray.remote(max_calls=1)  # ensure the worker is not reused to prevent Python and/or ray memory issues
 def start_worker(w):
     w.run()
     return w

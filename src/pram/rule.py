@@ -193,7 +193,6 @@ class Rule(ABC):
             self.i = IterPoint(i)
         elif (ii(i, list) or ii(i, tuple) or ii(i, np.ndarray)) and len(i) == 2 and ii(i[0], int) and ii(i[1], int):
             self.i = IterInt(i[0], i[1])
-        # elif ii(i, Iterable) and not ii(i, str) and len(i) > 2:
         elif ii(i, set):
             self.i = IterSet(i)
         else:
@@ -209,7 +208,6 @@ class Rule(ABC):
             self.t = TimePoint(t)
         elif (ii(t, list) or ii(t, tuple) or ii(t, np.ndarray)) and len(t) == 2 and ii(t[0], int) and ii(t[1], int):
             self.t = TimeInt(t[0], t[1])
-        # elif ii(t, Iterable) and not ii(t, str) and len(t) > 2:
         elif ii(t, set):
             self.t = TimeSet(t)
         else:

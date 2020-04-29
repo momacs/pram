@@ -686,11 +686,12 @@ class Simulation(object):
     state variables.
     '''
 
-    def __init__(self, pop_hist_len=0, traj=None, rand_seed=None, do_keep_mass_flow_specs=False):
+    def __init__(self, pop_hist_len=0, traj_id=None, rand_seed=None, do_keep_mass_flow_specs=False):
         self.set_rand_seed(rand_seed)
 
         self.pid = os.getpid()  # process ID
-        self.traj = traj        # trajectory
+        # self.traj = traj        # trajectory
+        self.traj_id = traj_id        # trajectory ID
         self.run_cnt = 0
 
         self.pop = GroupPopulation(self, pop_hist_len, do_keep_mass_flow_specs)
@@ -1648,6 +1649,27 @@ class Simulation(object):
         self.rules.discard(rule)
         return self
 
+    def remote_after(self):
+        """Restores the object after remote execution (i.e., parallelized to a cluster).
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        return self
+
+    def remote_before(self):
+        """Prepare the object for remote execution (i.e., parallelized to a cluster).
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        if self.traj_id is not None:
+            for p in self.probes:
+                p.set_traj_id(self.traj_id)
+        return self
+
     def reset_cb(self):
         """
         Args:
@@ -1834,7 +1856,7 @@ class Simulation(object):
             self._inf('Capturing the initial state')
 
             for p in self.probes:
-                p.run(None, None)
+                p.run(None, None, self.traj_id)
 
         # Run the simulation:
         self._inf('Initial population')
@@ -1882,7 +1904,7 @@ class Simulation(object):
 
             # Run probes:
             for p in self.probes:
-                p.run(self.timer.get_i(), self.timer.get_t())
+                p.run(self.timer.get_i(), self.timer.get_t(), self.traj_id)
 
             # Cleanup the population:
             self.pop.do_post_iter()
@@ -2055,9 +2077,10 @@ class Simulation(object):
 
         if self.cb.save_state:
             self.cb.save_state([{
+                'type'            : 'state',
                 'host_name'       : None,
                 'host_ip'         : None,
-                'traj_id'         : self.traj.id if self.traj else None,
+                'traj_id'         : self.traj_id,  # self.traj.id if self.traj else None,
                 'iter'            : self.timer.i if self.timer.is_running else -1,
                 'pop_m'           : self.pop.get_mass(),
                 'groups'          : [{ 'hash': g.get_hash(), 'm': g.m } for g in self.pop.groups.values()],  # self.pop.get_groups()

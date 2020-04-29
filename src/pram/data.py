@@ -39,26 +39,6 @@ class ProbePersistenceMode(IntEnum):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-@attrs(slots=True)
-class ProbePersistenceDBItem(object):
-    """A description of how a probe will interact with a database for the purpose of data persistence.
-
-    Args:
-        name (str): The item's name.
-        ins_qry (str): The SQL INSERT query that is used for persisting data in the database.  This query should be
-            parameterized to expect the value to be persisted.
-        sel_qry (str): The SQL SELECT query that is used for retrieving data from the database (e.g., to generate
-            plots).
-        ins_val (list): The values to be inserted into the database using the INSERT query.
-    """
-
-    name    : str  = attrib()
-    ins_qry : str  = attrib()  # insert query (used for persisting data in the DB)
-    sel_qry : str  = attrib()  # select query (used for retrieving data from the DB, e.g., to generate plots)
-    ins_val : list = attrib(factory=list, converter=converters.default_if_none(factory=list))
-
-
-# ----------------------------------------------------------------------------------------------------------------------
 class ProbePersistence(ABC):
     """Probe persistence base class.
 
@@ -195,13 +175,14 @@ class ProbePersistenceDB(ProbePersistence):
         self.mode = mode
         self.flush_every = flush_every
         self.traj_ens = traj_ens
+        self.work_collector = None
 
-        if conn is None:
+        if conn is None:  # standalone
             if os.path.isfile(self.fpath) and mode == ProbePersistenceMode.OVERWRITE:
                 os.remove(self.fpath)
             self.conn_open()
             self.do_close_conn = True
-        else:
+        else:  # part of traj ens
             self.conn = conn
             self.do_close_conn = False
 
@@ -211,6 +192,9 @@ class ProbePersistenceDB(ProbePersistence):
 
     def __del__(self):
         self.conn_close()
+
+    def clear_probes(self):
+        self.probes = {}
 
     def conn_close(self):
         """Closes the database connection."""
@@ -234,6 +218,9 @@ class ProbePersistenceDB(ProbePersistence):
     def flush(self):
         """Flushes all buffered values to the database."""
 
+        if not self.conn:
+            return
+
         with self.conn as c:
             for p in self.probes.values():
                 if len(p.ins_val) > 0:
@@ -253,7 +240,7 @@ class ProbePersistenceDB(ProbePersistence):
         probe_item = self.probes[DB.str_to_name(probe.name)]
         return [dict(r) for r in self.conn.execute(probe_item.sel_qry).fetchall()]
 
-    def persist(self, probe, vals, iter, t):
+    def persist(self, probe, vals, iter=None, t=None, traj_id=None):
         """Dispatch.
 
         Args:
@@ -264,9 +251,10 @@ class ProbePersistenceDB(ProbePersistence):
         """
 
         if self.traj_ens:
-            self.persist_traj_ens(probe, vals)
-        else:
-            self.persist_standalone(probe, vals, iter, t)
+            return self.persist_traj_ens(probe, vals)
+        if self.work_collector:
+            return self.persist_traj_ens_remote(probe, vals, iter, traj_id)
+        return self.persist_standalone(probe, vals, iter, t)
 
     def persist_standalone(self, probe, vals, iter, t):
         """Stores values to be persisted and persists them in accordance with the flushing frequency.
@@ -317,6 +305,21 @@ class ProbePersistenceDB(ProbePersistence):
                 with self.conn as c:
                     c.executemany(probe_item.ins_qry, probe_item.ins_val)
                 probe_item.ins_val = []
+
+    def persist_traj_ens_remote(self, probe, vals, iter, traj_id):
+        """Persists scheduled items in accordance with the flushing frequency.  The value for the 'iter_id' field gets
+        added to every item being persisted.
+
+        Note:
+            Flushing frequency is currently ignored to make the implementation simpler.  Specifically, the flush()
+            method doesn't need to do anything.
+
+        Args:
+            iter_id (int): ID of the iteration from the trajectory ensemble database.
+        """
+
+        probe_item = self.probes[DB.str_to_name('probe_' + probe.name)]
+        self.work_collector.save_probe.remote(probe_item.ins_qry, [traj_id, iter] + [c.val for c in probe.consts] + vals)
 
     def persist_traj_ens_exec__(self, iter_id):
         # Pending removal
@@ -504,9 +507,10 @@ class ProbePersistenceDB(ProbePersistence):
         """
 
         if self.traj_ens:
-            self.reg_probe_traj_ens(probe)
-        else:
-            self.reg_probe_standalone(probe, do_overwrite)
+            return self.reg_probe_traj_ens(probe)
+        if self.work_collector:
+            return self.reg_probe_traj_ens_remote(probe)
+        return self.reg_probe_standalone(probe, do_overwrite)
 
     def reg_probe_standalone(self, probe, do_overwrite=False):
         """Registers a probe (for standalone persitance).
@@ -545,7 +549,7 @@ class ProbePersistenceDB(ProbePersistence):
 
         sel_qry = f"SELECT {','.join(['i','t'] + [c.name for c in probe.consts] + [v.name for v in probe.vars])} FROM {name_db}"
 
-        self.probes[name_db] = ProbePersistenceDBItem(name_db, ins_qry, sel_qry)
+        self.probes[name_db] = ProbePersistenceDBItem(probe, name_db, ins_qry, sel_qry)
 
     def reg_probe_traj_ens(self, probe):
         """Registers a probe (for trajectory ensemble persistence).
@@ -582,7 +586,61 @@ class ProbePersistenceDB(ProbePersistence):
 
         sel_qry = f"SELECT {','.join(['i.i'] + [c.name for c in probe.consts] + [v.name for v in probe.vars])} FROM {name_db} a INNER JOIN iter i ON i.id = a.iter_id"
 
-        self.probes[name_db] = ProbePersistenceDBItem(name_db, ins_qry, sel_qry)
+        self.probes[name_db] = ProbePersistenceDBItem(probe, name_db, ins_qry, sel_qry)
+
+    def reg_probe_traj_ens_remote(self, probe):
+        """Registers a probe (for parallelized trajectory ensemble persistence).
+
+        Args:
+            probe (Probe): The probe.
+            do_overwrite (bool): Flag: Should an already registered probe with the same name be overwriten?
+
+        Throws:
+            ValueError
+        """
+
+        name_db = DB.str_to_name('probe_' + probe.name)
+
+        if name_db in self.probes:
+            return
+
+        # Create the table:
+        cols = [
+            'id INTEGER PRIMARY KEY AUTOINCREMENT',
+            'iter_id INTEGER NOT NULL'
+        ] + \
+        [ f'{c.name} {c.type}' for c in probe.consts ] + \
+        [ f'{v.name} {v.type}' for v in probe.vars ]
+
+        # Store probe:
+        ins_qry = \
+            f"INSERT INTO {name_db} " + \
+            f"({','.join(['iter_id'] + [c.name for c in probe.consts] + [v.name for v in probe.vars])}) " + \
+            f"VALUES ((SELECT id FROM iter WHERE traj_id = ? AND i = ?), {','.join(['?'] * (len(cols) - 2))})"  # -1 for the 'id' and 'iter_id' columns
+
+        sel_qry = f"SELECT {','.join(['i.i'] + [c.name for c in probe.consts] + [v.name for v in probe.vars])} FROM {name_db} a INNER JOIN iter i ON i.id = a.iter_id"
+
+        self.probes[name_db] = ProbePersistenceDBItem(probe, name_db, ins_qry, sel_qry)
+
+    def remote_after(self, traj_ens, conn):
+        self.traj_ens = traj_ens
+        self.conn = conn
+        self.work_collector = None
+
+        probes = [p.probe for p in self.probes.values()]
+        self.probes = {}
+        for p in probes:
+            self.reg_probe_traj_ens(p)
+
+    def remote_before(self, work_collector):
+        self.traj_ens = None
+        self.conn = None
+        self.work_collector = work_collector
+
+        probes = [p.probe for p in self.probes.values()]
+        self.probes = {}
+        for p in probes:
+            self.reg_probe_traj_ens_remote(p)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -673,13 +731,14 @@ class Const(namedtuple('Const', ['name', 'type', 'val'])):
 class Probe(ABC):
     """Probe base class."""
 
-    def __init__(self, name, persistence=None, pop=None, memo=None):
+    def __init__(self, name, persistence=None, pop=None, traj_id=None, memo=None):
         self.name = name
         self.consts = []
         self.persistence = None
         self.pop = pop  # pointer to the population (can be set elsewhere too)
         self.memo = memo
 
+        self.set_traj_id(traj_id)
         self.set_persistence(persistence)
 
     def plot(self, series, ylabel, xlabel='Iteration', figpath=None, figsize=(8,8), legend_loc='upper right', dpi=150, subplot_l=0.08, subplot_r=0.98, subplot_t=0.95, subplot_b=0.25):
@@ -694,7 +753,7 @@ class Probe(ABC):
         return self.persistence.plot(self, series, ylabel, xlabel, figpath, figsize, legend_loc, dpi, subplot_l, subplot_r, subplot_t, subplot_b)
 
     @abstractmethod
-    def run(self, iter, t):
+    def run(self, iter, t, traj_id=None):
         """Runs the probe.
 
         A probe is run by the :meth:`~pram.sim.Simulation.run` method of the
@@ -739,6 +798,30 @@ class Probe(ABC):
         """
 
         self.pop = pop
+
+    def set_traj_id(self, id):
+        self.traj_id = id
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+@attrs(slots=True)
+class ProbePersistenceDBItem(object):
+    """A description of how a probe will interact with a database for the purpose of data persistence.
+
+    Args:
+        name (str): The item's name.
+        ins_qry (str): The SQL INSERT query that is used for persisting data in the database.  This query should be
+            parameterized to expect the value to be persisted.
+        sel_qry (str): The SQL SELECT query that is used for retrieving data from the database (e.g., to generate
+            plots).
+        ins_val (list): The values to be inserted into the database using the INSERT query.
+    """
+
+    probe   : Probe = attrib()  # the original Probe object
+    name    : str   = attrib()
+    ins_qry : str   = attrib()  # insert query (used for persisting data in the DB)
+    sel_qry : str   = attrib()  # select query (used for retrieving data from the DB, e.g., to generate plots)
+    ins_val : list  = attrib(factory=list, converter=converters.default_if_none(factory=list))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -920,7 +1003,7 @@ class GroupAttrProbe(GroupProbe):
     def __init__(self, name, queries, qry_tot=None, var_names=None, consts=None, persistence=None, msg_mode=0, pop=None, memo=None):
         raise Error('Implementation pending completion.')
 
-    def run(self, iter, t):
+    def run(self, iter, t, traj_id=None):
         """Runs the probe.
 
         More details in the :meth:`abstract method <pram.data.GroupProbe.run>`.
@@ -969,7 +1052,7 @@ class GroupSizeProbe(GroupProbe):
 
         super().__init__(name, queries, qry_tot, consts, persistence, msg_mode, pop, memo)
 
-    def run(self, iter, t):
+    def run(self, iter, t, traj_id=None):
         """Runs the probe.
 
         More details in the :meth:`abstract method <pram.data.GroupProbe.run>`.
@@ -1010,4 +1093,4 @@ class GroupSizeProbe(GroupProbe):
                 vals_p.append(m / m_tot)
                 vals_m.append(m)
 
-            self.persistence.persist(self, vals_p + vals_m, iter, t)
+            self.persistence.persist(self, vals_p + vals_m, iter, t, traj_id)
