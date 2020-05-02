@@ -102,16 +102,16 @@ class PopProbe(Probe):
 
         super().__init__('pop', persistence)
 
-    def run(self, iter, t):
+    def run(self, iter, t, traj_id):
         if iter is None:
             self.run_init()
         else:
-            self.run_iter(iter, t)
+            self.run_iter(iter, t, traj_id)
 
     def run_init(self):
         self.pop_m_init = self.pop.m
 
-    def run_iter(self, iter, t):
+    def run_iter(self, iter, t, traj_id):
         migrating_groups = self.pop.get_groups(GroupQry(cond=[lambda g: g.has_attr({ 'is-migrating': True })]))
         if migrating_groups and len(migrating_groups) > 0:
             migration_time_lst = [g.get_attr('migration-time') for g in migrating_groups]
@@ -135,7 +135,7 @@ class PopProbe(Probe):
         )
 
         if self.persistence:
-            self.persistence.persist(self, [self.pop.m, self.pop.m_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd], iter, t)
+            self.persistence.persist(self, [self.pop.m, self.pop.m_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd], iter, t, traj_id)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
