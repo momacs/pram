@@ -135,16 +135,16 @@ class PopProbe(Probe):
 
         super().__init__('pop', persistence)
 
-    def run(self, iter, t):
+    def run(self, iter, t, traj_id):
         if iter is None:
             self.run_init()
         else:
-            self.run_iter(iter, t)
+            self.run_iter(iter, t, traj_id)
 
     def run_init(self):
         self.pop_m_init = self.pop.m
 
-    def run_iter(self, iter, t):
+    def run_iter(self, iter, t, traj_id):
         # Migrating population:
         migrating_groups = self.pop.get_groups(GroupQry(cond=[lambda g: g.has_attr({ 'is-migrating': True })]))
         if migrating_groups and len(migrating_groups) > 0:
@@ -180,7 +180,7 @@ class PopProbe(Probe):
         )
 
         if self.persistence:
-            self.persistence.persist(self, [self.pop.m, self.pop.m_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd, settled_m, settled_p], iter, t)
+            self.persistence.persist(self, [self.pop.m, self.pop.m_out, migrating_m, migrating_p, migrating_time_mean, migrating_time_sd, settled_m, settled_p], iter, t, traj_id)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -211,7 +211,7 @@ def print_settled_summary():
     print('')
     settled_m = 0
     for s in sites_dst:
-        m = s.get_pop_size()
+        m = s.get_mass()
         settled_m += m
         print(f'{s.name:<12}: {m:>9,.0f}')
     print(f'{"TOTAL":<12}: {settled_m:>9,.0f}')
