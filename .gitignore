@@ -25,6 +25,7 @@
 /cp-to-pkg
 /geckodriver.log
 /is-root
+/mk-notebooks-backup
 /mk-src-backup
 /pip-selfcheck.json
 /preamble.txt
