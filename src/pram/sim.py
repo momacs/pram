@@ -2083,8 +2083,9 @@ class Simulation(object):
                 'traj_id'         : self.traj_id,  # self.traj.id if self.traj else None,
                 'iter'            : self.timer.i if self.timer.is_running else -1,
                 'pop_m'           : self.pop.get_mass(),
-                'groups'          : [{ 'hash': g.get_hash(), 'm': g.m } for g in self.pop.groups.values()],  # self.pop.get_groups()
-                'mass_flow_specs' : mass_flow_specs if self.timer.i > 0 else None
+                'groups'          : [{ 'hash': g.get_hash(), 'm': g.m, 'attr': g.attr, 'rel': g.rel } for g in self.pop.groups.values()],  # self.pop.get_groups()
+                # 'mass_flow_specs' : mass_flow_specs if self.timer.i > 0 else None
+                'mass_flow_specs' : mass_flow_specs
             }])
 
         return self

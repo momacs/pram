@@ -1,8 +1,8 @@
 """
-Basic reproduction number (R0)
-    Varicella            10-12
-    Measles              16-18
+Basic reproduction number (R0) for several diseases
     Rotavirus            16-25
+    Measles              16-18
+    Varicella            10-12
     Smallpox             3-10
     Spanish flu          2.0 [1.5 - 2.8]
     Seasonal influenza   1.3 [0.9 - 1.8]
@@ -28,6 +28,8 @@ class SIRModelDerivatives(ODEDerivatives):
         beta  - Transmission rate (or effective contact rate)
         gamma - Recovery rate
 
+    R0 = beta * S0 / gamma,    where S0 is the initial size of the susceptible population
+
     Kermack WO & McKendrick AG (1927) A Contribution to the Mathematical Theory of Epidemics. Proceedings of the
     Royal Society A. 115(772), 700--721.
 
@@ -46,6 +48,30 @@ class SIRModelDerivatives(ODEDerivatives):
                 -p.beta * S * I / N,                # dS/dt
                  p.beta * S * I / N - p.gamma * I,  # dI/dt
                                       p.gamma * I   # dR/dt
+            ]
+        return fn
+
+
+class SIRDModelDerivatives(ODEDerivatives):  # new and not validated yet, but boy, does it have potential...
+    '''
+    Model parameters
+        beta  - Transmission rate (or effective contact rate)
+        gamma - Recovery rate
+        f     - Redovery fraction (i.e., 1 - f agents die)
+    '''
+
+    def __init__(self, beta, gamma):
+        self.params = DotMap(beta=beta, gamma=gamma)
+
+    def get_fn(self):
+        p = self.params
+        def fn(t, state):
+            S,I,R = state
+            N = sum(state)
+            return [
+                -p.beta * S * I / N,                    # dS/dt
+                 p.beta * S * I / N -     p.gamma * I,  # dI/dt
+                                      f * p.gamma * I   # dR/dt
             ]
         return fn
 
@@ -71,12 +97,14 @@ class SEIRModelDerivatives(ODEDerivatives):
     '''
     Model parameters
         beta  - Transmission rate (or effective contact rate)
-        k     - Progression rate from exposed (latent) to infected
+        kappa - Progression rate from exposed (latent) to infected
         gamma - Recovery rate
+
+    R0 = beta * S0 / gamma,    where S0 is the initial size of the susceptible population
     '''
 
-    def __init__(self, beta, k, gamma):
-        self.params = DotMap(beta=beta, k=k, gamma=gamma)
+    def __init__(self, beta, kappa, gamma):
+        self.params = DotMap(beta=beta, kappa=kappa, gamma=gamma)
 
     def get_fn(self):
         p = self.params
@@ -84,10 +112,10 @@ class SEIRModelDerivatives(ODEDerivatives):
             S,E,I,R = state
             N = sum(state)
             return [
-                -p.beta * S * I / N,                # dS/dt
-                 p.beta * S * I / N - p.k     * E,  # dE/dt
-                 p.k    * E         - p.gamma * I,  # dI/dt
-                                      p.gamma * I   # dR/dt
+                -p.beta  * S * I / N,                              # dS/dt
+                 p.beta  * S * I / N - p.kappa * E,                # dE/dt
+                                       p.kappa * E - p.gamma * I,  # dI/dt
+                                                     p.gamma * I   # dR/dt
             ]
         return fn
 
@@ -135,6 +163,62 @@ class SEQIHRModelDerivatives(ODEDerivatives):
                 p.delta_n * I + p.delta_h * H - p.mu * R                                    # dR/dt
             ]
         return fn
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Model parameters:
+
+class ModelParams(ABC):
+    @classmethod
+    def by_clinical_obs(cls):
+        """
+        Instantiates the class using clinical observations instead of model rate parameters.  This is useful because
+        typically the former are easier to obtain and more agreed upon.
+
+        The actual number of arguments to the method of an extending class will depend on the number of compartments in
+        in the underlying model.  Progression rates (kappa) should be computed based on incubation and symptomatic
+        periods (inbub_period and sympt_period).  Recovery rates (gamma) should be computed based on infection
+        durations (inf_dur).  Finally, transmission rates (beta) should be based on the R0 formula, which for the SIR
+        model (and all descendant models without vital dynamics) takes the form:
+
+            R0 = beta * S0 / gamma,    where S0 is the initial size of the susceptible population
+        """
+
+        pass
+
+
+class SEIRModelParams(ModelParams):
+    def __init__(self, beta, kappa, gamma, r0=None):
+        self.beta  = beta
+        self.kappa = kappa_1
+        self.gamma = gamma
+        self.r0    = r0
+
+    @classmethod
+    def by_clinical_obs(cls, s0, r0, incub_period, sympt_period):
+        kappa = 1 / incub_period
+        gamma = 1 / inf_dur
+        beta  = r0 * gamma / s0
+
+        return cls(beta, kappa, gamma, r0)
+
+
+class SEI2RModelParams(ModelParams):
+    def __init__(self, beta, kappa_1, kappa_2, gamma, r0=None):
+        self.beta    = beta
+        self.kappa_1 = kappa_1
+        self.kappa_2 = kappa_2
+        self.gamma   = gamma
+        self.r0      = r0
+
+    @classmethod
+    def by_clinical_obs(cls, s0, r0, incub_period, asympt_period, inf_dur):
+        kappa_1 = 1 / incub_period
+        kappa_2 = 1 / asympt_period
+        gamma   = 1 / (inf_dur - asympt_period)
+        beta    = r0 * gamma / s0
+
+        return cls(beta, kappa_1, kappa_2, gamma, r0)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -192,8 +276,8 @@ class SEIRModel_MC(DiscreteInvMarkovChain):
         gamma - Recovery rate
     '''
 
-    def __init__(self, var, beta, k, gamma, name='seir-model', t=TimeAlways(), i=IterAlways(), memo=None, cb_before_apply=None):
-        super().__init__(var, { 's': [1.0 - beta, beta, 0.0, 0.0], 'e': [0.0, 1.0 - k, k, 0.0], 'i': [0.0, 0.0, 1.0 - gamma, gamma], 'r': [0.0, 0.0, 0.0, 1.0] }, name, t, i, memo, cb_before_apply)
+    def __init__(self, var, beta, kappa, gamma, name='seir-model', t=TimeAlways(), i=IterAlways(), memo=None, cb_before_apply=None):
+        super().__init__(var, { 's': [1.0 - beta, beta, 0.0, 0.0], 'e': [0.0, 1.0 - kappa, kappa, 0.0], 'i': [0.0, 0.0, 1.0 - gamma, gamma], 'r': [0.0, 0.0, 0.0, 1.0] }, name, t, i, memo, cb_before_apply)
 
 
 class SEQIHRModel_MC(DiscreteInvMarkovChain):
@@ -232,11 +316,11 @@ class SIRSModel_ODE(ODESystemMass):
 
 
 class SEIRModel_ODE(ODESystemMass):
-    def __init__(self, var, beta, k, gamma, name='seir-model', t=TimeAlways(), i=IterAlways(), dt=0.1, memo=None):
-        super().__init__(SEIRModelDerivatives(beta, k, gamma), [DotMap(attr={ var:v }) for v in 'seir'], name, t, i, dt, memo=memo)
+    def __init__(self, var, beta, kappa, gamma, name='seir-model', t=TimeAlways(), i=IterAlways(), dt=0.1, memo=None):
+        super().__init__(SEIRModelDerivatives(beta, kappa, gamma), [DotMap(attr={ var:v }) for v in 'seir'], name, t, i, dt, memo=memo)
 
-    def set_params(self, beta=None, k=None, gamma=None):
-        super().set_params(beta=beta, k=k, gamma=gamma)
+    def set_params(self, beta=None, kappa=None, gamma=None):
+        super().set_params(beta=beta, kappa=kappa, gamma=gamma)
 
 
 class SEQIHRModel_ODE(ODESystemMass):
@@ -284,11 +368,11 @@ class SEIRModel(Model):
     """Main SEIR model interface.
     """
 
-    def __init__(self, var, beta, k, gamma, name='seir-model', t=TimeAlways(), i=IterAlways(), solver=MCSolver(), memo=None, cb_before_apply=None):
+    def __init__(self, var, beta, kappa, gamma, name='seir-model', t=TimeAlways(), i=IterAlways(), solver=MCSolver(), memo=None, cb_before_apply=None):
         if isinstance(solver, MCSolver):
-            self.rule = SEIRModel_MC (var, beta, k, gamma, name, t, i, memo, cb_before_apply)
+            self.rule = SEIRModel_MC (var, beta, kappa, gamma, name, t, i, memo, cb_before_apply)
         elif isinstance(solver, ODESolver):
-            self.rule = SEIRModel_ODE(var, beta, k, gamma, name, t, i, solver.dt, memo)
+            self.rule = SEIRModel_ODE(var, beta, kappa, gamma, name, t, i, solver.dt, memo)
         else:
             raise ModelConstructionError('Incompatible solver')
 

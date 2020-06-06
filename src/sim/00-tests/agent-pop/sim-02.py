@@ -2,7 +2,7 @@
 An example of how a population of agents can be generated from the recorded population-level mass dynamics.
 
 Building on the previous and very simple simulation, this simulation uses two rules, eight groups, and the dynamics is
-a result of conditioning on group's current location (naturally encoded via a Site object).  Notably, the initial eight
+a result of conditioning on group's current location (which is encoded via a Site object).  Notably, the initial eight
 groups are quickly split into the total of 32 groups (already at iteration three).  A further increase in complexity
 (but also realism) comes from the feedback in the system.  Namely, susceptible agents become infected with the
 probability dependant on the number of infected agents around them.  That number changes from iteration to iteration
@@ -14,6 +14,7 @@ ignored, then the algorithm can likely be improved.
 '''
 
 import numpy as np
+import os
 
 from pram.entity      import Group, GroupQry, GroupSplitSpec, Site
 from pram.model.model import MCSolver
@@ -26,20 +27,19 @@ from pram.traj        import Trajectory, TrajectoryEnsemble
 # ----------------------------------------------------------------------------------------------------------------------
 fpath_db = os.path.join(os.path.dirname(__file__), 'sim-02.sqlite3')
 
-def get_out_fpath(filename):
-    return os.path.join(os.path.dirname(__file__), filename)
-
 
 # ----------------------------------------------------------------------------------------------------------------------
 class FluProgressRule(Rule):
     def apply(self, pop, group, iter, t):
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
-            at  = group.get_rel(Site.AT)
-            n   = at.get_pop_size()                               # total    population at the group's current location
-            n_i = at.get_pop_size(GroupQry(attr={ 'flu': 'i' }))  # infected population at the group's current location
+            # at  = group.get_rel(Site.AT)
+            # n   = at.get_pop_size()                               # total    population at the group's current location
+            # n_i = at.get_pop_size(GroupQry(attr={ 'flu': 'i' }))  # infected population at the group's current location
+            #
+            # p_infection = float(n_i) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
 
-            p_infection = float(n_i) / float(n)  # changes every iteration (i.e., the source of the simulation dynamics)
+            p_infection = group.get_rel(Site.AT).get_mass_prop(GroupQry(attr={ 'flu': 'i' }))
 
             return [
                 GroupSplitSpec(p=    p_infection, attr_set={ 'flu': 'i', 'mood': 'annoyed' }),
@@ -122,10 +122,12 @@ if te.is_db_empty:
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# te.traj[1].plot_mass_locus_line((1200,300), get_out_fpath('sim-02.png'))
+# te.traj[1].plot_mass_locus_line((1200,300), os.path.join(os.path.dirname(__file__), 'sim-02.png'))
 
+# A single agent:
 agent = te.traj[1].gen_agent(3)
 print(agent)
 print(agent['rel'][Site.AT][0])  # the name and has of the site is retrieved from the DB correctly
 
-# print(te.traj[1].gen_agent_pop(2,2))
+# Population of agents:
+print(te.traj[1].gen_agent_pop(2,2))  # two-agent population simulated for two iterations

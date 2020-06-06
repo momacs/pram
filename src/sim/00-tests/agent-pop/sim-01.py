@@ -6,6 +6,7 @@ model implemented as a Markov chain.
 '''
 
 import numpy as np
+import os
 
 from pram.entity      import Group
 from pram.model.model import MCSolver
@@ -22,9 +23,6 @@ group_names = [
     (1, 'I', Group.gen_hash(attr={ 'flu': 'i' })),
     (2, 'R', Group.gen_hash(attr={ 'flu': 'r' }))
 ]
-
-def get_out_fpath(filename):
-    return os.path.join(os.path.dirname(__file__), filename)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -49,7 +47,7 @@ if te.is_db_empty:
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# te.traj[1].plot_mass_locus_line((1200,300), get_out_fpath('sim-01.png'))
+# te.traj[1].plot_mass_locus_line((1200,300), os.path.join(os.path.dirname(__file__), 'sim-01.png'))
 
-print(te.traj[1].gen_agent(4))        # four-iteration simulation
+print(te.traj[1].gen_agent(4))        # a single agent in a four-iteration simulation
 print(te.traj[1].gen_agent_pop(2,3))  # two-agent population simulated for three iterations

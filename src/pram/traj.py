@@ -482,8 +482,8 @@ class TrajectoryEnsemble(object):
 
         This is a two-step process:
 
-        (1)  Pick the agent's initial group taking into account the initial mass distribution among the groups
-        (2+) Pick the next group taking into account transition probabilities to all possible next groups
+        (1) Pick the agent's initial group taking into account the initial mass distribution among the groups
+        (2) Pick the next group taking into account transition probabilities to all possible next groups
 
         Because step 1 always takes place, the resulting list of agent's states will be of size 'n_iter + 1'.
         '''
@@ -497,10 +497,12 @@ class TrajectoryEnsemble(object):
 
             for i in range(-1, n_iter):
                 if i == -1:  # (1) setting the initial group
-                    groups = list(zip(*[[r[0], round(r[1],2)] for r in c.execute('SELECT g.id, g.m_p FROM grp g INNER JOIN iter i ON i.id = g.iter_id WHERE i.traj_id = ? AND i.i = ?', [traj.id, -1])]))
+                    # groups = list(zip(*[[r[0], round(r[1],2)] for r in c.execute('SELECT g.id, g.m_p FROM grp g INNER JOIN iter i ON i.id = g.iter_id WHERE i.traj_id = ? AND i.i = ?', [traj.id, -1])]))
+                    groups = list(zip(*[[r[0], round(r[1],2)] for r in c.execute('SELECT grp_id, m_p FROM mass_locus ml INNER JOIN iter i ON ml.iter_id = i.id WHERE i.traj_id = ? AND i.i = ?', [traj.id, -1])]))
                 else:  # (2) generating a sequence of group transitions
                     groups = list(zip(*[[r[0], round(r[1],2)] for r in c.execute('SELECT g_dst.id, mf.m_p FROM mass_flow mf INNER JOIN iter i ON i.id = mf.iter_id INNER JOIN grp g_src ON g_src.id = mf.grp_src_id INNER JOIN grp g_dst ON g_dst.id = mf.grp_dst_id WHERE i.traj_id = ? AND i.i = ? AND g_src.id = ?', [traj.id, i, grp_id])]))
 
+                # print(groups)
                 if sum(groups[1]) > 0:  # prevents errors when the sum is zero (should always be True for the 1st iter)
                     grp_id = random.choices(groups[0], groups[1])[0]
 
@@ -1384,64 +1386,6 @@ class TrajectoryEnsemble(object):
             self.save_sim(t)
         return self
 
-    # def save_state(self, traj, mass_flow_specs=None):
-    #     ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
-    #
-    #     with self.conn as c:
-    #         self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
-    #         # self.save_groups(traj, iter_id, c)
-    #         self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
-    #         self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
-    #
-    #     return self
-
-    # def save_state(self, traj_id, iter, pop_m, groups, mass_flow_specs=None):
-    #     ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
-    #
-    #     with self.conn as c:
-    #         # self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
-    #         # # self.save_groups(traj, iter_id, c)
-    #         # self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
-    #         # self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
-    #
-    #         self.curr_iter_id = self.save_iter(traj_id, iter, None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
-    #         # self.save_groups(traj, iter_id, c)
-    #         self.save_mass_locus__par(pop_m, group, self.curr_iter_id, c)
-    #         self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
-    #
-    #     return self
-
-    def save_work(self, work):
-        with self.conn as c:
-            for (i,p) in enumerate(self.unpersisted_probes):
-                try:
-                    c.execute(p['qry'], p['vals'])
-                    del self.unpersisted_probes[i]
-                except sqlite3.IntegrityError:
-                    pass
-
-            for w in work:
-                if w['type'] == 'state':
-                    host_name       = w['host_name']
-                    host_ip         = w['host_ip']
-                    traj_id         = w['traj_id']
-                    iter            = w['iter']
-                    pop_m           = w['pop_m']
-                    groups          = w['groups']
-                    # mass_flow_specs = pickle.loads(w['mass_flow_specs'])
-                    mass_flow_specs = None
-
-                    self.curr_iter_id = self.save_iter(traj_id, iter, host_name, host_ip, c)
-                    self.save_mass_locus__par(pop_m, groups, self.curr_iter_id, c)
-                    self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
-                elif w['type'] == 'probe':
-                    try:
-                        c.execute(w['qry'], w['vals'])
-                    except sqlite3.IntegrityError:
-                        self.unpersisted_probes.append(s)
-
-        return self
-
     def save_iter(self, traj_id, iter, host_name, host_ip, conn):
         ''' Returns iter_id. '''
 
@@ -1564,7 +1508,11 @@ class TrajectoryEnsemble(object):
 
             # New group -- persist:
             if self._db_get_one('SELECT COUNT(*) FROM grp WHERE hash = ?', [str(group_hash)], conn) == 0:
-                group_id = conn.execute('INSERT INTO grp (hash, attr, rel) VALUES (?,?,?)', [str(group_hash), None, None]).lastrowid
+                # group_id = conn.execute('INSERT INTO grp (hash, attr, rel) VALUES (?,?,?)', [str(group_hash), None, None]).lastrowid
+                group_id = conn.execute(
+                    'INSERT INTO grp (hash, attr, rel) VALUES (?,?,?)',
+                    [str(group_hash), DB.obj2blob(g['attr']), DB.obj2blob(g['rel'])]
+                ).lastrowid
 
                 if self.pragma.memoize_group_ids:
                     self.cache.group_hash_to_id[group_hash] = group_id
@@ -1584,6 +1532,70 @@ class TrajectoryEnsemble(object):
                 'INSERT INTO mass_locus (iter_id, grp_id, m, m_p) VALUES (?,?,?,?)',
                 [iter_id, group_id, g['m'], g['m'] / pop_m]
             )
+
+        return self
+
+    # def save_state(self, traj, mass_flow_specs=None):
+    #     ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
+    #
+    #     with self.conn as c:
+    #         self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
+    #         # self.save_groups(traj, iter_id, c)
+    #         self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
+    #         self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
+    #
+    #     return self
+
+    # def save_state(self, traj_id, iter, pop_m, groups, mass_flow_specs=None):
+    #     ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
+    #
+    #     with self.conn as c:
+    #         # self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
+    #         # # self.save_groups(traj, iter_id, c)
+    #         # self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
+    #         # self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
+    #
+    #         self.curr_iter_id = self.save_iter(traj_id, iter, None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
+    #         # self.save_groups(traj, iter_id, c)
+    #         self.save_mass_locus__par(pop_m, group, self.curr_iter_id, c)
+    #         self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
+    #
+    #     return self
+
+    def save_work(self, work):
+        with self.conn as c:
+            for (i,p) in enumerate(self.unpersisted_probes):
+                try:
+                    c.execute(p['qry'], p['vals'])
+                    del self.unpersisted_probes[i]
+                except sqlite3.IntegrityError:
+                    pass
+
+            for w in work:
+                if w['type'] == 'state':
+                    host_name       = w['host_name']
+                    host_ip         = w['host_ip']
+                    traj_id         = w['traj_id']
+                    iter            = w['iter']
+                    pop_m           = w['pop_m']
+                    groups          = w['groups']
+
+                    if not w.get('mass_flow_specs') is None:
+                        if isinstance(w.get('mass_flow_specs'), list):
+                            mass_flow_specs = w['mass_flow_specs']
+                        else:
+                            mass_flow_specs = pickle.loads(w['mass_flow_specs'])
+                    else:
+                        mass_flow_specs = None
+
+                    self.curr_iter_id = self.save_iter(traj_id, iter, host_name, host_ip, c)
+                    self.save_mass_locus__par(pop_m, groups, self.curr_iter_id, c)
+                    self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
+                elif w['type'] == 'probe':
+                    try:
+                        c.execute(w['qry'], w['vals'])
+                    except sqlite3.IntegrityError:
+                        self.unpersisted_probes.append(s)
 
         return self
 

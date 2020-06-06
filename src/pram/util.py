@@ -521,6 +521,14 @@ class Time(object):
     })
 
     @staticmethod
+    def day_of_year_to_dt(year, day, format=None):
+        dt = (datetime.datetime(year, 1, 1) + datetime.timedelta(day - 1))
+        if format is None:
+            return dt
+        else:
+            return dt.strftime(format)
+
+    @staticmethod
     def dt():
         ''' Datetime now. '''
 

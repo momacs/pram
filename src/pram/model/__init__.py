@@ -1,2 +1,2 @@
 from .model import Model, Solver, MCSolver, ODESolver
-from .epi   import SISModel, SIRModel, SIRSModel, SEIRModel, SEQIHRModel
+from .epi   import SEIRModelParams, SEI2RModelParams, SISModel, SIRModel, SIRSModel, SEIRModel, SEQIHRModel
