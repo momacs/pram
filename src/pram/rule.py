@@ -82,7 +82,7 @@ class TimePoint(Time):
     t: float = attrib(default=0.00, converter=float)
 
     def __attrs_post_init__(self):
-        if self.i < 0:
+        if self.t < 0:
             raise ValueError(f'Time must be non-negative, but {self.i} passed.')
 
 
