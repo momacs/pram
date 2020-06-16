@@ -1950,7 +1950,11 @@ class Group(Entity):
         # if name == Site.AT:
         #     raise ValueError("Relation name '{}' is restricted for internal use.".format(Site.AT))
 
-        self.rel[name] = value if not isinstance(value, Entity) else value.get_hash()
+        # self.rel[name] = value if not isinstance(value, Entity) else value.get_hash()
+        if not self.pop:
+            self.rel[name] = value
+        else:
+            self.rel[name] = value.get_hash()
         self.hash = None
 
         if self.pop and name == Site.AT:
