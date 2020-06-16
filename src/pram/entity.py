@@ -1780,7 +1780,7 @@ class Group(Entity):
         """
 
         # return self._has(self.rel, sites, self.rel_used)
-        return self._has_rel(qry)
+        return self._has_rel(sites)
 
     def hr(self, qry):
         """See :meth:`~pram.entity.Group.has_rel` method."""
