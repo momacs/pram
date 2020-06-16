@@ -812,7 +812,7 @@ class Simulation(object):
             self: For method call chaining.
         """
 
-        if probe.name in [p.name for probe in self.probes]:
+        if probe.name in [p.name for p in self.probes]:
             raise SimulationConstructionError(f'Probe with that name ({probe.name}) already exists.')
 
         self.pop.ar_enc.encode_probe(probe)
