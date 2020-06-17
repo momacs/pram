@@ -5,23 +5,14 @@ import sqlite3
 
 from collections import namedtuple
 
+from sim import school_specs
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # (0) init:
 
-Spec = namedtuple('Spec', ('name', 'n'))
-specs = [
-    Spec('0',    50),
-    Spec('1',   100),
-    Spec('2',   200),
-    Spec('3',   300),
-    Spec('4',   500),
-    Spec('5',  5000),
-    Spec('6', 50000)
-]
-
-sim_dur_days_data = 1
-sim_dur_days_plot = 1
+sim_dur_days_data = 3
+sim_dur_days_plot = 3
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -33,9 +24,9 @@ fpath_db = os.path.join(dir, f'probes-{sim_dur_days_data}d.sqlite3')
 if not os.path.isfile(fpath_db):
     raise ValueError(f'Database does not exist: {fpath_db}')
 
-qry01 = [f'(t{s.name}.pa + t{s.name}.ps) AS p_inf_{s.name}' for s in specs]
-qry02 = [f'FROM flu_{specs[0].name} t{specs[0].name}'] + [f'INNER JOIN flu_{s.name} t{s.name} on (t{s.name}.i = t{specs[0].name}.i)' for s in specs[1:]]
-qry = f'SELECT t{specs[0].name}.i, ' + ', '.join(qry01) + '\n' + '\n'.join(qry02) + f' WHERE t{specs[0].name}.i <= {24 * sim_dur_days_plot}'
+qry01 = [f't{s.name}.pi AS p_inf_{s.name}' for s in school_specs]
+qry02 = [f'FROM flu_{school_specs[0].name} t{school_specs[0].name}'] + [f'INNER JOIN flu_{s.name} t{s.name} on (t{s.name}.i = t{school_specs[0].name}.i)' for s in school_specs[1:]]
+qry = f'SELECT t{school_specs[0].name}.i, ' + ', '.join(qry01) + '\n' + '\n'.join(qry02) + f' WHERE t{school_specs[0].name}.i <= {24 * sim_dur_days_plot}'
 
 with sqlite3.connect(fpath_db, check_same_thread=False) as c:
     df = pd.read_sql(qry, c)  # [:24 * sim_dur_days_plot]
@@ -49,9 +40,9 @@ fpath_plot = os.path.join(dir, f'plot-{sim_dur_days_data}d-{sim_dur_days_plot}d.
 
 fig = plt.figure(figsize=(20,10))
 legend = []
-for s in specs:
+for s in school_specs:
     plt.plot(df['i'] / 24, df[f'p_inf_{s.name}'], lw=1, antialiased=True)
-    legend.append(f'n={s.n}')
+    legend.append(f'n={s.m}')
 plt.legend(legend, loc='lower right')
 plt.xlabel('days')
 plt.ylabel('proportion of infected students')
