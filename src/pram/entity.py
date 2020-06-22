@@ -18,7 +18,7 @@ import os
 import xxhash
 
 from dotmap           import DotMap
-from numba            import jit
+# from numba            import jit
 
 from abc             import ABC
 from attr            import attrs, attrib, converters, validators
@@ -1101,7 +1101,7 @@ class Group(Entity):
             if self.pop:
                 qry = { k:v.get_hash() if isinstance(v, Site) else v for (k,v) in qry.items() }
             if self.is_enc:
-                ary = self.pop.ar_enc.encode_rel(qry)
+                qry = self.pop.ar_enc.encode_rel(qry)
                 return qry <= self.rel_enc
             else:
                 return qry.items() <= self.rel.items()
