@@ -5,6 +5,8 @@ from pram.util import Time
 
 from abc import abstractmethod, ABC
 
+__all__ = []
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Geography(ABC):
