@@ -19,7 +19,7 @@ from pram.model.model import MCSolver
 from pram.model.epi   import SIRSModel
 from pram.rule        import ODESystemMass, GammaDistributionProcess
 from pram.sim         import Simulation
-from pram.traj        import Trajectory, TrajectoryEnsemble
+from pram.traj        import ClusterInf, Trajectory, TrajectoryEnsemble
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -62,9 +62,9 @@ class MakeSusceptibleProcess(GammaDistributionProcess):  # extends the GammaDist
 
 if os.path.isfile(fpath_db): os.remove(fpath_db)
 
-te = TrajectoryEnsemble(fpath_db)
+# te = TrajectoryEnsemble(fpath_db)
 # te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(address='auto'))
-# te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(num_cpus=6, memory=500*1024*1024, object_store_memory=500*1024*1024, include_webui=False))
+te = TrajectoryEnsemble(fpath_db, cluster_inf=ClusterInf(num_cpus=6, memory=500*1024*1024, object_store_memory=500*1024*1024, include_webui=False))
 
 if te.is_db_empty:  # generate simulation data if the trajectory ensemble database is empty
     te.set_pragma_memoize_group_ids(True)
