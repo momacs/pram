@@ -5,6 +5,8 @@ reducing the number of infected; the sooner it is undertaken the lower the infec
 This system uses ordinary differential equations solver to implement the SEQIHR model.
 '''
 
+import os
+
 from scipy.stats import truncnorm, uniform
 
 from pram.entity      import Group
@@ -66,7 +68,7 @@ if te.is_db_empty:
                 SARSQuarantineIntervention(
                     SEQIHRModel('sars', beta=0.80, alpha_n=0.75, alpha_q=0.40, delta_n=0.01, delta_h=0.03, mu=0.01, chi=0.01, phi=0.20, rho=0.75, solver=ODESolver()),
                     chi=0.99,
-                    i=intervention_onset
+                    i=int(intervention_onset)
                 ),
                 Group(m=95000, attr={ 'sars': 's' }),
                 Group(m= 5000, attr={ 'sars': 'e' })
