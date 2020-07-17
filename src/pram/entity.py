@@ -17,9 +17,6 @@ import numpy as np
 import os
 import xxhash
 
-from dotmap           import DotMap
-# from numba            import jit
-
 from abc             import ABC
 from attr            import attrs, attrib, converters, validators
 from collections.abc import Iterable
@@ -28,7 +25,9 @@ from functools       import lru_cache, reduce
 from iteround        import saferound
 from scipy.stats     import rv_continuous
 
-from .util import DB, Err, FS
+# from numba            import jit
+
+from .util import DB, Err, FS, Time
 
 __all__ = ['GroupFrozenError', 'Resource', 'Site', 'GroupQry', 'GroupSplitSpec', 'GroupDBRelSpec', 'Group']
 
@@ -435,11 +434,12 @@ class Site(Resource):
         return self.get_attr(name)
 
     @classmethod
-    def gen_from_db(cls, db_fpath, tbl, name_col, rel_name=AT, attr=[], limit=0):
+    def gen_from_db(cls, db, schema, tbl, name_col, rel_name=AT, attr=[], limit=0):
         """Generates sites from a relational database.
 
         Args:
-            db_fpath (str): Path to the database file (SQLite3).
+            db (:class:`~pram.util.DB`): Database object.
+            schema (str): Schema name.
             tbl (str): Table name.
             name_col (str): Table column storing names of sites.
             rel_name (str): Name of the relation to be associated with each of the sites generated.  For example, if
@@ -454,14 +454,14 @@ class Site(Resource):
                 were used as keys, but a recent change in the internal design did away with that.
         """
 
-        FS.req_file(db_fpath, f'The database does not exist: {db_fpath}')
-
         sites = {}
-        with DB.open_conn(db_fpath) as c:
-            for row in c.execute('SELECT {} FROM {}{}'.format(','.join(attr + [name_col]), tbl, '' if limit <= 0 else f' LIMIT {limit}')).fetchall():
-                s = cls(row[name_col], { a: row[a] for a in attr }, rel_name=rel_name)
-                # sites[s.get_hash()] = s  # old ways of handling sites
-                sites[row[name_col]] = s
+        c = db.conn.cursor()
+        c.execute('SELECT {} FROM {}{}'.format(','.join(attr + [name_col]), tbl if schema is None else f'{schema}.{tbl}', '' if limit <= 0 else f' LIMIT {limit}'))
+        for row in c.fetchall():
+            s = cls(row[name_col], { a: row[a] for a in attr }, rel_name=rel_name)
+            sites[row[name_col]] = s
+            # sites[s.get_hash()] = s  # old ways of handling sites
+        c.close()
 
         return sites
 
@@ -833,9 +833,12 @@ class GroupDBRelSpec(object):
         sites (Mapping[str, Site]):
     """
 
-    name  : str  = attrib()
-    col   : str  = attrib()
-    sites : dict = attrib(default=None)  # if None it will be generated from the DB
+    name      : str  = attrib()
+    col       : str  = attrib()
+    fk_schema : str  = attrib()
+    fk_tbl    : str  = attrib()
+    fk_col    : str  = attrib()
+    sites     : dict = attrib(default=None)  # if None it will be generated from the DB
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1267,7 +1270,7 @@ class Group(Entity):
         return self.get_attr(name)
 
     @classmethod
-    def gen_from_db(cls, db_fpath, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0, fn_live_info=None):
+    def gen_from_db(cls, db, schema, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0, fn_live_info=None):
         """Generate groups from a relational database.
 
         In this method, lists are sometimes converted to allow for set operations (e.g., union or difference) and the
@@ -1282,7 +1285,8 @@ class Group(Entity):
         method internally.
 
         Args:
-            db_fpath (str): Path to the database file (SQLite3).
+            db (:class:`~pram.util.DB`): Database object.
+            schema (str): Database schema.
             tbl (str): Table name.
             attr_db (Iterable[str]): Group attributes to be retrieved from the database (if extant).
             rel_db (Iterable[GroupDBRelSpec]): Group relation to be retrieved from the database (if extant).
@@ -1299,9 +1303,9 @@ class Group(Entity):
             list(Group): A list of groups generated.
         """
 
-        inf = fn_live_info  # shorthand
+        ts_0 = Time.ts()
 
-        FS.req_file(db_fpath, f'The database does not exist: {db_fpath}')
+        inf = fn_live_info  # shorthand
 
         if inf:
             inf('    Expected in table')
@@ -1310,10 +1314,9 @@ class Group(Entity):
 
         # (1) Sort out attributes and relations that do and do not exist in the table and reconcile them with the fixed ones:
         # (1.1) Use table columns to identify the attributes and relations that do and do not exist:
-        with DB.open_conn(db_fpath) as c:
-            columns = [i[1] for i in c.execute(f'PRAGMA table_info({tbl})')]
-            attr_db_keep = [a for a in attr_db if a in columns]     # attributes to be kept based on the table schema
-            rel_db_keep  = [r for r in rel_db if r.col in columns]  # relations
+        columns = db.get_cols(schema, tbl)
+        attr_db_keep = [a for a in attr_db if a in columns]     # attributes to be kept based on the table schema
+        rel_db_keep  = [r for r in rel_db if r.col in columns]  # relations
 
         if inf:
             inf( '    Found in table')
@@ -1329,7 +1332,7 @@ class Group(Entity):
             inf(f'        Attributes : {attr_rm}')
             inf(f'        Relations  : {rel_rm}')
             if len(set(attr_db_keep) & set(attr_fix)) > 0:
-                inf( '    WARNING: The following exist in the table but will be masked because are manually fixed')
+                inf( '    Warning: The following exist in the table but will be masked because are manually fixed')
                 inf(f'        Attributes : {list(set(attr_db_keep)             & set(attr_fix.keys()))}')
                 inf(f'        Relations  : {list(set([r.col for r in rel_db])  & set(rel_fix.keys()))}')
 
@@ -1366,43 +1369,61 @@ class Group(Entity):
         site_n = 0
 
         gc.disable()
-        with DB.open_conn(db_fpath) as c:
-            # (3.1) Sites:
-            for r in rel_db_keep:
-                # (3.1.1) Sites have been provided:
-                if r.sites is not None:
-                    sites[r.name] = r.sites
-                    if inf:
-                        inf(f"    Using the provided {'{:,}'.format(len(sites[r.name]))} '{r.name}' sites")
-                # (3.1.2) Sites have not been provided; generate them from the DB:
-                else:
-                    fk = DB.get_fk(c, tbl, r.col)
-                    sites[r.name] = Site.gen_from_db(db_fpath, tbl=fk.tbl_to, name_col=fk.col_to)
-                    site_n += len(sites[r.name])
-                    if inf:
-                        inf(f"    Generated {'{:,}'.format(len(sites[r.name]))} '{r.name}' sites from the '{fk.tbl_to}' table")
 
-            # (3.2) Groups:
-            row_cnt = DB.get_cnt(c, tbl)
-            for row in c.execute(qry).fetchall():
-                g_attr = {}  # group attributes
-                g_rel  = {}  # group relations
+        # (3.1) Sites:
+        for r in rel_db_keep:
+            ts_sites_0 = Time.ts()
+            # (3.1.1) Sites have been provided:
+            if r.sites is not None:
+                sites[r.name] = r.sites
+                if inf:
+                    inf(f"    Using the provided {'{:,}'.format(len(sites[r.name]))} '{r.name}' sites")
+            # (3.1.2) Sites have not been provided; generate them from the DB:
+            else:
+                # fk = db.get_fk(schema, tbl, r.col)
+                # print(fk)
+                # sites[r.name] = Site.gen_from_db(db, schema=fk.schema_to, tbl=fk.tbl_to, name_col=fk.col_to)
+                sites[r.name] = Site.gen_from_db(db, schema=r.fk_schema, tbl=r.fk_tbl, name_col=r.fk_col)
+                site_n += len(sites[r.name])
+                if inf:
+                    # inf(f"    Generated {'{:,}'.format(len(sites[r.name]))} '{r.name}' sites from the '{fk.tbl_to}' table")
+                    inf(f"    Generated {'{:,}'.format(len(sites[r.name]))} '{r.name}' sites from the '{r.fk_tbl}' table")
+            ts_sites_1 = Time.ts()
 
-                g_attr.update(attr_fix)
-                g_rel.update(rel_fix)
+        # (3.2) Groups:
+        ts_groups_0 = Time.ts()
+        row_cnt = db.get_row_cnt(tbl)
+        # with db.conn.cursor() as c:
+        c = db.conn.cursor()
+        c.execute(qry)
+        for row in c.fetchall():
+            g_attr = {}  # group attributes
+            g_rel  = {}  # group relations
 
-                g_attr.update({ a: row[a] for a in attr_db_keep })
-                g_rel.update({ r.name: sites[r.name][row[r.col]] for r in rel_db_keep })
+            g_attr.update(attr_fix)
+            g_rel.update(rel_fix)
 
-                if rel_at is not None:
-                    g_rel.update({ Site.AT: g_rel.get(rel_at) })
+            g_attr.update({ a: row[a] for a in attr_db_keep })
+            g_rel.update({ r.name: sites[r.name][row[r.col]] for r in rel_db_keep })
 
-                groups.append(cls(m=row['m'], attr=g_attr, rel=g_rel))
-                grp_pop += int(row['m'])
+            if rel_at is not None:
+                g_rel.update({ Site.AT: g_rel.get(rel_at) })
+
+            # groups.append(cls(m=row['m'], attr=g_attr, rel=g_rel))
+            # grp_pop += int(row['m'])
+            groups.append(cls(m=row[0], attr=g_attr, rel=g_rel))
+            grp_pop += int(row[0])
+        c.close()
+        ts_groups_1 = Time.ts()
+
         gc.enable()
+        ts_1 = Time.ts()
 
         if inf:
             inf( '    Summary')
+            inf(f'        Time total:  {Time.tsdiff2human(ts_1 - ts_0)}  ({ts_1 - ts_0} ms)')
+            inf(f'        Time groups: {Time.tsdiff2human(ts_groups_1 - ts_groups_0)}  ({ts_groups_1 - ts_groups_0} ms)')
+            inf(f'        Time sites:  {Time.tsdiff2human(ts_sites_1 - ts_sites_0)}  ({ts_sites_1 - ts_sites_0} ms)')
             inf(f'        Records in table: {"{:,}".format(row_cnt)}')
             inf(f'        Groups formed: {"{:,}".format(len(groups))}')
             inf(f'        Sites formed: {"{:,}".format(site_n)}')
@@ -1515,7 +1536,7 @@ class Group(Entity):
             inf(f'        Attributes : {attr_fix}')
             inf(f'        Relations  : {rel_fix}')
             if len(set(attr_db_keep) & set(attr_fix)) > 0:
-                inf( '    WARNING: The following exist in the table but will be masked because are manually fixed')
+                inf( '    Warning: The following exist in the table but will be masked because are manually fixed')
                 inf(f'        Attributes : {list(set(attr_db_keep)             & set(attr_fix.keys()))}')
                 inf(f'        Relations  : {list(set([r.col for r in rel_db])  & set(rel_fix.keys()))}')
 
@@ -1544,7 +1565,7 @@ class Group(Entity):
         grp_n_tot = 0
 
         with DB.open_conn(db_fpath) as c:
-            row_cnt = DB.get_cnt(c, tbl)
+            row_cnt = DB.get_row_cnt(c, tbl)
             for row in c.execute(qry).fetchall():
                 g_attr = {}  # group attributes
                 g_rel  = {}  # group relations

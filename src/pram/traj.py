@@ -8,6 +8,7 @@
 #         /Volumes/d/pitt/sci/pram/lib/python3.6/site-packages/altair/utils/headless.py
 
 import altair as alt
+import altair_saver as alt_save
 import gc
 import json
 import matplotlib.pyplot as plt
@@ -251,7 +252,7 @@ class TrajectoryEnsemble(object):
     system.
     '''
 
-    DDL = '''
+    SQL_CREATE_SCHEMA = '''
         CREATE TABLE traj (
         id   INTEGER PRIMARY KEY AUTOINCREMENT,
         ts   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -384,7 +385,7 @@ class TrajectoryEnsemble(object):
         # Database does not exist:
         if not is_extant:
             with self.conn as c:
-                c.executescript(self.DDL)
+                c.executescript(self.SQL_CREATE_SCHEMA)
             self.is_db_empty = True
             print('New database initialized')
 
@@ -940,9 +941,12 @@ class TrajectoryEnsemble(object):
             fontSize=20
         ).resolve_scale(
             color='independent'
-        ).save(
-            filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
         )
+        # .save(
+        #     filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
+        # )
+
+        alt_save.save(plot, filepath)
 
         return plot if do_ret_plot else self
 
@@ -1005,9 +1009,12 @@ class TrajectoryEnsemble(object):
             fontSize=20
         ).resolve_scale(
             color='independent'
-        ).save(
-            filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
         )
+        # .save(
+        #     filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
+        # )
+
+        alt_save.save(plot, filepath)
 
         return plot if do_ret_plot else self
 

@@ -1,6 +1,7 @@
-__all__ = ['util', 'data', 'entity', 'rule', 'pop', 'sim', 'model']
+__all__ = ['util', 'io', 'data', 'entity', 'rule', 'pop', 'sim', 'model']
 
 import pram.util
+import pram.io
 import pram.data
 import pram.entity
 import pram.rule

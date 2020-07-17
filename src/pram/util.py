@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # TODO
 #     Python 3.3
@@ -19,14 +20,18 @@ import cloudpickle as pickle
 import random
 import re
 import platform
+import psycopg2
+import psycopg2.extras
 import shutil
 import sqlite3
 import string
 import sys
 import time
 
-from dotmap  import DotMap
-from pathlib import Path
+from abc         import abstractmethod, ABC
+from collections import namedtuple
+from dotmap      import DotMap
+from pathlib     import Path
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -41,12 +46,26 @@ class Data(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class DB(object):
-    ''' Currently supports only SQLite3. '''
+DB_FK = namedtuple('DB_FK', ['schema_from', 'schema_to'])
 
+class DB(ABC):
     VALID_CHARS = f'_{string.ascii_letters}{string.digits}'
 
     PATT_VALID_NAME = re.compile('^[a-zA-Z][a-zA-Z0-9_]*$')
+
+    def __init__(self):
+        self.conn = None
+
+    def __del__(self):
+        if self.conn:
+            self.conn.close()
+
+    def open_conn(self):
+        self.conn = self.get_new_conn()
+
+    @abstractmethod
+    def get_new_conn(self):
+        pass
 
     @staticmethod
     def blob2obj(b, do_decompress=True):
@@ -65,37 +84,39 @@ class DB(object):
         else:
             return pickle.dumps(o)  #, pickle.HIGHEST_PROTOCOL
 
-    @staticmethod
-    def get_num(conn, tbl, col, where=None):
-        where = '' if where is None else f' WHERE {where}'
-        row = conn.execute(f'SELECT {col} FROM {tbl}{where}').fetchone()
-        return row[0] if row else None
+    def exec(self, qry):
+        with self.conn.cursor() as c:
+            c.execute(qry)
 
-    @staticmethod
-    def get_cnt(conn, tbl, where=None):
-        return DB.get_num(conn, tbl, 'COUNT(*)', where)
+    def exec_get(self, qry):
+        with self.conn.cursor() as c:
+            c.execute(qry)
+            return c.fetchall()
 
-    @staticmethod
-    def get_id(conn, tbl, col='rowid', where=None):
-        return DB.get_num(conn, tbl, 'rowid', where)
+    @abstractmethod
+    def get_cols(self, schema, tbl):
+        pass
 
-    @staticmethod
-    def get_fk(conn, tbl, col_from):
+    @abstractmethod
+    def get_name(self):
+        pass
+
+    @abstractmethod
+    def get_num(self, tbl, col, where=None):
+        pass
+
+    def get_row_cnt(self, tbl, where=None):
+        return self.get_num(tbl, 'COUNT(*)', where)
+
+    @abstractmethod
+    def get_id(self, tbl, col='rowid', where=None):
+        pass
+
+    @abstractmethod
+    def get_fk(self, schema, tbl, col_from):
         ''' Get the foreign key constraint for the specified table and column. '''
 
-        with conn as c:
-            for row in c.execute(f'PRAGMA foreign_key_list({tbl})').fetchall():
-                if row['from'] == col_from:
-                    return DotMap(tbl_to=row['table'], col_to=row['to'])
-            return None
-
-    @staticmethod
-    def open_conn(fpath):
-        conn = sqlite3.connect(fpath, check_same_thread=False)
-        conn.execute('PRAGMA foreign_keys = ON')
-        conn.execute('PRAGMA journal_mode=WAL')  # PRAGMA journal_mode = DELETE
-        conn.row_factory = sqlite3.Row
-        return conn
+        pass
 
     @staticmethod
     def str_to_name(s, do_raise_on_empty=True):
@@ -111,6 +132,137 @@ class DB(object):
             raise TypeError(f'The string provided translates into an empty database-compliant name: {s}')
 
         return f"'{s}'"  # quote in case it's a keyword
+
+    @abstractmethod
+    def str_to_type(s):
+        pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class PgDB(DB):
+    # def __init__(self, host, port, usr, pwd, db, cursor_factory=psycopg2.extras.NamedTupleCursor):
+    def __init__(self, host, port, usr, pwd, db, cursor_factory=psycopg2.extras.DictCursor):
+        super().__init__()
+
+        self.host = host
+        self.port = port
+        self.usr  = usr
+        self.pwd  = pwd
+        self.db   = db
+
+        self.cursor_factory = cursor_factory
+
+    def get_num(self, tbl, col, where=None):
+        where = '' if where is None else f' WHERE {where}'
+        with self.conn.cursor() as c:
+            c.execute(f'SELECT {col} FROM {tbl}{where}')
+            row = c.fetchone()
+            return row[0] if row else None
+
+    def get_cols(self, schema, tbl):
+        with self.conn.cursor() as c:
+            # c.execute(f"SELECT column_name FROM information_schema.columns WHERE table_schema = '{schema}' AND table_name = '{tbl}'")
+            # c.execute(f"SELECT attname AS col FROM pg_attribute WHERE attrelid = '{schema}.{tbl}'::regclass AND attnum > 0 ORDER BY attnum;")
+        #     c.execute(f"""
+        #        select t.table_schema as schema_name,
+        #        t.table_name as view_name,
+        #        c.column_name,
+        #        c.data_type
+        #        from information_schema.tables t
+        #     left join information_schema.columns c
+        #               on t.table_schema = c.table_schema
+        #               and t.table_name = c.table_name
+        # where table_type = 'VIEW' AND t.table_schema = '{schema}' AND t.table_name = '{tbl}';
+        #     """)
+            # return [i[1] for i in c.fetchall()]
+
+            c.execute(f"SELECT * FROM {schema+'.' if schema is not None else ''}{tbl} LIMIT 0")
+            return [d[0] for d in c.description]
+
+    def get_id(self, tbl, col='rowid', where=None):
+        return self.get_num(conn, tbl, 'rowid', where)
+
+    def get_fk(self, schema, tbl, col_from):
+        with self.conn.cursor() as c:
+            c.execute(f"""
+                SELECT
+                	tc.table_schema AS schema_from,
+                	tc.table_name AS tbl_from,
+                	kcu.column_name AS col_from,
+                	ccu.table_schema AS schema_to,
+                	ccu.table_name AS tbl_to,
+                	ccu.column_name AS col_to,
+                	tc.constraint_name AS fk_name
+                FROM
+                	information_schema.table_constraints AS tc
+                	INNER JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND
+                		tc.table_schema = kcu.table_schema
+                	INNER JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name AND
+                		ccu.table_schema = tc.table_schema
+                WHERE
+                	tc.constraint_type = 'FOREIGN KEY' AND
+                	tc.table_schema = '{schema}' AND
+                	tc.table_name = '{tbl}' AND
+                	kcu.column_name = '{col_from}';
+            """)
+            r = c.fetchone()
+            if r:
+                return DB_FK(r.schema_from, r.tbl_from, r.col_from, r.schema_to, r.tbl_to, r.col_to, r.fk_name)
+            return None
+
+    def get_name(self):
+        return self.db
+
+    def get_new_conn(self):
+        return psycopg2.connect(host=self.host, port=self.port, user=self.usr, password=self.pwd, database=self.db, cursor_factory=self.cursor_factory)
+
+    @staticmethod
+    def str_to_type(s):
+        return {
+            'int'   : 'integer',
+            'float' : 'double precision',
+            'str'   : 'text',
+            'obj'   : 'blob'
+        }.get(s, None)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+class SQLiteDB(DB):
+    def __init__(self, fpath):
+        super().__init__()
+
+        self.fpath = fpath
+
+    def get_num(self, tbl, col, where=None):
+        where = '' if where is None else f' WHERE {where}'
+        row = self.conn.execute(f'SELECT {col} FROM {tbl}{where}').fetchone()
+        return row[0] if row else None
+
+    def get_cols(self, schema, tbl):
+        return [i[1] for i in self.conn.execute(f'PRAGMA table_info({tbl})')]
+
+    def get_id(conn, tbl, col='rowid', where=None):
+        return self.get_num(self, tbl, 'rowid', where)
+
+    def get_fk(self, schema, tbl, col_from):
+        with self.conn as c:
+            for r in c.execute(f'PRAGMA foreign_key_list({tbl})').fetchall():
+                if r['from'] == col_from:
+                    # return DotMap(tbl_to=row['table'], col_to=row['to'])
+                    return DB_FK(None, tbl, col_from, None, r['table'], r['to'], None)
+            return None
+
+    def get_name(self):
+        return self.fpath
+
+    def get_new_conn(self):
+        FS.req_file(self.fpath, f'The database does not exist: {self.fpath}')
+
+        conn = sqlite3.connect(self.fpath, check_same_thread=False)
+        conn.execute('PRAGMA foreign_keys = ON')
+        conn.execute('PRAGMA journal_mode=WAL')  # PRAGMA journal_mode = DELETE
+        conn.row_factory = sqlite3.Row
+        return conn
 
     @staticmethod
     def str_to_type(s):

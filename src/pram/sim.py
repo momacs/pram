@@ -676,6 +676,24 @@ class SimulationSetter(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+# class SimulationUI(object):
+#     Var = namedtuple('Var', 'name val specs')
+#
+#     def __init__(self):
+#         self.vars = []
+#
+#     def add(self, name, val, specs):
+#         self.vars[name] = self.__class__.Var(name, val, specs)
+#         return self
+#
+#     def get(self, name):
+#         return self.vars.get[name]
+#
+#     def get_val(self, name):
+#         return self.vars.get[name].val
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 class Simulation(object):
     '''
     A PRAM simulation.
@@ -1238,7 +1256,7 @@ class Simulation(object):
         subprocess.run(['blockdiag', '-Tpdf', fpath_diag])
         subprocess.run(['open', fpath_pdf])
 
-    def gen_groups_from_db(self, fpath_db, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0, is_verbose=False):
+    def gen_groups_from_db(self, db, schema, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0, is_verbose=False):
         """
         Args:
 
@@ -1269,14 +1287,14 @@ class Simulation(object):
         if not self.analysis.rule_static.are_rules_done:
             self.analyze_rules_static()  # by now we know all rules have been added
 
-        self._inf(f"Generating groups from a database ({fpath_db}; table '{tbl}')")
+        self._inf(f"Generating groups from a database ({db.get_name()}; table '{tbl}')")
 
         if self.pragma.rule_analysis_for_db_gen:
             attr_db.extend(self.analysis.rule_static.attr_used)
             # rel_db  = self.analysis.rule_static.rel_used  # TODO: Need to use entity.GroupDBRelSpec class
 
         fn_live_info = self._inf if self.pragma.live_info else None
-        self.add_groups(Group.gen_from_db(fpath_db, tbl, attr_db, rel_db, attr_fix, rel_fix, attr_rm, rel_rm, rel_at, limit, fn_live_info))
+        self.add_groups(Group.gen_from_db(db, schema, tbl, attr_db, rel_db, attr_fix, rel_fix, attr_rm, rel_rm, rel_at, limit, fn_live_info))
         return self
 
     def gen_groups_from_db_old(self, fpath_db, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0, fpath=None, is_verbose=False):
@@ -1336,7 +1354,7 @@ class Simulation(object):
 
         return FS.load_or_gen(fpath, lambda: fn_gen(fpath_db), 'sites', is_verbose)
 
-    def gen_sites_from_db_new(self, fpath_db, tbl, name_col, rel_name=Site.AT, attr=[], limit=0):
+    def gen_sites_from_db_new(self, fpath_db, schema, tbl, name_col, rel_name=Site.AT, attr=[], limit=0):
         """
         Args:
 
@@ -1347,7 +1365,7 @@ class Simulation(object):
 
         self._inf(f'Generating sites from a database ({fpath_db})')
 
-        self.add_sites(Site.gen_from_db(fpath_db, tbl, name_col, rel_name, attr, limit))
+        self.add_sites(Site.gen_from_db(fpath_db, schema, tbl, name_col, rel_name, attr, limit))
 
     def get_pragma(self, name):
         fn = {
@@ -1538,7 +1556,7 @@ class Simulation(object):
         return Simulation._unpickle(fpath, gzip.GzipFile)
 
     def new_group(self, name=None, m=0.0):
-        # return Group(name or self.pop.get_next_group_name(), n, callee=self)
+        # return Group(name or self.pop.get_next_group_name(), m, callee=self)
         return Group(name, m, callee=self)
 
     def plot(self):
@@ -2165,6 +2183,32 @@ class Simulation(object):
         self.fn.group_setup = fn
         return self
 
+    def set_iter_cnt(self, iter_cnt):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.iter_cnt = iter_cnt
+        return self
+
+    def set_dur(self, dur):
+        """
+        Args:
+
+
+        Returns:
+            self: For method call chaining.
+        """
+
+        self.dur = dur
+        if self.timer:
+            self.timer.set_dur(dur)
+        return self
+
     def set_pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, comp_summary=None, fractional_mass=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
         """Sets multiple pragmas at one time.
 
@@ -2274,32 +2318,6 @@ class Simulation(object):
 
     def set_pragma_rule_analysis_for_db_gen(self, value):
         self.pragma.rule_analysis_for_db_gen = value
-        return self
-
-    def set_iter_cnt(self, iter_cnt):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
-        self.iter_cnt = iter_cnt
-        return self
-
-    def set_dur(self, dur):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
-        self.dur = dur
-        if self.timer:
-            self.timer.set_dur(dur)
         return self
 
     def set_rand_seed(self, rand_seed):
