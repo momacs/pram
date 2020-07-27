@@ -21,6 +21,7 @@
 /tmp-rt
 /todo
 /work
+/cheat-sheets.txt
 /commit.txt
 /cp-to-pkg
 /geckodriver.log
@@ -70,7 +71,7 @@ doctrees/
 .RData
 .Rhistory
 
- # MacOS:
+# MacOS:
 .DS_Store
 .DS_Store?
 ._*
