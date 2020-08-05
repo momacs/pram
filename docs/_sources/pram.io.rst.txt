@@ -1,0 +1,30 @@
+pram.io package
+===============
+
+Submodules
+----------
+
+pram.io.locale\_db module
+-------------------------
+
+.. automodule:: pram.io.locale_db
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pram.io.pop module
+------------------
+
+.. automodule:: pram.io.pop
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+Module contents
+---------------
+
+.. automodule:: pram.io
+   :members:
+   :undoc-members:
+   :show-inheritance:

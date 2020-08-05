@@ -1,0 +1,50 @@
+**********
+Front-Ends
+**********
+
+Automatic Agent Population Generation
+=====================================
+
+The Web app located in the `src/web <https://github.com/momacs/pram/tree/master/src/web>`_ directory of the GitHub repo demonstrates how the ``Simulation`` object can be used asynchronously via a Web user interface. A production-grade server-side logic handles client requests. As shown of the screenshots below, the UI itself is organized into a logical sequence of five sections: Rules, Population, Probes, Simulation, and Output.
+
+The first figure below shows the results of syntactic rule analysis which discovers two relevant attributes (i.e., ``income`` and ``flu``) and two relevant relations (i.e., ``home`` and ``school``). The second figure shows generating populations from a database. The UI assists the user by suggesting attributes and relations to be used for forming groups by fuzzy-matching the database table column names against the sets of relevant attributes and relations. For example, at least one rule makes use of the relation ``school`` and the UI suggests to form groups based on the foreign key column ``school_id`` due to the fuzzy-matching score of the two strings being high enough (``0.67``).
+
+.. figure:: https://raw.githubusercontent.com/momacs/pram/master/media/web-app/flu-ac-04.png
+   :alt: Web UI 01
+
+.. figure:: https://raw.githubusercontent.com/momacs/pram/master/media/web-app/flu-ac-05.png
+   :alt: Web UI 02
+
+
+PRAMity
+=======
+
+`PRAMity <https://github.com/momacs/pramity>`_ (a portmanteau of PRAM and Unity) is a software framework for visualizing PRAM models as 3D real-time simulations.  Pramity uses `Unity <https://unity.com>`_ and enables the user to enter the simulation and "play" as one of the agents.  In that way it combines the modeling and simulation framework that is PRAM and serious games.
+
+PRAMity is:
+
+- **Instructive** in that it promotes understanding of the modeling technique by making the user a part of a simulation
+- **Constructive** in that it helps to find bugs in model design and simulation code
+- **Extractive** in that it enables to obtain data on human decision-making process in context (i.e., human-subject experiments)
+- **Pedagogical** in that it can make modeling and simulation more accessible to the future generation of modelers
+
+.. figure:: _static/app-pramity-shadow.png
+   :target: https://github.com/momacs/pramity
+
+   A PRAMity "Flu at the mall" simulation running in Unity
+
+Venture Capital App
+===================
+
+`Venture Capital app <https://github.com/momacs/pram-vc>`_ is a decision-support Web application for a Venture Capitalist interested in investing in startups distributed across different geographical regions.  Under the hood, the VC app uses PRAM to model startups as agents and to model their lifecycle over time.  In that way, the user of the app gets an idea about their exit valuation given (1) the ecosystem parameters and (2) their investment strategy.
+
+The VC app is an example of how PRAM can be used as a modeling backend.  As such, it demonstrates how future applications might attempt to model the following example aspects:
+
+- Impact of predicted adverse weather patterns in a region
+- Impact of potential political instability in a region
+- Impact on local sustainability (e.g., natural resource reserves)
+
+.. figure:: _static/app-vc-app-shadow.png
+   :target: https://github.com/momacs/pram-vc
+
+   The Venture Capital App's user interface

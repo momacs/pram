@@ -1,0 +1,35 @@
+******
+PyPRAM
+******
+
+Probabilistic Relational Agent-based Models (PRAMs) is a modeling and simulation framework that puts agent-based models (ABMs) on a sound probabilistic foundation.  When compared to equivalent ABMs, PRAMs are:
+
+- More space- and time-efficient (due to agent population encoding)
+- More sound (due to probabilistic foundation)
+- More expressive (due to allowing relations)
+
+Contents:
+
+..
+   toctree::
+   :hidden:
+
+   Home <self>
+
+.. toctree::
+   :maxdepth: 2
+
+   intro.rst
+   details.rst
+   examples.rst
+   front-ends.rst
+   API Reference <pram.rst>
+   license.rst
+
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

@@ -1,0 +1,74 @@
+************
+Introduction
+************
+
+Features of the PRAM framework:
+
+- Models on an agent population level instead of the level of individual agents by grouping functionally equivalent agents into ``groups``
+- Allows groups of agents to be related to one or more ``sites`` (e.g., a school the agents attend to or a opinion they share)
+- Lifts the domain (and thus offers lifted inference)
+- Models agent population mass dynamics as mass shift (or transfer) between groups
+- Agent population mass dynamics observes axioms of probability
+- Is equivalent to compartmental models but without imposing the requirement of specifying all compartments beforehand (i.e., groups are created automatically when necessary)
+
+Additional features more specific to the implementation in the PyPRAM package:
+
+- Attempts to integrate and unify other modeling and simulation frameworks (e.g., ABMs, compartmental models, redistribution systems, ordinary-differential equations, Markov chains, etc.)
+- Allows modelers to compose complicated models from smaller parts called `modeling primitives`
+- Organizes modeling primitives into a multigraph
+- Inheritance-based hierarchies expressed within the modeling primitives multigraph explicitly encode specialization and generalization
+- Provides systemic diagnostics
+  - Mass dynamics visualization
+  - Time-frequency analysis
+  - Recurrence quantification analysis
+  - Etc.
+
+
+Dependencies
+============
+
+- `Python 3.6 <https://python.org>`_
+- `altair <https://altair-viz.github.io>`_
+- `altair-saver <https://pypi.org/project/altair-saver>`_
+- `attrs <https://github.com/python-attrs/attrs>`_
+- `cloudpickle <https://github.com/cloudpipe/cloudpickle>`_
+- `dotmap <https://pypi.org/project/dotmap>`_
+- `iteround <https://pypi.org/project/iteround>`_
+- `matplotlib <https://matplotlib.org>`_
+- `numpy <https://www.numpy.org>`_
+- `psutil <https://github.com/giampaolo/psutil>`_
+- `psycopg2 <https://www.psycopg.org>`_
+- `pybind11 <https://pybind11.readthedocs.io>`_ (for `PyRQA`)
+- `PyOpenCL <https://documen.tician.de/pyopencl>`_ (for `PyRQA`)
+- `PyRQA <https://pypi.org/project/PyRQA>`_
+- `ray <https://docs.ray.io>`_
+- `scipy <https://www.scipy.org>`_
+- `selenium <https://selenium-python.readthedocs.io>`_ (for saving ``altair`` graphs)
+- `sortedcontainers <http://www.grantjenks.com/docs/sortedcontainers/index.html>`_
+- `tqdm <https://tqdm.github.io>`_
+- `Gecko Driver <https://github.com/mozilla/geckodriver/releases>`_ and a recent version of Firefox (for saving ``altair`` graphs)
+- `Chrome Driver <https://sites.google.com/a/chromium.org/chromedriver>`_ (a Chrome alternative to the above)
+- `xxhash <https://pypi.org/project/xxhash/>`_
+- `Gecko Driver <https://github.com/mozilla/geckodriver/releases>`_ or `Chrome Driver <https://sites.google.com/a/chromium.org/chromedriver>`_ and a recent version of either of the respective Web browser (i.e., Firefox or Chrome; for saving ``altair`` graphs)
+
+
+Installation
+============
+
+Install PyPRAM like so:
+
+.. code-block:: sh
+
+   pip install git+https://github.com/momacs/pram.git
+
+To install all extra dependencies instead, do:
+
+.. code-block:: sh
+
+   pip install git+https://github.com/momacs/pram.git#egg=pram[all]
+
+
+Basic API Usage
+===============
+
+...
