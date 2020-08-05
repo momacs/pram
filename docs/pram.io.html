@@ -1,0 +1,304 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pram.io package &#8212; PyPRAM  documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="pram.model package" href="pram.model.html" />
+    <link rel="prev" title="pram package" href="pram.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="pram-io-package">
+<h1>pram.io package<a class="headerlink" href="#pram-io-package" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="module-pram.io.locale_db">
+<span id="pram-io-locale-db-module"></span><h2>pram.io.locale_db module<a class="headerlink" href="#module-pram.io.locale_db" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt id="pram.io.locale_db.LocaleDB">
+<em class="property">class </em><code class="sig-prename descclassname">pram.io.locale_db.</code><code class="sig-name descname">LocaleDB</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">db_host</span></em>, <em class="sig-param"><span class="n">db_port</span></em>, <em class="sig-param"><span class="n">db_usr</span></em>, <em class="sig-param"><span class="n">db_pwd</span></em>, <em class="sig-param"><span class="n">db_name</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.locale_db.LocaleDB" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt id="pram.io.locale_db.LocaleDB.get_pop">
+<code class="sig-name descname">get_pop</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.locale_db.LocaleDB.get_pop" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.locale_db.LocaleDB.ls_geo_co">
+<code class="sig-name descname">ls_geo_co</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">statefp10</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.locale_db.LocaleDB.ls_geo_co" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.locale_db.LocaleDB.ls_geo_st">
+<code class="sig-name descname">ls_geo_st</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.locale_db.LocaleDB.ls_geo_st" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.locale_db.LocaleDB.set_pop_view_household">
+<code class="sig-name descname">set_pop_view_household</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">stcotrbg</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.locale_db.LocaleDB.set_pop_view_household" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.locale_db.LocaleDB.set_pop_view_household_geo">
+<code class="sig-name descname">set_pop_view_household_geo</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">stcotrbg</span></em>, <em class="sig-param"><span class="n">geo_tbl</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.locale_db.LocaleDB.set_pop_view_household_geo" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-pram.io.pop">
+<span id="pram-io-pop-module"></span><h2>pram.io.pop module<a class="headerlink" href="#module-pram.io.pop" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt id="pram.io.pop.EUGeography">
+<em class="property">class </em><code class="sig-prename descclassname">pram.io.pop.</code><code class="sig-name descname">EUGeography</code><a class="headerlink" href="#pram.io.pop.EUGeography" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pram.io.pop.Geography" title="pram.io.pop.Geography"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.io.pop.Geography</span></code></a></p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="pram.io.pop.Geography">
+<em class="property">class </em><code class="sig-prename descclassname">pram.io.pop.</code><code class="sig-name descname">Geography</code><a class="headerlink" href="#pram.io.pop.Geography" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">abc.ABC</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="pram.io.pop.PopulationLocation">
+<em class="property">class </em><code class="sig-prename descclassname">pram.io.pop.</code><code class="sig-name descname">PopulationLocation</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">fpath_db</span></em>, <em class="sig-param"><span class="n">tbl_contacts</span><span class="o">=</span><span class="default_value">'contacts'</span></em>, <em class="sig-param"><span class="n">tbl_mobility</span><span class="o">=</span><span class="default_value">'mobility'</span></em>, <em class="sig-param"><span class="n">date_format</span><span class="o">=</span><span class="default_value">'%Y-%m-%d'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get">
+<code class="sig-name descname">get</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">var</span></em>, <em class="sig-param"><span class="n">census_block_grp</span></em>, <em class="sig-param"><span class="n">date</span></em>, <em class="sig-param"><span class="n">do_get_avg</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_bg_mean">
+<code class="sig-name descname">get_bg_mean</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">var</span></em>, <em class="sig-param"><span class="n">census_block_grp</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_bg_mean" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_contacts">
+<code class="sig-name descname">get_contacts</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">census_block_grp</span></em>, <em class="sig-param"><span class="n">date</span></em>, <em class="sig-param"><span class="n">do_get_avg</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_contacts" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_contacts_bg_mean">
+<code class="sig-name descname">get_contacts_bg_mean</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">census_block_grp</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_contacts_bg_mean" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_contacts_by_day_of_year">
+<code class="sig-name descname">get_contacts_by_day_of_year</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">census_block_grp</span></em>, <em class="sig-param"><span class="n">year</span></em>, <em class="sig-param"><span class="n">day</span></em>, <em class="sig-param"><span class="n">do_get_avg</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_contacts_by_day_of_year" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_contacts_date_mean">
+<code class="sig-name descname">get_contacts_date_mean</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">date</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_contacts_date_mean" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_contacts_date_mean_by_day_of_year">
+<code class="sig-name descname">get_contacts_date_mean_by_day_of_year</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">year</span></em>, <em class="sig-param"><span class="n">day</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_contacts_date_mean_by_day_of_year" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_date_mean">
+<code class="sig-name descname">get_date_mean</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">var</span></em>, <em class="sig-param"><span class="n">date</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_date_mean" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_mobility">
+<code class="sig-name descname">get_mobility</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">census_block_grp</span></em>, <em class="sig-param"><span class="n">date</span></em>, <em class="sig-param"><span class="n">do_get_avg</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_mobility" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_mobility_bg_mean">
+<code class="sig-name descname">get_mobility_bg_mean</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">census_block_grp</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_mobility_bg_mean" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_mobility_by_day_of_year">
+<code class="sig-name descname">get_mobility_by_day_of_year</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">census_block_grp</span></em>, <em class="sig-param"><span class="n">year</span></em>, <em class="sig-param"><span class="n">day</span></em>, <em class="sig-param"><span class="n">do_get_avg</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_mobility_by_day_of_year" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_mobility_date_mean">
+<code class="sig-name descname">get_mobility_date_mean</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">date</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_mobility_date_mean" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.get_mobility_date_mean_by_day_of_year">
+<code class="sig-name descname">get_mobility_date_mean_by_day_of_year</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">year</span></em>, <em class="sig-param"><span class="n">day</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.get_mobility_date_mean_by_day_of_year" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.load_data">
+<code class="sig-name descname">load_data</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">fpath_db</span></em>, <em class="sig-param"><span class="n">tbl_contacts</span></em>, <em class="sig-param"><span class="n">tbl_mobility</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.load_data" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.load_data_tbl">
+<code class="sig-name descname">load_data_tbl</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">var</span></em>, <em class="sig-param"><span class="n">tbl</span></em>, <em class="sig-param"><span class="n">conn</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.load_data_tbl" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.set_contacts_first_day_of_year">
+<code class="sig-name descname">set_contacts_first_day_of_year</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">day</span><span class="o">=</span><span class="default_value">1</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.set_contacts_first_day_of_year" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.set_mobility_first_day_of_year">
+<code class="sig-name descname">set_mobility_first_day_of_year</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">day</span><span class="o">=</span><span class="default_value">1</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.set_mobility_first_day_of_year" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pram.io.pop.PopulationLocation.set_setting">
+<code class="sig-name descname">set_setting</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">var</span></em>, <em class="sig-param"><span class="n">name</span></em>, <em class="sig-param"><span class="n">val</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.io.pop.PopulationLocation.set_setting" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="pram.io.pop.USGeography">
+<em class="property">class </em><code class="sig-prename descclassname">pram.io.pop.</code><code class="sig-name descname">USGeography</code><a class="headerlink" href="#pram.io.pop.USGeography" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pram.io.pop.Geography" title="pram.io.pop.Geography"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.io.pop.Geography</span></code></a></p>
+<dl class="py attribute">
+<dt id="pram.io.pop.USGeography.UNITS">
+<code class="sig-name descname">UNITS</code><em class="property"> = [{'name': 'block', 'fips-substr-idx': (0, 2)}, {'name': 'block group', 'fips-substr-idx': (3, 3)}, {'name': 'tract', 'fips-substr-idx': (4, 6)}, {'name': 'county', 'fips-substr-idx': (7, 9)}, {'name': 'state', 'fips-substr-idx': (10, 11)}]</em><a class="headerlink" href="#pram.io.pop.USGeography.UNITS" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-pram.io">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-pram.io" title="Permalink to this headline">¶</a></h2>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="index.html">
+    <img class="logo" src="_static/logo.png" alt="Logo"/>
+    
+  </a>
+</p>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=momacs&repo=pram&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="details.html">Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Example Simulations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="front-ends.html">Front-Ends</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="pram.html">API Reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="pram.html#subpackages">Subpackages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pram.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.data">pram.data module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.entity">pram.entity module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.graph">pram.graph module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.pop">pram.pop module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.rule">pram.rule module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.signal">pram.signal module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.sim">pram.sim module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.traj">pram.traj module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.util">pram.util module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  <li><a href="pram.html">pram package</a><ul>
+      <li>Previous: <a href="pram.html" title="previous chapter">pram package</a></li>
+      <li>Next: <a href="pram.model.html" title="next chapter">pram.model package</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018-2020, momacs.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/pram.io.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

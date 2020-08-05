@@ -1,22 +1,23 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>pram.model package &#8212; PyPRAM  documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="_static/language_data.js"></script>
-    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="License" href="license.html" />
-    <link rel="prev" title="pram.log package" href="pram.log.html" />
+    <link rel="prev" title="pram.io package" href="pram.io.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -40,163 +41,135 @@
 </div>
 <div class="section" id="module-pram.model.epi">
 <span id="pram-model-epi-module"></span><h2>pram.model.epi module<a class="headerlink" href="#module-pram.model.epi" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
+<p>Contains epidemiological models code.</p>
+<dl class="py class">
+<dt id="pram.model.epi.SEI2RModelParams">
+<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SEI2RModelParams</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">beta</span></em>, <em class="sig-param"><span class="n">kappa_1</span></em>, <em class="sig-param"><span class="n">kappa_2</span></em>, <em class="sig-param"><span class="n">gamma</span></em>, <em class="sig-param"><span class="n">r0</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SEI2RModelParams" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pram.model.epi.ModelParams</span></code></p>
+<dl class="py method">
+<dt id="pram.model.epi.SEI2RModelParams.by_clinical_obs">
+<em class="property">classmethod </em><code class="sig-name descname">by_clinical_obs</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">s0</span></em>, <em class="sig-param"><span class="n">r0</span></em>, <em class="sig-param"><span class="n">incub_period</span></em>, <em class="sig-param"><span class="n">asympt_period</span></em>, <em class="sig-param"><span class="n">inf_dur</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SEI2RModelParams.by_clinical_obs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Instantiates the class using clinical observations instead of model rate parameters.  This is useful because
+typically the former are easier to obtain and more agreed upon.</p>
+<p>The actual number of arguments to the method of an extending class will depend on the number of compartments in
+in the underlying model.  Progression rates (kappa) should be computed based on incubation and symptomatic
+periods (inbub_period and sympt_period).  Recovery rates (gamma) should be computed based on infection
+durations (inf_dur).  Finally, transmission rates (beta) should be based on the R0 formula, which for the SIR
+model (and all descendant models without vital dynamics) takes the form:</p>
+<blockquote>
+<div><p>R0 = beta * S0 / gamma,    where S0 is the initial size of the susceptible population</p>
+</div></blockquote>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="pram.model.epi.SEIRModel">
+<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SEIRModel</code><span class="sig-paren">(</span><em class="sig-param">var</em>, <em class="sig-param">beta</em>, <em class="sig-param">kappa</em>, <em class="sig-param">gamma</em>, <em class="sig-param">name='seir-model'</em>, <em class="sig-param">t=attr.attrs</em>, <em class="sig-param">i=attr.attrs</em>, <em class="sig-param">solver=&lt;pram.model.model.MCSolver object&gt;</em>, <em class="sig-param">memo=None</em>, <em class="sig-param">cb_before_apply=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SEIRModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pram.model.model.Model" title="pram.model.model.Model"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.model.model.Model</span></code></a></p>
+<p>SEIR model interface.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="pram.model.epi.SEIRModelParams">
+<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SEIRModelParams</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">beta</span></em>, <em class="sig-param"><span class="n">kappa</span></em>, <em class="sig-param"><span class="n">gamma</span></em>, <em class="sig-param"><span class="n">r0</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SEIRModelParams" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pram.model.epi.ModelParams</span></code></p>
+<dl class="py method">
+<dt id="pram.model.epi.SEIRModelParams.by_clinical_obs">
+<em class="property">classmethod </em><code class="sig-name descname">by_clinical_obs</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">s0</span></em>, <em class="sig-param"><span class="n">r0</span></em>, <em class="sig-param"><span class="n">incub_period</span></em>, <em class="sig-param"><span class="n">sympt_period</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SEIRModelParams.by_clinical_obs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Instantiates the class using clinical observations instead of model rate parameters.  This is useful because
+typically the former are easier to obtain and more agreed upon.</p>
+<p>The actual number of arguments to the method of an extending class will depend on the number of compartments in
+in the underlying model.  Progression rates (kappa) should be computed based on incubation and symptomatic
+periods (inbub_period and sympt_period).  Recovery rates (gamma) should be computed based on infection
+durations (inf_dur).  Finally, transmission rates (beta) should be based on the R0 formula, which for the SIR
+model (and all descendant models without vital dynamics) takes the form:</p>
+<blockquote>
+<div><p>R0 = beta * S0 / gamma,    where S0 is the initial size of the susceptible population</p>
+</div></blockquote>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
 <dt id="pram.model.epi.SEQIHRModel">
-<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SEQIHRModel</code><span class="sig-paren">(</span><em class="sig-param">var</em>, <em class="sig-param">beta</em>, <em class="sig-param">alpha_n</em>, <em class="sig-param">alpha_q</em>, <em class="sig-param">delta_n</em>, <em class="sig-param">delta_h</em>, <em class="sig-param">mu</em>, <em class="sig-param">chi</em>, <em class="sig-param">phi</em>, <em class="sig-param">rho</em>, <em class="sig-param">name='seqihr-model'</em>, <em class="sig-param">t=TimeAlways()</em>, <em class="sig-param">i=IterAlways()</em>, <em class="sig-param">solver=&lt;pram.model.model.MCSolver object&gt;</em>, <em class="sig-param">memo=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SEQIHRModel" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SEQIHRModel</code><span class="sig-paren">(</span><em class="sig-param">var</em>, <em class="sig-param">beta</em>, <em class="sig-param">alpha_n</em>, <em class="sig-param">alpha_q</em>, <em class="sig-param">delta_n</em>, <em class="sig-param">delta_h</em>, <em class="sig-param">mu</em>, <em class="sig-param">chi</em>, <em class="sig-param">phi</em>, <em class="sig-param">rho</em>, <em class="sig-param">name='seqihr-model'</em>, <em class="sig-param">t=attr.attrs</em>, <em class="sig-param">i=attr.attrs</em>, <em class="sig-param">solver=&lt;pram.model.model.MCSolver object&gt;</em>, <em class="sig-param">memo=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SEQIHRModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pram.model.model.Model" title="pram.model.model.Model"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.model.model.Model</span></code></a></p>
+<p>SEQIHR model interface.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="pram.model.epi.SIRModel">
+<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SIRModel</code><span class="sig-paren">(</span><em class="sig-param">var</em>, <em class="sig-param">beta</em>, <em class="sig-param">gamma</em>, <em class="sig-param">name='sir-model'</em>, <em class="sig-param">t=attr.attrs</em>, <em class="sig-param">i=attr.attrs</em>, <em class="sig-param">solver=&lt;pram.model.model.MCSolver object&gt;</em>, <em class="sig-param">memo=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SIRModel" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#pram.model.model.Model" title="pram.model.model.Model"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.model.model.Model</span></code></a></p>
 </dd></dl>
 
-<dl class="class">
-<dt id="pram.model.epi.SEQIHRModelDerivatives">
-<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SEQIHRModelDerivatives</code><span class="sig-paren">(</span><em class="sig-param">beta</em>, <em class="sig-param">alpha_n</em>, <em class="sig-param">alpha_q</em>, <em class="sig-param">delta_n</em>, <em class="sig-param">delta_h</em>, <em class="sig-param">mu</em>, <em class="sig-param">chi</em>, <em class="sig-param">phi</em>, <em class="sig-param">rho</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SEQIHRModelDerivatives" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="pram.html#pram.rule.ODEDerivatives" title="pram.rule.ODEDerivatives"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.rule.ODEDerivatives</span></code></a></p>
-<dl class="simple">
-<dt>Model parameters</dt><dd><p>beta             - Transmission coefficient
-alpha_n, alpha_q - Rate at which non-quarantined and quarantined individuals become infectious
-delta_n, delta_h - Rate at which non-isolated and isolated individuals become recovered
-mu               - Natural death rate
-chi, phi         - Rate of quarantine and isolation
-rho              - Isolation efficiency [0..1]</p>
-</dd>
-<dt>In the source below, parameters used are</dt><dd><p>alpha_1 = alpha_n
-alpha_2 = alpha_q
-delta_1 = delta_n
-delta_2 = delta_h</p>
-</dd>
-</dl>
-<p>“(…) some of the drawbacks of the simple model when used to evaluate intervention policies. We argue that the
-main reason for these problems is due to the simplifying assumption of exponential distributions for the
-disease stages, which is used in the model. This provides a motivation for using more realistic stage
-distributions. Non-exponential distributions have been considered in epidemiological models (see, for
-example, …). However, none of these studies focuses on the evaluation of intervention policies.”</p>
-<p>Feng &amp; Xu (2007) Epidemiological Models with Non-Exponentially Distributed Disease Stages and Applications to
-Disease Control.  Bulletin of Mathematical Biology.</p>
-<dl class="method">
-<dt id="pram.model.epi.SEQIHRModelDerivatives.get_fn">
-<code class="sig-name descname">get_fn</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SEQIHRModelDerivatives.get_fn" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="class">
-<dt id="pram.model.epi.SEQIHRModel_ODE">
-<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SEQIHRModel_ODE</code><span class="sig-paren">(</span><em class="sig-param">var</em>, <em class="sig-param">beta</em>, <em class="sig-param">alpha_n</em>, <em class="sig-param">alpha_q</em>, <em class="sig-param">delta_n</em>, <em class="sig-param">delta_h</em>, <em class="sig-param">mu</em>, <em class="sig-param">chi</em>, <em class="sig-param">phi</em>, <em class="sig-param">rho</em>, <em class="sig-param">name='seqihr-model'</em>, <em class="sig-param">t=TimeAlways()</em>, <em class="sig-param">i=IterAlways()</em>, <em class="sig-param">dt=0.1</em>, <em class="sig-param">memo=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SEQIHRModel_ODE" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="pram.html#pram.rule.ODESystemMass" title="pram.rule.ODESystemMass"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.rule.ODESystemMass</span></code></a></p>
-<dl class="method">
-<dt id="pram.model.epi.SEQIHRModel_ODE.set_params">
-<code class="sig-name descname">set_params</code><span class="sig-paren">(</span><em class="sig-param">beta=None</em>, <em class="sig-param">alpha_n=None</em>, <em class="sig-param">alpha_q=None</em>, <em class="sig-param">delta_n=None</em>, <em class="sig-param">delta_h=None</em>, <em class="sig-param">mu=None</em>, <em class="sig-param">chi=None</em>, <em class="sig-param">phi=None</em>, <em class="sig-param">rho=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SEQIHRModel_ODE.set_params" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="class">
-<dt id="pram.model.epi.SIRModelDerivatives">
-<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SIRModelDerivatives</code><span class="sig-paren">(</span><em class="sig-param">beta</em>, <em class="sig-param">gamma</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SIRModelDerivatives" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="pram.html#pram.rule.ODEDerivatives" title="pram.rule.ODEDerivatives"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.rule.ODEDerivatives</span></code></a></p>
-<dl class="simple">
-<dt>Model parameters</dt><dd><p>beta  - Transmission rate
-gamma - Recovery rate</p>
-</dd>
-</dl>
-<p>Kermack WO &amp; McKendrick AG (1927) A Contribution to the Mathematical Theory of Epidemics. Proceedings of the
-Royal Society A. 115(772), 700–721.</p>
-<p><a class="reference external" href="http://www.public.asu.edu/~hnesse/classes/sir.html">http://www.public.asu.edu/~hnesse/classes/sir.html</a></p>
-<dl class="method">
-<dt id="pram.model.epi.SIRModelDerivatives.get_fn">
-<code class="sig-name descname">get_fn</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SIRModelDerivatives.get_fn" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="class">
+<dl class="py class">
 <dt id="pram.model.epi.SIRSModel">
-<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SIRSModel</code><span class="sig-paren">(</span><em class="sig-param">var</em>, <em class="sig-param">beta</em>, <em class="sig-param">gamma</em>, <em class="sig-param">alpha=0.0</em>, <em class="sig-param">name='sirs-model'</em>, <em class="sig-param">t=TimeAlways()</em>, <em class="sig-param">i=IterAlways()</em>, <em class="sig-param">solver=&lt;pram.model.model.MCSolver object&gt;</em>, <em class="sig-param">memo=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SIRSModel" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SIRSModel</code><span class="sig-paren">(</span><em class="sig-param">var</em>, <em class="sig-param">beta</em>, <em class="sig-param">gamma</em>, <em class="sig-param">alpha=0.0</em>, <em class="sig-param">name='sirs-model'</em>, <em class="sig-param">t=attr.attrs</em>, <em class="sig-param">i=attr.attrs</em>, <em class="sig-param">solver=&lt;pram.model.model.MCSolver object&gt;</em>, <em class="sig-param">memo=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SIRSModel" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#pram.model.model.Model" title="pram.model.model.Model"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.model.model.Model</span></code></a></p>
+<p>SIRS model interface.</p>
+<p class="rubric">Notes</p>
+<p><code class="docutils literal notranslate"><span class="pre">alpha</span> <span class="pre">=</span> <span class="pre">0</span></code> implies the SIR model.</p>
 </dd></dl>
 
-<dl class="class">
-<dt id="pram.model.epi.SIRSModel_MC">
-<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SIRSModel_MC</code><span class="sig-paren">(</span><em class="sig-param">var</em>, <em class="sig-param">beta</em>, <em class="sig-param">gamma</em>, <em class="sig-param">alpha=0.0</em>, <em class="sig-param">name='sirs-model'</em>, <em class="sig-param">t=TimeAlways()</em>, <em class="sig-param">i=IterAlways()</em>, <em class="sig-param">memo=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SIRSModel_MC" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="pram.html#pram.rule.DiscreteInvMarkovChain" title="pram.rule.DiscreteInvMarkovChain"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.rule.DiscreteInvMarkovChain</span></code></a></p>
-<p>The SIR(S) epidemiological model without vital dynamics.</p>
-<dl class="simple">
-<dt>Model parameters:</dt><dd><p>beta  - Transmission rate
-gamma - Recovery rate
-alpha - Immunity loss rate (alpha = 0 implies life-long immunity and consequently the SIR model)</p>
-</dd>
-</dl>
-<p>—-[ Notation A ]—-</p>
-<dl class="simple">
-<dt>code:</dt><dd><p>SIRSModel(‘flu’, 0.05, 0.20, 0.10)  # SIRS
-SIRSModel(‘flu’, 0.05, 0.20, 0.00)  # SIR</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="class">
-<dt id="pram.model.epi.SIRSModel_ODE">
-<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SIRSModel_ODE</code><span class="sig-paren">(</span><em class="sig-param">var</em>, <em class="sig-param">beta</em>, <em class="sig-param">gamma</em>, <em class="sig-param">alpha=0.0</em>, <em class="sig-param">name='sirs-model'</em>, <em class="sig-param">t=TimeAlways()</em>, <em class="sig-param">i=IterAlways()</em>, <em class="sig-param">dt=0.1</em>, <em class="sig-param">memo=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SIRSModel_ODE" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="pram.html#pram.rule.ODESystemMass" title="pram.rule.ODESystemMass"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.rule.ODESystemMass</span></code></a></p>
-<dl class="method">
-<dt id="pram.model.epi.SIRSModel_ODE.set_params">
-<code class="sig-name descname">set_params</code><span class="sig-paren">(</span><em class="sig-param">beta=None</em>, <em class="sig-param">gamma=None</em>, <em class="sig-param">alpha=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SIRSModel_ODE.set_params" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="class">
-<dt id="pram.model.epi.SISModel_MC">
-<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SISModel_MC</code><span class="sig-paren">(</span><em class="sig-param">var</em>, <em class="sig-param">beta</em>, <em class="sig-param">gamma</em>, <em class="sig-param">name='sis-model'</em>, <em class="sig-param">t=TimeAlways()</em>, <em class="sig-param">i=IterAlways()</em>, <em class="sig-param">memo=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SISModel_MC" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="pram.html#pram.rule.DiscreteInvMarkovChain" title="pram.rule.DiscreteInvMarkovChain"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.rule.DiscreteInvMarkovChain</span></code></a></p>
-<p>The SIS epidemiological model without vital dynamics.</p>
-<dl class="simple">
-<dt>Model parameters:</dt><dd><p>beta  - Transmission rate
-gamma - Recovery rate</p>
-</dd>
-</dl>
-<p>—-[ Notation A ]—-</p>
-<dl class="simple">
-<dt>code:</dt><dd><p>SISModel(‘flu’, 0.05, 0.10)</p>
-</dd>
-</dl>
+<dl class="py class">
+<dt id="pram.model.epi.SISModel">
+<em class="property">class </em><code class="sig-prename descclassname">pram.model.epi.</code><code class="sig-name descname">SISModel</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">rule</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.epi.SISModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pram.model.model.Model" title="pram.model.model.Model"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.model.model.Model</span></code></a></p>
 </dd></dl>
 
 </div>
 <div class="section" id="module-pram.model.model">
 <span id="pram-model-model-module"></span><h2>pram.model.model module<a class="headerlink" href="#module-pram.model.model" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
+<p>Contains abstract and generic model code.</p>
+<dl class="py class">
 <dt id="pram.model.model.MCSolver">
 <em class="property">class </em><code class="sig-prename descclassname">pram.model.model.</code><code class="sig-name descname">MCSolver</code><a class="headerlink" href="#pram.model.model.MCSolver" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#pram.model.model.Solver" title="pram.model.model.Solver"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.model.model.Solver</span></code></a></p>
+<p>Markov chain model solver.</p>
 </dd></dl>
 
-<dl class="class">
+<dl class="py class">
 <dt id="pram.model.model.Model">
-<em class="property">class </em><code class="sig-prename descclassname">pram.model.model.</code><code class="sig-name descname">Model</code><span class="sig-paren">(</span><em class="sig-param">rule</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.model.Model" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">pram.model.model.</code><code class="sig-name descname">Model</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">rule</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.model.Model" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">abc.ABC</span></code></p>
-<dl class="method">
+<p>A model base class.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>rule</strong> (<a class="reference internal" href="pram.html#pram.rule.Rule" title="pram.rule.Rule"><em>Rule</em></a>) – The group rule implementing the model dynamics.</p>
+</dd>
+</dl>
+<dl class="py method">
 <dt id="pram.model.model.Model.set_params">
-<code class="sig-name descname">set_params</code><span class="sig-paren">(</span><em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.model.Model.set_params" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">set_params</code><span class="sig-paren">(</span><em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.model.Model.set_params" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
-<dl class="exception">
+<dl class="py exception">
 <dt id="pram.model.model.ModelConstructionError">
 <em class="property">exception </em><code class="sig-prename descclassname">pram.model.model.</code><code class="sig-name descname">ModelConstructionError</code><a class="headerlink" href="#pram.model.model.ModelConstructionError" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></p>
 </dd></dl>
 
-<dl class="class">
+<dl class="py class">
 <dt id="pram.model.model.ODESolver">
-<em class="property">class </em><code class="sig-prename descclassname">pram.model.model.</code><code class="sig-name descname">ODESolver</code><span class="sig-paren">(</span><em class="sig-param">dt=0.1</em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.model.ODESolver" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">pram.model.model.</code><code class="sig-name descname">ODESolver</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">dt</span><span class="o">=</span><span class="default_value">0.1</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pram.model.model.ODESolver" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#pram.model.model.Solver" title="pram.model.model.Solver"><code class="xref py py-class docutils literal notranslate"><span class="pre">pram.model.model.Solver</span></code></a></p>
+<p>Ordinary differential equations system model solver.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>dt</strong> (<em>float</em>) – Numeric integrator time step size.</p>
+</dd>
+</dl>
 </dd></dl>
 
-<dl class="class">
+<dl class="py class">
 <dt id="pram.model.model.Solver">
 <em class="property">class </em><code class="sig-prename descclassname">pram.model.model.</code><code class="sig-name descname">Solver</code><a class="headerlink" href="#pram.model.model.Solver" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">abc.ABC</span></code></p>
+<p>Model solver base class.</p>
 </dd></dl>
 
 </div>
@@ -244,7 +217,6 @@ gamma - Recovery rate</p>
 <li class="toctree-l2"><a class="reference internal" href="pram.html#submodules">Submodules</a></li>
 <li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.data">pram.data module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.entity">pram.entity module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.event">pram.event module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.graph">pram.graph module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.pop">pram.pop module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="pram.html#module-pram.rule">pram.rule module</a></li>
@@ -263,7 +235,7 @@ gamma - Recovery rate</p>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
   <li><a href="pram.html">pram package</a><ul>
-      <li>Previous: <a href="pram.log.html" title="previous chapter">pram.log package</a></li>
+      <li>Previous: <a href="pram.io.html" title="previous chapter">pram.io package</a></li>
       <li>Next: <a href="license.html" title="next chapter">License</a></li>
   </ul></li>
   </ul></li>
@@ -278,7 +250,7 @@ gamma - Recovery rate</p>
     </form>
     </div>
 </div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
+<script>$('#searchbox').show(0);</script>
 
 
 
@@ -292,10 +264,10 @@ gamma - Recovery rate</p>
       <div class="clearer"></div>
     </div>
     <div class="footer">
-      &copy;2018-2019, momacs.
+      &copy;2018-2020, momacs.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.1</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.2</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |

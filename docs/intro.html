@@ -1,18 +1,19 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Introduction &#8212; PyPRAM  documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="_static/language_data.js"></script>
-    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Details" href="details.html" />
@@ -49,7 +50,7 @@
 <li><p>Attempts to integrate and unify other modeling and simulation frameworks (e.g., ABMs, compartmental models, redistribution systems, ordinary-differential equations, Markov chains, etc.)</p></li>
 <li><p>Allows modelers to compose complicated models from smaller parts called <cite>modeling primitives</cite></p></li>
 <li><p>Organizes modeling primitives into a multigraph</p></li>
-<li><p>Inheritance-based hierarchies expressed within the modeling primitives multigraph explicitely encode specialization and generalization</p></li>
+<li><p>Inheritance-based hierarchies expressed within the modeling primitives multigraph explicitly encode specialization and generalization</p></li>
 <li><p>Provides systemic diagnostics
 - Mass dynamics visualization
 - Time-frequency analysis
@@ -60,32 +61,38 @@
 <h2>Dependencies<a class="headerlink" href="#dependencies" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
 <li><p><a class="reference external" href="https://python.org">Python 3.6</a></p></li>
-<li><p><a class="reference external" href="https://pypi.org/project/xxhash/">xxhash</a></p></li>
-<li><p><a class="reference external" href="https://pypi.org/project/dotmap">dotmap</a></p></li>
-<li><p><a class="reference external" href="http://www.grantjenks.com/docs/sortedcontainers/index.html">sortedcontainers</a></p></li>
-<li><p><a class="reference external" href="https://github.com/python-attrs/attrs">attrs</a></p></li>
-<li><p><a class="reference external" href="https://pypi.org/project/dill/">dill</a></p></li>
-<li><p><a class="reference external" href="https://www.numpy.org">numpy</a></p></li>
-<li><p><a class="reference external" href="https://www.scipy.org">scipy</a></p></li>
-<li><p><a class="reference external" href="https://matplotlib.org">matplotlib</a></p></li>
-<li><p><a class="reference external" href="https://graph-tool.skewed.de">graph-tool</a></p></li>
-<li><p><a class="reference external" href="https://www.cairographics.org/pycairo">pycairo</a> (for <cite>graph-tool</cite>)</p></li>
-<li><p><a class="reference external" href="https://pygobject.readthedocs.io">PyGObject</a> (for <cite>graph-tool</cite>)</p></li>
 <li><p><a class="reference external" href="https://altair-viz.github.io">altair</a></p></li>
-<li><p><a class="reference external" href="https://selenium-python.readthedocs.io">selenium</a> (for saving <cite>altair</cite> graphs)</p></li>
-<li><p><a class="reference external" href="https://github.com/mozilla/geckodriver/releases">Gecko Driver</a> and a recent version of Firefox (for saving <cite>altair</cite> graphs)</p></li>
-<li><p><a class="reference external" href="https://sites.google.com/a/chromium.org/chromedriver">Chrome Driver</a> (a Chrome alternative to the above)</p></li>
-<li><p><a class="reference external" href="https://pypi.org/project/PyRQA">PyRQA</a></p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/altair-saver">altair-saver</a></p></li>
+<li><p><a class="reference external" href="https://github.com/python-attrs/attrs">attrs</a></p></li>
+<li><p><a class="reference external" href="https://github.com/cloudpipe/cloudpickle">cloudpickle</a></p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/dotmap">dotmap</a></p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/iteround">iteround</a></p></li>
+<li><p><a class="reference external" href="https://matplotlib.org">matplotlib</a></p></li>
+<li><p><a class="reference external" href="https://www.numpy.org">numpy</a></p></li>
+<li><p><a class="reference external" href="https://github.com/giampaolo/psutil">psutil</a></p></li>
+<li><p><a class="reference external" href="https://www.psycopg.org">psycopg2</a></p></li>
 <li><p><a class="reference external" href="https://pybind11.readthedocs.io">pybind11</a> (for <cite>PyRQA</cite>)</p></li>
 <li><p><a class="reference external" href="https://documen.tician.de/pyopencl">PyOpenCL</a> (for <cite>PyRQA</cite>)</p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/PyRQA">PyRQA</a></p></li>
+<li><p><a class="reference external" href="https://docs.ray.io">ray</a></p></li>
+<li><p><a class="reference external" href="https://www.scipy.org">scipy</a></p></li>
+<li><p><a class="reference external" href="https://selenium-python.readthedocs.io">selenium</a> (for saving <code class="docutils literal notranslate"><span class="pre">altair</span></code> graphs)</p></li>
+<li><p><a class="reference external" href="http://www.grantjenks.com/docs/sortedcontainers/index.html">sortedcontainers</a></p></li>
+<li><p><a class="reference external" href="https://tqdm.github.io">tqdm</a></p></li>
+<li><p><a class="reference external" href="https://github.com/mozilla/geckodriver/releases">Gecko Driver</a> and a recent version of Firefox (for saving <code class="docutils literal notranslate"><span class="pre">altair</span></code> graphs)</p></li>
+<li><p><a class="reference external" href="https://sites.google.com/a/chromium.org/chromedriver">Chrome Driver</a> (a Chrome alternative to the above)</p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/xxhash/">xxhash</a></p></li>
+<li><p><a class="reference external" href="https://github.com/mozilla/geckodriver/releases">Gecko Driver</a> or <a class="reference external" href="https://sites.google.com/a/chromium.org/chromedriver">Chrome Driver</a> and a recent version of either of the respective Web browser (i.e., Firefox or Chrome; for saving <code class="docutils literal notranslate"><span class="pre">altair</span></code> graphs)</p></li>
 </ul>
 </div>
 <div class="section" id="installation">
 <h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
-<p>The <a class="reference external" href="https://github.com/momacs/pram/blob/master/script/setup-ubuntu.sh">setup-ubuntu.sh</a> script is the preferred method of deploying the package onto a fresh installation of the Ubuntu Server/Desktop (tested with 18.04 LTS) because it alleviates the pain of installing all dependencies manually.  The <code class="docutils literal notranslate"><span class="pre">do_env</span></code> variable controls whether the package and its dependencies are installed inside a Python <code class="docutils literal notranslate"><span class="pre">venv</span></code> (yes by default).  The script can be downloaded and run like so:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>wget https://raw.githubusercontent.com/momacs/pram/master/script/setup-ubuntu.sh
-chmod a+x setup-ubuntu.sh
-./setup-ubuntu.sh
+<p>Install PyPRAM like so:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>pip install git+https://github.com/momacs/pram.git
+</pre></div>
+</div>
+<p>To install all extra dependencies instead, do:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>pip install git+https://github.com/momacs/pram.git#egg<span class="o">=</span>pram<span class="o">[</span>all<span class="o">]</span>
 </pre></div>
 </div>
 </div>
@@ -156,7 +163,7 @@ chmod a+x setup-ubuntu.sh
     </form>
     </div>
 </div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
+<script>$('#searchbox').show(0);</script>
 
 
 
@@ -170,10 +177,10 @@ chmod a+x setup-ubuntu.sh
       <div class="clearer"></div>
     </div>
     <div class="footer">
-      &copy;2018-2019, momacs.
+      &copy;2018-2020, momacs.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.1</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.2</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |
