@@ -1,20 +1,22 @@
-"""
-Basic reproduction number (R0) for several diseases
-    Rotavirus            16-25
-    Measles              16-18
-    Varicella            10-12
-    Smallpox             3-10
-    Spanish flu          2.0 [1.5 - 2.8]
-    Seasonal influenza   1.3 [0.9 - 1.8]
-    H1N1 swine flu 2019  1.2 - 1.5
-"""
+# -*- coding: utf-8 -*-
+"""Contains epidemiological models code."""
+
+# Basic reproduction number (R0) for several diseases
+#     Rotavirus            16-25
+#     Measles              16-18
+#     Varicella            10-12
+#     Smallpox             3-10
+#     Spanish flu          2.0 [1.5 - 2.8]
+#     Seasonal influenza   1.3 [0.9 - 1.8]
+#     H1N1 swine flu 2019  1.2 - 1.5
 
 from abc import abstractmethod, ABC
 
 from dotmap import DotMap
 
-from .model import Model, ModelConstructionError, MCSolver, ODESolver
-from ..rule import TimeAlways, IterAlways, DiscreteInvMarkovChain, ODEDerivatives, ODESystemMass
+from  .model  import Model, ModelConstructionError, MCSolver, ODESolver
+from ..entity import GroupQry
+from ..rule   import TimeAlways, IterAlways, DiscreteInvMarkovChain, ODEDerivatives, ODESystemMass
 
 __all__ = ['SEIRModelParams', 'SEI2RModelParams', 'SISModel', 'SIRModel', 'SIRSModel', 'SEIRModel', 'SEQIHRModel']
 
@@ -23,18 +25,17 @@ __all__ = ['SEIRModelParams', 'SEI2RModelParams', 'SISModel', 'SIRModel', 'SIRSM
 # ODE models deriavatives:
 
 class SIRModelDerivatives(ODEDerivatives):
-    '''
-    Model parameters
-        beta  - Transmission rate (or effective contact rate)
-        gamma - Recovery rate
+    """SIR model derivatives.
+
+    Model parameters:
+        - beta  - Transmission rate (or effective contact rate)
+        - gamma - Recovery rate
 
     R0 = beta * S0 / gamma,    where S0 is the initial size of the susceptible population
 
     Kermack WO & McKendrick AG (1927) A Contribution to the Mathematical Theory of Epidemics. Proceedings of the
     Royal Society A. 115(772), 700--721.
-
-    http://www.public.asu.edu/~hnesse/classes/sir.html
-    '''
+    """
 
     def __init__(self, beta, gamma):
         self.params = DotMap(beta=beta, gamma=gamma)
@@ -53,12 +54,13 @@ class SIRModelDerivatives(ODEDerivatives):
 
 
 class SIRDModelDerivatives(ODEDerivatives):  # new and not validated yet, but boy, does it have potential...
-    '''
-    Model parameters
-        beta  - Transmission rate (or effective contact rate)
-        gamma - Recovery rate
-        f     - Redovery fraction (i.e., 1 - f agents die)
-    '''
+    """SIRD model derivatives.
+
+    Model parameters:
+        - beta  - Transmission rate (or effective contact rate)
+        - gamma - Recovery rate
+        - f     - Redovery fraction (i.e., 1 - f agents die)
+    """
 
     def __init__(self, beta, gamma):
         self.params = DotMap(beta=beta, gamma=gamma)
@@ -94,14 +96,15 @@ class SIRSModelDerivatives(ODEDerivatives):
 
 
 class SEIRModelDerivatives(ODEDerivatives):
-    '''
-    Model parameters
-        beta  - Transmission rate (or effective contact rate)
-        kappa - Progression rate from exposed (latent) to infected
-        gamma - Recovery rate
+    """SEIR model derivatives.
+
+    Model parameters:
+        - beta  - Transmission rate (or effective contact rate)
+        - kappa - Progression rate from exposed (latent) to infected
+        - gamma - Recovery rate
 
     R0 = beta * S0 / gamma,    where S0 is the initial size of the susceptible population
-    '''
+    """
 
     def __init__(self, beta, kappa, gamma):
         self.params = DotMap(beta=beta, kappa=kappa, gamma=gamma)
@@ -121,14 +124,15 @@ class SEIRModelDerivatives(ODEDerivatives):
 
 
 class SEQIHRModelDerivatives(ODEDerivatives):
-    '''
-    Model parameters
-        beta             - Transmission coefficient
-        alpha_n, alpha_q - Rate at which non-quarantined and quarantined individuals become infectious
-        delta_n, delta_h - Rate at which non-isolated and isolated individuals become recovered
-        mu               - Natural death rate
-        chi, phi         - Rate of quarantine and isolation
-        rho              - Isolation efficiency [0..1]
+    """SEQIHR model derivatives.
+
+    Model parameters:
+        - beta             - Transmission coefficient
+        - alpha_n, alpha_q - Rate at which non-quarantined and quarantined individuals become infectious
+        - delta_n, delta_h - Rate at which non-isolated and isolated individuals become recovered
+        - mu               - Natural death rate
+        - chi, phi         - Rate of quarantine and isolation
+        - rho              - Isolation efficiency [0..1]
 
     In the source below, parameter names used are:
         alpha_1 instead of alpha_n
@@ -144,7 +148,7 @@ class SEQIHRModelDerivatives(ODEDerivatives):
 
     Feng & Xu (2007) Epidemiological Models with Non-Exponentially Distributed Disease Stages and Applications to
     Disease Control.  Bulletin of Mathematical Biology.
-    '''
+    """
 
     def __init__(self, beta, alpha_n, alpha_q, delta_n, delta_h, mu, chi, phi, rho):
         self.params = DotMap(beta=beta, alpha_n=alpha_n, alpha_q=alpha_q, delta_n=delta_n, delta_h=delta_h, mu=mu, chi=chi, phi=phi, rho=rho)
@@ -225,56 +229,50 @@ class SEI2RModelParams(ModelParams):
 # Markov chain models:
 
 class SISModel_MC(DiscreteInvMarkovChain):
-    '''
-    The SIS epidemiological model without vital dynamics (Markov chain implementation).
+    """SIS model (Markov chain).
 
     Model parameters:
-        beta  - Transmission rate (or effective contact rate)
-        gamma - Recovery rate
-    '''
+        - beta  - Transmission rate (or effective contact rate)
+        - gamma - Recovery rate
+    """
 
     def __init__(self, var, beta, gamma, name='sis-model', t=TimeAlways(), i=IterAlways(), memo=None):
         super().__init__(var, { 's': [1.0 - beta, beta], 'i': [gamma, 1.0 - gamma] }, name, t, i, memo)
 
 
 class SIRModel_MC(DiscreteInvMarkovChain):
-    '''
-    The SIR epidemiological model without vital dynamics (Markov chain implementation).
+    """SIR model (Markov chain).
 
     Model parameters:
-        beta  - Transmission rate (or effective contact rate)
-        gamma - Recovery rate
-    '''
+        - beta  - Transmission rate (or effective contact rate)
+        - gamma - Recovery rate
+    """
 
     def __init__(self, var, beta, gamma, name='sir-model', t=TimeAlways(), i=IterAlways(), memo=None):
         super().__init__(var, { 's': [1.0 - beta, beta, 0.0], 'i': [0.0, 1.0 - gamma, gamma], 'r': [0.0, 0.0, 1.0] }, name, t, i, memo)
 
 
-
-
 class SIRSModel_MC(DiscreteInvMarkovChain):
-    '''
-    The SIRS epidemiological model without vital dynamics (Markov chain implementation).
+    """SIRS model (Markov chain).
 
     Model parameters:
-        beta  - Transmission rate (or effective contact rate)
-        gamma - Recovery rate
-        alpha - Immunity loss rate (alpha = 0 implies life-long immunity and consequently the SIR model)
-    '''
+        - beta  - Transmission rate (or effective contact rate)
+        - gamma - Recovery rate
+        - alpha - Immunity loss rate (alpha = 0 implies life-long immunity and consequently the SIR model)
+    """
 
     def __init__(self, var, beta, gamma, alpha=0.0, name='sirs-model', t=TimeAlways(), i=IterAlways(), memo=None):
         super().__init__(var, { 's': [1.0 - beta, beta, 0.0], 'i': [0.0, 1.0 - gamma, gamma], 'r': [alpha, 0.0, 1.0 - alpha] }, name, t, i, memo)
 
 
 class SEIRModel_MC(DiscreteInvMarkovChain):
-    '''
-    The SEIR epidemiological model without vital dynamics (Markov chain implementation).
+    """SEIR model (Markov chain).
 
     Model parameters:
-        beta  - Transmission rate (or effective contact rate)
-        k     - Progression rate from exposed (latent) to infected
-        gamma - Recovery rate
-    '''
+        - beta  - Transmission rate (or effective contact rate)
+        - k     - Progression rate from exposed (latent) to infected
+        - gamma - Recovery rate
+    """
 
     def __init__(self, var, beta, kappa, gamma, name='seir-model', t=TimeAlways(), i=IterAlways(), memo=None, cb_before_apply=None):
         super().__init__(var, { 's': [1.0 - beta, beta, 0.0, 0.0], 'e': [0.0, 1.0 - kappa, kappa, 0.0], 'i': [0.0, 0.0, 1.0 - gamma, gamma], 'r': [0.0, 0.0, 0.0, 1.0] }, name, t, i, memo, cb_before_apply)
@@ -292,16 +290,15 @@ class SISModel_ODE(ODESystemMass):
 
 
 class SIRModel_ODE(ODESystemMass):
-    '''
-    The SIR epidemiological model without vital dynamics (Markov chain implementation).
+    """SIS model (ordinary differential equations).
 
     Model parameters:
-        beta  - Transmission rate (or effective contact rate)
-        gamma - Recovery rate
-    '''
+        - beta  - Transmission rate (or effective contact rate)
+        - gamma - Recovery rate
+    """
 
     def __init__(self, var, beta, gamma, name='sir-model', t=TimeAlways(), i=IterAlways(), dt=0.1, memo=None):
-        super().__init__(SIRModelDerivatives(beta, gamma), [DotMap(attr={ var:v }) for v in 'sir'], name, t, i, dt, memo=memo)
+        super().__init__(SIRModelDerivatives(beta, gamma), [GroupQry(attr={ var:v }) for v in 'sir'], name, t, i, dt, memo=memo)
 
     def set_params(self, beta=None, gamma=None):
         super().set_params(beta=beta, gamma=gamma)
@@ -309,7 +306,7 @@ class SIRModel_ODE(ODESystemMass):
 
 class SIRSModel_ODE(ODESystemMass):
     def __init__(self, var, beta, gamma, alpha=0.0, name='sir-model', t=TimeAlways(), i=IterAlways(), dt=0.1, memo=None):
-        super().__init__(SIRSModelDerivatives(beta, gamma, alpha), [DotMap(attr={ var:v }) for v in 'sirs'], name, t, i, dt, memo=memo)
+        super().__init__(SIRSModelDerivatives(beta, gamma, alpha), [GroupQry(attr={ var:v }) for v in 'sirs'], name, t, i, dt, memo=memo)
 
     def set_params(self, beta=None, gamma=None, alpha=None):
         super().set_params(beta=beta, gamma=gamma, alpha=alpha)
@@ -317,7 +314,7 @@ class SIRSModel_ODE(ODESystemMass):
 
 class SEIRModel_ODE(ODESystemMass):
     def __init__(self, var, beta, kappa, gamma, name='seir-model', t=TimeAlways(), i=IterAlways(), dt=0.1, memo=None):
-        super().__init__(SEIRModelDerivatives(beta, kappa, gamma), [DotMap(attr={ var:v }) for v in 'seir'], name, t, i, dt, memo=memo)
+        super().__init__(SEIRModelDerivatives(beta, kappa, gamma), [GroupQry(attr={ var:v }) for v in 'seir'], name, t, i, dt, memo=memo)
 
     def set_params(self, beta=None, kappa=None, gamma=None):
         super().set_params(beta=beta, kappa=kappa, gamma=gamma)
@@ -325,7 +322,7 @@ class SEIRModel_ODE(ODESystemMass):
 
 class SEQIHRModel_ODE(ODESystemMass):
     def __init__(self, var, beta, alpha_n, alpha_q, delta_n, delta_h, mu, chi, phi, rho, name='seqihr-model', t=TimeAlways(), i=IterAlways(), dt=0.1, memo=None):
-        super().__init__(SEQIHRModelDerivatives(beta, alpha_n, alpha_q, delta_n, delta_h, mu, chi, phi, rho), [DotMap(attr={ var:v }) for v in 'seqihr'], name, t, i, dt, memo=memo)
+        super().__init__(SEQIHRModelDerivatives(beta, alpha_n, alpha_q, delta_n, delta_h, mu, chi, phi, rho), [GroupQry(attr={ var:v }) for v in 'seqihr'], name, t, i, dt, memo=memo)
 
     def set_params(self, beta=None, alpha_n=None, alpha_q=None, delta_n=None, delta_h=None, mu=None, chi=None, phi=None, rho=None):
         super().set_params(beta=beta, alpha_n=alpha_n, alpha_q=alpha_q, delta_n=delta_n, delta_h=delta_h, mu=mu, chi=chi, phi=phi, rho=rho)
@@ -349,10 +346,10 @@ class SIRModel(Model):
 
 
 class SIRSModel(Model):
-    """Main SIRS model interface.
+    """SIRS model interface.
 
     Notes:
-       alpha of 0 implies the SIR model.
+       ``alpha = 0`` implies the SIR model.
     """
 
     def __init__(self, var, beta, gamma, alpha=0.0, name='sirs-model', t=TimeAlways(), i=IterAlways(), solver=MCSolver(), memo=None):
@@ -365,7 +362,7 @@ class SIRSModel(Model):
 
 
 class SEIRModel(Model):
-    """Main SEIR model interface.
+    """SEIR model interface.
     """
 
     def __init__(self, var, beta, kappa, gamma, name='seir-model', t=TimeAlways(), i=IterAlways(), solver=MCSolver(), memo=None, cb_before_apply=None):
@@ -378,7 +375,7 @@ class SEIRModel(Model):
 
 
 class SEQIHRModel(Model):
-    """Main SEQIHR model interface.
+    """SEQIHR model interface.
     """
 
     def __init__(self, var, beta, alpha_n, alpha_q, delta_n, delta_h, mu, chi, phi, rho, name='seqihr-model', t=TimeAlways(), i=IterAlways(), solver=MCSolver(), memo=None):

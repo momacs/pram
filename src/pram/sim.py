@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+"""Contains PRAM simulation code."""
+
+# ----------------------------------------------------------------------------------------------------------------------
+#
 # Probabilitistic Relational Agent-based Models (PRAMs)
 #
 # BSD 3-Clause License
@@ -53,8 +58,7 @@ class SimulationConstructionWarning(Warning): pass
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Timer(object):
-    '''
-    Simulation timer.
+    """Simulation timer.
 
     This discrete time is unitless; it is the simulation context that defines the appropriate granularity.  For
     instance, million years (myr) might be appropriate for geological processes while Plank time might be appropriate
@@ -65,7 +69,10 @@ class Timer(object):
     the object.  Because of this, rule times, which define the number of milliseconds in a time unit, can be scaled.
 
     Apart from time, this timers also stores the iteration count.
-    '''
+
+    Todo:
+        This class and its subclasses are not yet incorporated into the package.
+    """
 
     # TODO: Loop detection currently relies on modulus which does not handle 'step_size' > 1 properly.
 
@@ -239,7 +246,8 @@ class YearTimer(Timer):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class DynamicRuleAnalyzer(object):
-    '''
+    """Infers group attributes and relations conditioned upon based on running a simulation.
+
     Analyze rule conditioning after running the simulation.  This is done by processing group attributes and
     relations that the simulation has recorded as accessed by at least one rule.  The evidence of attributes and
     relations having been actually accessed is a strong one.  However, as tempting as it may be to use this
@@ -251,7 +259,7 @@ class DynamicRuleAnalyzer(object):
     simulation runs, only updated.  This way a simulation will always be aware of what was relevant from the very
     beginning.  This information will also be persisted if the simulation object is serialized to continue
     execution on another system.
-    '''
+    """
 
     def __init__(self, sim):
         self.sim = sim
@@ -283,9 +291,8 @@ class DynamicRuleAnalyzer(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class StaticRuleAnalyzer(object):
-    '''
-    Analyzes the syntax (i.e., abstract syntax trees or ASTs) of rule objects to identify group attributes and
-    relations these rules condition on.
+    """Analyzes the syntax (i.e., abstract syntax trees) of rule objects to identify group attributes and relations
+    these rules condition on.
 
     Apart from attempting to deduce the attributes and rules, this class keeps track of the numbers of recognized and
     unrecognized attributes and relations (compartmentalized by method type, e.g., 'has_attr' and 'get_attr').
@@ -298,8 +305,9 @@ class StaticRuleAnalyzer(object):
         https://github.com/hchasestevens/astpath
         https://astsearch.readthedocs.io/en/latest
 
-    # TODO: Double check the case of multiple sequential simulation runs.
-    '''
+    TODO
+        Double check the case of multiple sequential simulation runs.
+    """
 
     def __init__(self):
         self.reset()
@@ -396,7 +404,9 @@ class StaticRuleAnalyzer(object):
                 self._analyze(i)
 
     def analyze_rules(self, rules):
-        ''' Can be (and in fact is) called before any groups have been added. '''
+        """
+        Can be (and in fact is) called before any groups have been added.
+        """
 
         # (1) Reset the state:
         self.attr_used = set()
@@ -415,7 +425,9 @@ class StaticRuleAnalyzer(object):
         self.are_rules_done = True
 
     def analyze_groups(self, groups):
-        ''' Should be called after all the groups have been added. '''
+        """
+        Should be called after all the groups have been added.
+        """
 
         attr_groups = set()  # attributes defining groups
         rel_groups  = set()  # ^ (relations)
@@ -464,213 +476,440 @@ class StaticRuleAnalyzer(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SimulationAdder(object):
+    """Simulation element adder.
+
+    A syntactic sugar class that makes the simulation definition API even more flexible and palatable.
+
+    An instance of this class is returned by :meth:`Simulation.add() <pram.sim.Simulation.add>` and enables better
+    compartmentalization::
+
+        s = Simulation()
+        s.add().
+            rules(...).
+            probes(...).
+            groups(...).
+            sites(...)
+        s.run(24)
+
+    or::
+
+        (Simulation().
+            add().
+                rules(...).
+                probes(...).
+                groups(...).
+                sites(...).
+                done().
+            run(24)
+        )
+
+    All methods of this class, apart from :meth:`~pram.sim.SimulationAdder.done`, return ``self`` for method call
+    chaining.
+    """
+
     def __init__(self, sim):
         self.sim = sim
 
     def done(self):
+        """Declare being done adding and return to the :class:`~pram.sim.Simulation` object.
+
+        Returns:
+            :class:`~pram.sim.Simulation`: The delegating simulation object.
+        """
+
         return self.sim
 
     def group(self, group):
+        """Shortcut to :meth:`Simulation.add_group() <pram.sim.Simulation.add_group>`."""
+
         self.sim.add_group(group)
         return self
 
     def groups(self, groups):
+        """Shortcut to :meth:`Simulation.add_groups() <pram.sim.Simulation.add_groups>`."""
+
         self.sim.add_groups(groups)
         return self
 
     def probe(self, probe):
+        """Shortcut to :meth:`Simulation.add_probe() <pram.sim.Simulation.add_probe>`."""
+
         self.sim.add_probe(probe)
         return self
 
     def probes(self, probes):
+        """Shortcut to :meth:`Simulation.add_probes() <pram.sim.Simulation.add_probes>`."""
+
         self.sim.add_probes(probes)
         return self
 
     def rule(self, rule):
+        """Shortcut to :meth:`Simulation.add_rule() <pram.sim.Simulation.add_rule>`."""
+
         self.sim.add_rule(rule)
         return self
 
     def rules(self, rules):
+        """Shortcut to :meth:`Simulation.add_rules() <pram.sim.Simulation.add_rules>`."""
+
         self.sim.add_rules(rules)
         return self
 
     def sim_rule(self, rule):
+        """Shortcut to :meth:`Simulation.add_sim_rule() <pram.sim.Simulation.add_sim_rule>`."""
+
         self.sim.add_sim_rule(rule)
         return self
 
     def sim_rules(self, rules):
+        """Shortcut to :meth:`Simulation.add_sim_rules() <pram.sim.Simulation.add_sim_rules>`."""
+
         self.sim.add_sim_rules(rules)
         return self
 
     def site(self, site):
+        """Shortcut to :meth:`Simulation.add_site() <pram.sim.Simulation.add_site>`."""
+
         self.sim.add_site(site)
         return self
 
     def sites(self, sites):
+        """Shortcut to :meth:`Simulation.add_sites() <pram.sim.Simulation.add_sites>`."""
+
         self.sim.add_sites(sites)
         return self
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SimulationDBI(object):
-    def __init__(self, sim, fpath):
-        self.sim = sim
-        self.fpath = fpath
+    """Simulation database interface.
 
-        FS.req_file(fpath, f'The database does not exist: {fpath}')
+    A syntactic sugar class that makes the simulation definition API even more flexible and palatable.
+
+    An instance of this class is returned by :meth:`Simulation.dbi() <pram.sim.Simulation.dbi>` and enables better
+    compartmentalization::
+
+        from pram.util import PgDB
+        ...
+
+        s = Simulation()
+        s.add().
+            rules(...).
+            probes(...)
+        s.db(PgDB('localhost', 5432, 'user', 'pwd', 'database')).
+            gen_groups(...)
+        s.run(24)
+
+    or::
+
+        from pram.util import PgDB
+        ...
+
+        (Simulation().
+            add().
+                rules(...).
+                probes(...).
+                done().
+            db(PgDB('localhost', 5432, 'user', 'pwd', 'database')).
+                gen_groups(...).
+                done().
+            run(24)
+        )
+
+    All methods of this class, apart from :meth:`~pram.sim.SimulationAdder.done`, return ``self`` for method call
+    chaining.
+
+    Args:
+        db (DB): Database management system specific object.
+    """
+
+    def __init__(self, sim, db):
+        self.sim = sim
+        self.db = db
 
     def done(self):
+        """Declare being done interacting with the database interface and return to the :class:`~pram.sim.Simulation`
+        object.
+
+        Returns:
+            :class:`~pram.sim.Simulation`: The delegating simulation object.
+        """
+
         return self.sim
 
     def gen_groups(self, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0, is_verbose=False):
-        """
-        Usage example:
+        """Shortcut to :meth:`Simulation.gen_groups_from_db() <pram.sim.Simulation.gen_groups_from_db>`."""
 
-            (Simulation().
-                add().
-                    rule(...).
-                    probe(...).
-                    done().
-                db(os.path.join(os.path.dirname(__file__), 'db', 'allegheny-students.sqlite3')).
-                    gen_groups(
-                        tbl      = 'students',
-                        attr_db  = [],
-                        rel_db   = [GroupDBRelSpec(name='school', col='school_id')],
-                        attr_fix = {},
-                        rel_fix  = { 'home': Site('home') },
-                        rel_at   = 'school'
-                    ).
-                    done().
-                run(5)
-            )
-        """
-
-        self.sim.gen_groups_from_db(self.fpath, tbl, attr_db, rel_db, attr_fix, rel_fix, attr_rm, rel_rm, rel_at, limit, is_verbose)
+        self.sim.gen_groups_from_db(self.db, tbl, attr_db, rel_db, attr_fix, rel_fix, attr_rm, rel_rm, rel_at, limit, is_verbose)
         return self
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SimulationPlotter(object):
+    """Simulation results plotter.
+
+    A syntactic sugar class that makes the simulation results API even more flexible and palatable.
+
+    An instance of this class is returned by :meth:`Simulation.plot() <pram.sim.Simulation.plot>` and enables better
+    compartmentalization::
+
+        s = Simulation()
+        s.add().
+            rules(...).
+            probes(...).
+            groups(...).
+            sites(...)
+        s.run(24)
+        s.plot().
+            group_size(...)
+
+    or::
+
+        (Simulation().
+            add().
+                rules(...).
+                probes(...).
+                groups(...).
+                sites(...).
+                done().
+            run(24).
+            plot().
+                group_size(...).
+                done()
+        )
+
+    All methods of this class, apart from :meth:`~pram.sim.SimulationAdder.done`, return ``self`` for method call
+    chaining.
+    """
+
     def __init__(self, sim):
         self.sim = sim
 
     def done(self):
+        """Declare being done plotting and return to the :class:`~pram.sim.Simulation` object.
+
+        Returns:
+            :class:`~pram.sim.Simulation`: The delegating simulation object.
+        """
+
         return self.sim
 
     def group_size(self, do_log=False, fpath=None, title='Distribution of Group Size', nx=250):
+        """Shortcut to :meth:`Simulation.plot_group_size() <pram.sim.Simulation.plot_group_size>`."""
+
         self.sim.plot_group_size(do_log, fpath, title, nx)
+        return self
+
+    def site_size(self, do_log=False, fpath=None, title='Distribution of Group Size', nx=250):
+        """Shortcut to :meth:`Simulation.plot_site_size() <pram.sim.Simulation.plot_site_size>`."""
+
+        self.sim.plot_site_size(do_log, fpath, title, nx)
         return self
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SimulationSetter(object):
+    """Simulation element setter.
+
+    A syntactic sugar class that makes the simulation definition API even more flexible and palletable.
+
+    An instance of this class is returned by :meth:`Simulation.set() <pram.sim.Simulation.set>` and enables better
+    compartmentalization::
+
+        s = Simulation()
+        s.add().
+            rules(...).
+            probes(...).
+            groups(...).
+            sites(...)
+        s.set().
+            pragma_live_info(True)
+        s.run(24)
+
+    or::
+
+        (Simulation().
+            add().
+                rules(...).
+                probes(...).
+                groups(...).
+                sites(...).
+                done().
+            set().
+                pragma_live_info(True).
+                done().
+            run(24)
+        )
+
+    All methods of this class, apart from :meth:`~pram.sim.SimulationAdder.done`, return ``self`` for method call
+    chaining.
+    """
+
     def __init__(self, sim):
         self.sim = sim
 
     def cb_after_iter(self, fn):
+        """Shortcut to :meth:`Simulation.set_cb_after_iter() <pram.sim.Simulation.set_cb_after_iter>`."""
+
         self.sim.set_cb_after_iter(fn)
         return self
 
     def cb_before_iter(self, fn):
+        """Shortcut to :meth:`Simulation.set_cb_before_iter() <pram.sim.Simulation.set_cb_before_iter>`."""
+
         self.sim.set_cb_before_iter(fn)
         return self
 
     def cb_check_work(self, fn):
+        """Shortcut to :meth:`Simulation.set_cb_check_work() <pram.sim.Simulation.set_cb_check_work>`."""
+
         self.sim.set_cb_check_work(fn)
         return self
 
     def cb_save_state(self, fn):
+        """Shortcut to :meth:`Simulation.set_cb_save_state() <pram.sim.Simulation.set_cb_save_state>`."""
+
         self.sim.set_cb_save_state(fn)
         return self
 
     def cb_upd_progress(self, fn):
+        """Shortcut to :meth:`Simulation.set_cb_upd_progress() <pram.sim.Simulation.set_cb_upd_progress>`."""
+
         self.sim.set_cb_upd_progress(fn)
         return self
 
     def done(self):
+        """Declare being done setting and return to the :class:`~pram.sim.Simulation` object.
+
+        Returns:
+            :class:`~pram.sim.Simulation`: The delegating simulation object.
+        """
+
         return self.sim
 
     def dur(self, dur):
+        """Shortcut to :meth:`Simulation.set_dur() <pram.sim.Simulation.set_dur>`."""
+
         self.sim.set_dur(dur)
         return self
 
     def iter_cnt(self, n):
+        """Shortcut to :meth:`Simulation.set_iter_cnt() <pram.sim.Simulation.set_iter_cnt>`."""
+
         self.sim.set_iter_cnt(n)
         return self
 
     def fn_group_setup(self, fn):
+        """Shortcut to :meth:`Simulation.set_fn_group_setup() <pram.sim.Simulation.set_fn_group_setup>`."""
+
         self.sim.set_fn_group_setup(fn)
         return self
 
     def pragma(self, name, value):
+        """Shortcut to :meth:`Simulation.set_pragma() <pram.sim.Simulation.set_pragma>`."""
+
         self.sim.set_pragma(name, value)
         return self
 
     def pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, comp_summary=None, fractional_mass=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
+        """Shortcut to :meth:`Simulation.set_pragmas() <pram.sim.Simulation.set_pragmas>`."""
+
         self.sim.set_pragmas(analyze, autocompact, autoprune_groups, autostop, autostop_n, autostop_p, autostop_t, comp_summary, fractional_mass, live_info, live_info_ts, probe_capture_init, rule_analysis_for_db_gen)
         return self
 
     def pragma_analyze(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_analyze() <pram.sim.Simulation.set_pragma_analyze>`."""
+
         self.sim.set_pragma_analyze(value)
         return self
 
     def pragma_autocompact(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_autocompact() <pram.sim.Simulation.set_pragma_autocompact>`."""
+
         self.sim.set_pragma_autocompact(value)
         return self
 
     def pragma_autoprune_groups(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_autoprune_groups() <pram.sim.Simulation.set_pragma_autoprune_groups>`."""
+
         self.sim.set_pragma_autoprune_groups(value)
         return self
 
     def pragma_autostop(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_autostop() <pram.sim.Simulation.set_pragma_autostop>`."""
+
         self.sim.set_pragma_autostop(value)
         return self
 
     def pragma_autostop_n(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_autostop_n() <pram.sim.Simulation.set_pragma_autostop_n>`."""
+
         self.sim.set_pragma_autostop_n(value)
         return self
 
     def pragma_autostop_p(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_autostop_p() <pram.sim.Simulation.set_pragma_autostop_p>`."""
+
         self.sim.set_pragma_autostop_p(value)
         return self
 
     def pragma_autostop_t(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_autostop_t() <pram.sim.Simulation.set_pragma_autostop_t>`."""
+
         self.sim.set_pragma_autostop_t(value)
         return self
 
     def pragma_comp_summary(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_comp_summary() <pram.sim.Simulation.set_pragma_comp_summary>`."""
+
         self.sim.set_pragma_comp_summary(value)
         return self
 
     def pragma_fractional_mass(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_fractional_mass() <pram.sim.Simulation.set_pragma_fractional_mass>`."""
+
         self.sim.set_pragma_fractional_mass(value)
         return self
 
     def pragma_live_info(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_live_info() <pram.sim.Simulation.set_pragma_live_info>`."""
+
         self.sim.set_pragma_live_info(value)
         return self
 
     def pragma_live_info_ts(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_live_info_ts() <pram.sim.Simulation.set_pragma_live_info_ts>`."""
+
         self.sim.set_pragma_live_info_ts(value)
         return self
 
     def pragma_probe_capture_init(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_probe_capture_init() <pram.sim.Simulation.set_pragma_probe_capture_init>`."""
+
         self.sim.set_pragma_probe_capture_init(value)
         return self
 
     def pragma_rule_analysis_for_db_gen(self, value):
+        """Shortcut to :meth:`Simulation.set_pragma_rule_analysis_for_db_gen() <pram.sim.Simulation.set_pragma_rule_analysis_for_db_gen>`."""
+
         self.sim.set_pragma_rule_analysis_for_db_gen(value)
         return self
 
     def rand_seed(self, rand_seed):
+        """Shortcut to :meth:`Simulation.set_rand_seed() <pram.sim.Simulation.set_rand_seed>`."""
+
         self.sim.set_rand_seed(rand_seed)
         return self
 
     def var(self, name, val):
+        """Shortcut to :meth:`Simulation.set_var() <pram.sim.Simulation.set_var>`."""
+
         self.sim.set_var(name, val)
         return self
 
     def vars(self, vars):
+        """Shortcut to :meth:`Simulation.set_vars() <pram.sim.Simulation.set_vars>`."""
+
         self.sim.set_vars(vars)
         return self
 
@@ -695,21 +934,29 @@ class SimulationSetter(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Simulation(object):
-    '''
-    A PRAM simulation.
+    """A PRAM simulation.
 
     At this point, this simulation is a discrete-event simulation (DES).  DES models the operation of a system as a
     (discrete) sequence of events in time.  DES can be contrasted with continuous simulation in which the system state
     is changed continuously over time on the basis of a set of differential equations defining the rates of change of
     state variables.
-    '''
+
+    Args:
+        pop_hist_len (int): Maximum lenght of the population history.  Keep memory utilization in mind when using
+            positive numbers for this argument.
+        traj_id (Any): ID of the trajectory which wraps the simulation object.  That ID should come from the trajectory
+            ensemble database.
+        random_seed (int, optional): Pseudo-random number generator seed.
+        do_keep_mass_flow_specs (bool): Store the last iteration mass flow specs?  See
+            :class:`pop.GroupPopulation <pram.pop.GroupPopulation>` and
+            :class:`pop.MassFlowSpec <pram.pop.MassFlowSpec>` classes.
+    """
 
     def __init__(self, pop_hist_len=0, traj_id=None, rand_seed=None, do_keep_mass_flow_specs=False):
         self.set_rand_seed(rand_seed)
 
         self.pid = os.getpid()  # process ID
-        # self.traj = traj        # trajectory
-        self.traj_id = traj_id        # trajectory ID
+        self.traj_id = traj_id  # trajectory ID
         self.run_cnt = 0
 
         self.pop = GroupPopulation(self, pop_hist_len, do_keep_mass_flow_specs)
@@ -757,12 +1004,19 @@ class Simulation(object):
             print(f'[info] {msg}')
 
     def add(self, lst=None):
-        """
-        Args:
+        """Simulation element adder.
 
+        If the ``lst`` argument is None, this method returns instance of the :class:`~pram.sim.SimulationAdder` class
+        that will handle adding simulation elements.  Otherwise, it will add all elements of ``lst`` to the simulation.
+
+        Args:
+            lst (Iterable): Combination of objects of the following types: :class:`Group <pram.entity.Group>`,
+                :class:`Probe <pram.data.Probe>`, :class:`SimRule <pram.rule.SimRule>`,
+                :class:`Rule <pram.rule.Rule>`, :class:`Model <pram.model.model.Model>`, and
+                :class:`Site <pram.entity.Site>`.
 
         Returns:
-            self: For method call chaining.
+            SimulationAdder
         """
 
         if lst:
@@ -784,12 +1038,13 @@ class Simulation(object):
             return SimulationAdder(self)
 
     def add_group(self, group):
-        """
-        Args:
+        """Adds a group.
 
+        Args:
+            group (Group): The group.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         # No rules present:
@@ -809,12 +1064,13 @@ class Simulation(object):
         return self
 
     def add_groups(self, groups):
-        """
-        Args:
+        """Adds groups.
 
+        Args:
+            groups (Iterable[Group]): The groups.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         for g in groups:
@@ -822,12 +1078,13 @@ class Simulation(object):
         return self
 
     def add_probe(self, probe):
-        """
-        Args:
+        """Adds a probe.
 
+        Args:
+            probe (Probe): The probe.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         if probe.name in [p.name for p in self.probes]:
@@ -839,12 +1096,13 @@ class Simulation(object):
         return self
 
     def add_probes(self, probes):
-        """
-        Args:
+        """Adds probes.
 
+        Args:
+            probes (Iterable[Probe]): The probes.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         for p in probes:
@@ -852,24 +1110,20 @@ class Simulation(object):
         return self
 
     def add_rule(self, rule):
-        """
-        Args:
+        """Adds a rule.
 
+        If the rule has any inner rules, all of those are added as well.  An example of an inner rule is a desease
+        transmission model that is being acted upon by another rule, e.g., an intervention rule which therefore
+        contains it.  Such containing relationship is not being enforced by the framework however.
+
+        An instance of a rule can only be added once.
+
+        Args:
+            rule (Rule): The rule.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
-
-        '''
-        Adds a rule to the simulation.  If the rule has any inner rules, all of those are added as well.  An example of
-        an inner rule is a desease transmission model that is being acted upon by another rule, e.g., an intervention
-        rule which therefore contains it.  Such containing relationship is not being enforced by the framework however.
-
-        Rules which have already been added will not be added again.  Consequently, if two copies of a rule should be
-        present within a simulation, two Rule objects should be instantiated.  This prevents any complication stemming
-        from rules being nested within other rules as is the case with the containing relationship mentinoed in the
-        previous paragraph.
-        '''
 
         if len(self.rules) == 0:
             self._inf('Constructing a PRAM')
@@ -890,12 +1144,13 @@ class Simulation(object):
         return self
 
     def add_rules(self, rules):
-        """
-        Args:
+        """Adds rules.
 
+        Args:
+            rules (Iterable[Rule]): The rules.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         for r in rules:
@@ -903,12 +1158,13 @@ class Simulation(object):
         return self
 
     def add_sim_rule(self, rule):
-        """
-        Args:
+        """Adds a simulation rule.
 
+        Args:
+            rule (SimRule): The simulation rule.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.sim_rules.append(rule)
@@ -916,12 +1172,13 @@ class Simulation(object):
         return self
 
     def add_sim_rules(self, rules):
-        """
-        Args:
+        """Adds simulation rules.
 
+        Args:
+            rules (Iterable[SimRule]): The simulation rules.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         for r in rules:
@@ -929,48 +1186,39 @@ class Simulation(object):
         return self
 
     def add_site(self, site):
-        """
-        Args:
+        """Adds a site.
 
+        Args:
+            site (Site): The site.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.pop.add_site(site)
         return self
 
     def add_sites(self, sites):
-        """
-        Args:
+        """Adds sites.
 
+        Args:
+            sites (Iterable[Site]): The sites.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.pop.add_sites(sites)
         return self
 
     def analyze_rules_static(self):
-        """
-        Args:
+        """Runs static rule analysis.
 
+        See :class:`~pram.sim.StaticRuleAnalyzer`.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
-
-        '''
-        Analyze rule conditioning prior to running the simulation.  This is done by analyzing the syntax (i.e.,
-        abstract syntax trees or ASTs) of rule objects to identify group attributes and relations these rules condition
-        on.  This is a difficult problem and the current implementation leaves room for future improvement.  In fact,
-        the current algorithm works only if the names of attributes and relations are specified in the code of rules as
-        string literals.  For example, if an attribute name is stored in a variable or is a result of a method call, it
-        will not be captured by this algorithm.
-
-        As a consequence, it is not possible to perform error-free groups auto-pruning based on this analysis.
-        '''
 
         self._inf('Running static rule analysis')
 
@@ -982,12 +1230,12 @@ class Simulation(object):
         return self
 
     def analyze_rules_dynamic(self):
-        """
-        Args:
+        """Runs dynamic rule analysis.
 
+        See :class:`~pram.sim.DynamicRuleAnalyzer`.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self._inf('Running dynamic rule analysis')
@@ -1009,23 +1257,6 @@ class Simulation(object):
         return self
 
     def analyze_rules_dynamic_old(self):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
-        '''
-        Analyze rule conditioning after running the simulation.  This is done by processing group attributes and
-        relations that the simulation has recorded as accessed by at least one rule.  The evidence of attributes and
-        relations having been actually accessed is a strong one.  However, as tempting as it may be to use this
-        information to prune groups, it's possible that further simulation iterations depend on other sets of
-        attributes and relations.  As a consequence, it is not possible to perform error-free groups auto-pruning based
-        on this analysis alone.
-        '''
-
         self._inf('Running dynamic rule analysis')
 
         lr = self.analysis.rule_dynamic
@@ -1057,144 +1288,85 @@ class Simulation(object):
         return self
 
     def clear_probes(self):
-        """
-        Args:
-
+        """Removes all probes.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.probes.clear()
         return self
 
     def clear_rules(self):
-        """
-        Args:
-
+        """Removes all rules.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.rules.clear()
         return self
 
-    def commit_group(self, group):
-        """
-        Args:
-
+    def clear_sim_rules(self):
+        """Removes all simulation rules.
 
         Returns:
-            self: For method call chaining.
+            ``self``
+        """
+
+        self.sim_rules.clear()
+        return self
+
+    def commit_group(self, group):
+        """Finishes adding a new group.
+
+        See :meth:`~pram.sim.Simulation.new_group` for explanation of the mechanism.
+
+        Args:
+            group (Group): The group in question.
+
+        Returns:
+            ``self``
         """
 
         self.add_group(group)
         return self
 
     def compact(self):
-        """
-        Args:
-
+        """Compacts the simulation.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.pop.compact()
         return self
 
-    def db(self, fpath):
-        return SimulationDBI(self, fpath)
+    def db(self, db):
+        """Simulation database interface.
 
-    def gen_ast(self):
-        '''
-        Code to AST
-            https://greentreesnakes.readthedocs.io
-        AST to code
-            https://astor.readthedocs.io
-        Visualizing
-            https://vpyast.appspot.com
-            https://ucb-sejits.github.io/ctree-docs/ipythontips.html
-        '''
+        Args:
+            db (DB): Database management system specific object.
 
-        pass
+        Returns:
+            SimulationDBI
+        """
+
+        return SimulationDBI(self, db)
 
     def gen_diagram(self, fpath_diag, fpath_pdf):
-        '''
-        Languages
-            DOT
-                https://en.wikipedia.org/wiki/DOT_(graph_description_language)
-        Misc
-            Graphviz
-                Graph Visualization Tools
-                Plots DOTs
-                https://gitlab.com/graphviz/graphviz
-        JavaScript graph editor library
-            List
-                https://modeling-languages.com/javascript-drawing-libraries-diagrams
-            Free
-                Processing
-                    https://p5js.org
-                    https://p5js.org/examples  [links to examples]
-                jGraph / MxGraph
-                    https://github.com/jgraph
-                        https://github.com/jgraph/mxgraph
-                            https://jgraph.github.io/mxgraph/javascript/index.html  [links to examples]
-                        https://github.com/jgraph/drawio
-                DiagramJS
-                    https://github.com/bpmn-io/diagram-js
-                       https://github.com/bpmn-io/diagram-js/tree/master/example
-                draw2d
-                    http://www.draw2d.org/draw2d
-                        http://www.draw2d.org/draw2d_touch/jsdoc_6/#!/example  [good examples library]
-                Cystoscape.js
-                    Graph theory (network) library for visualisation and analysis
-                    https://js.cytoscape.org
-            Commercial
-                GoJS
-                    https://gojs.net
-                        https://gojs.net/latest/samples/basic.html  [good examples library]
-                JointJS
-                    https://www.jointjs.com
-                DHTMLX
-                    https://dhtmlx.com/docs/products/dhtmlxDiagram
-                        https://docs.dhtmlx.com/diagram/samples/06_diagram_editor
-                            https://docs.dhtmlx.com/diagram/samples/06_diagram_editor/01_editor.html
-                            https://docs.dhtmlx.com/diagram/samples/06_diagram_editor/01_editor.html
-        Python
-            List
-                https://code.activestate.com/pypm/search:diagram/
-            Free
-                diagram
-                    Text mode diagrams using UTF-8 characters and fancy colors
-                    https://pypi.org/project/diagram
-                pygraph
-                python-graph
-                    https://github.com/Shoobx/python-graph
-                bdp
-                    bdp (Block Diagram in Python) is a package that translates diagrams described using Python objects to TikZ
-                    https://github.com/bogdanvuk/bdp
-                TikZ and PGF
-                    TikZ and PGF are TeX packages for creating graphics programmatically
-                    http://www.texample.net/tikz/examples/spacetime
-                blockdiag
-                    blockdiag and its family generate diagram images from simple text files
-                    http://blockdiag.com
-                    http://blockdiag.com/en/blockdiag/examples.html  [good examples library]
-                    https://www.jitsejan.com/creating-block-diagram.html
-                graphics.py
-                    http://anh.cs.luc.edu/handsonPythonTutorial/graphics.html
-        D3
-            https://github.com/d3/d3/wiki/Gallery  [good examples library]
-            http://nvd3.org
-            https://www.fullstackpython.com/d3-js.html
-        Python to D3
-            Python NVD3
-                https://github.com/areski/python-nvd3
-            mpld3
-                http://mpld3.github.io/
-        '''
+        """Generates a simulation diagram.
+
+        Todo:
+            Reimplement and extend this method.
+
+        Args:
+            fpath_diag(str): Path to the diagram source file.
+            fpath_pdf(str): Path to the diagram PDF file.
+
+        Returns:
+            ``self``
+        """
 
         # blockdiag sim {
         # diagram = '''
@@ -1256,32 +1428,49 @@ class Simulation(object):
         subprocess.run(['blockdiag', '-Tpdf', fpath_diag])
         subprocess.run(['open', fpath_pdf])
 
-    def gen_groups_from_db(self, db, schema, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0, is_verbose=False):
-        """
-        Args:
+        return self
 
+    def gen_groups_from_db(self, db, schema, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, attr_rm=[], rel_rm=[], rel_at=None, limit=0):
+        """Generate groups from a database.
+
+        Usage example::
+
+            from pram.util import SQLiteDB
+            ...
+
+            s = Simulation()
+            s.gen_groups_from_db(
+                db       = SQLiteDB('db.sqlite3'),
+                schema   = None,
+                tbl      = 'people',
+                attr_db  = ['age_group'],
+                attr_fix = {},
+                rel_db   = [
+                    GroupDBRelSpec(name='school', col='school_id', fk_schema=None, fk_tbl='schools', fk_col='sp_id', sites=None)
+                ],
+                rel_fix  = { 'home': Site('home') },
+                rel_at   = 'home'
+            )
+            s.add_rules(...)
+            s.add_probes(...)
+            s.run(24)
+
+        Args:
+            db (DB): Database management system specific object.
+            schema (str): Database schema.
+            tbl (str): Table name.
+            attr_db (Iterable[str]): Group attributes to be retrieved from the database (if extant).
+            rel_db (Iterable[GroupDBRelSpec]): Group relation to be retrieved from the database (if extant).
+            attr_fix (Mappint[str, Any]): Group attributes to be fixed for every group.
+            rel_fix (Mapping[str, Site]): Group relations to be fixed for every group.
+            attr_rm (Iterable[str]): Group attributes to NOT be retrieved from the database (overwrites all).
+            rel_rm (Iterable[str]): Group relation to NOT be retrieved from the database (overwrites all).
+            rel_at (Site, optional): A site to be set as every group's current location.
+            limit (int): The maximum number of groups to be generated.  Ordinarily, this is not changed from its
+                default value of zero.  It is however useful for testing, especially with very large databases.
 
         Returns:
-            self: For method call chaining.
-
-        Here is a usage example::
-
-            (Simulation().
-                add().
-                    rule(...).
-                    probe(...).
-                    done().
-                gen_groups_from_db(
-                    fpath_db = os.path.join(os.path.dirname(__file__), 'db', 'allegheny-students.sqlite3')
-                    tbl      = 'students',
-                    attr_db  = [],
-                    rel_db   = [GroupDBRelSpec(name='school', col='school_id')],
-                    attr_fix = {},
-                    rel_fix  = { 'home': Site('home') },
-                    rel_at   = 'school'
-                ).
-                run(5)
-            )
+            ``self``
         """
 
         if not self.analysis.rule_static.are_rules_done:
@@ -1298,14 +1487,6 @@ class Simulation(object):
         return self
 
     def gen_groups_from_db_old(self, fpath_db, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0, fpath=None, is_verbose=False):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         if not self.analysis.rule_static.are_rules_done:
             self.analyze_rules_static()  # by now we know all rules have been added
 
@@ -1325,27 +1506,45 @@ class Simulation(object):
         self.add_groups(groups)
         return self
 
-    def get_iter_reg_init(self):
-        """
-        A simulation iteration can be regular or initial-condition which depends on the simulation timer running or
-        not.
+    def get_iter(self):
+        """Get current iteration.
+
+        Used for parallel execution progress reporting.
 
         Returns:
-            int: If the iteration is regular, it is returned (i.e., >= 0); -1 otherwise.
+            int: If the simulation is running, a non-negative value is returned.  If the simulation is in the
+                initial-condition mode (i.e., before at least one call of :meth:`~pram.sim.Simulation.run`), -1 is
+                returned.
         """
 
         return self.timer.i if self.timer.is_running else -1
 
-    @staticmethod
-    def gen_sites_from_db(fpath_db, fn_gen=None, fpath=None, is_verbose=False, pragma_live_info=False, pragma_live_info_ts=False):
-        """
-        Args:
+    def gen_sites_from_db(self, db, schema, tbl, name_col, rel_name=Site.AT, attr=[], limit=0):
+        """Generate sites from a database.
 
+        Args:
+            db (DB): Database management system specific object.
+            schema (str): Schema name.
+            tbl (str): Table name.
+            name_col (str): Table column storing names of sites.
+            rel_name (str): Name of the relation to be associated with each of the sites generated.  For example, if
+                hospital sites are being generated, the ``rel_name`` could be set to ``hospital``.
+            attr (Iterable[str]): Names of table columns storing attributes to be internalized by the site objects
+                being generated.
+            limit (int): The maximum number of sites to be generated.  Ordinarily, this is not changed from its default
+                value of zero.  It is however useful for testing, especially with very large databases.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
+        self._inf(f'Generating sites from a database ({fpath_db})')
+
+        self.add_sites(Site.gen_from_db(db, schema, tbl, name_col, rel_name, attr, limit))
+        return self
+
+    @staticmethod
+    def gen_sites_from_db_old(fpath_db, fn_gen=None, fpath=None, is_verbose=False, pragma_live_info=False, pragma_live_info_ts=False):
         if pragma_live_info:
             if pragma_live_info_ts:
                 print(f'[{datetime.datetime.now()}: info] Generating sites from the database ({fpath_db})')
@@ -1354,20 +1553,45 @@ class Simulation(object):
 
         return FS.load_or_gen(fpath, lambda: fn_gen(fpath_db), 'sites', is_verbose)
 
-    def gen_sites_from_db_new(self, fpath_db, schema, tbl, name_col, rel_name=Site.AT, attr=[], limit=0):
-        """
-        Args:
+    def get_comp_hist(self):
+        """Retrieves computational history.
 
+        The computational history dict contains the following items:
+        - **mem_iter** (*Iterable[int]): Memory usage per iteration [B].
+        - **t_iter** (*Iterable[int]): Time per iteration [ms].
+        - **t_sim** (*int*): Total simulation time [ms].
 
         Returns:
-            self: For method call chaining.
+            Mapping[str, Any]
         """
 
-        self._inf(f'Generating sites from a database ({fpath_db})')
-
-        self.add_sites(Site.gen_from_db(fpath_db, schema, tbl, name_col, rel_name, attr, limit))
+        return self.comp_hist
 
     def get_pragma(self, name):
+        """Return value of the designated pragma.
+
+        Available pragmas, their data types, and their functions are:
+        
+        - **analyze** (*bool*): Should static and dynamic rule analyses be performed?
+        - **autocompact** (*bool*): Should the simulation be autocompacted after every iteration?
+        - **autoprune_groups** (*bool*): Should empty groups be removed after every iteration?
+        - **autostop** (*bool*): Should the simulation be stoped after stopping condition has been reached?
+        - **autostop_n** (*bool*): Stopping condition: Mass smaller than specified has been transfered.
+        - **autostop_p** (*bool*): Stopping condition: Mass proportion smaller than specified has been transfered.
+        - **autostop_t** (*bool*):
+        - **live_info** (*bool*): Display live info during simulation run?
+        - **live_info_ts** (*bool*): Display live info timestamps?
+        - **partial_mass** (*bool*): Allow floating point group mass?  Integer is the default.
+        - **probe_capture_init** (*bool*): Instruct probes to capture the initial state of the simulation?
+        - **rule_analysis_for_db_gen** (*bool*):
+
+        Args:
+            name (str): The pragma.
+
+        Returns:
+            Any: Depending on the pragma type.
+        """
+
         fn = {
             'analyze'                  : self.get_pragma_analyze,
             'autocompact'              : self.get_pragma_autocompact,
@@ -1376,6 +1600,7 @@ class Simulation(object):
             'autostop_n'               : self.get_pragma_autostop_n,
             'autostop_p'               : self.get_pragma_autostop_p,
             'autostop_t'               : self.get_pragma_autostop_t,
+            'comp_summary'             : self.get_pragma_comp_summary,
             'live_info'                : self.get_pragma_live_info,
             'live_info_ts'             : self.get_pragma_live_info_ts,
             'partial_mass'             : self.get_pragma_partial_mass,
@@ -1389,42 +1614,68 @@ class Simulation(object):
         return fn()
 
     def get_pragma_analyze(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.analyze
 
     def get_pragma_autocompact(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.autocompact
 
     def get_pragma_autoprune_groups(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.autoprune_groups
 
     def get_pragma_autostop(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.autostop
 
     def get_pragma_autostop_n(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.autostop_n
 
     def get_pragma_autostop_p(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.autostop_p
 
     def get_pragma_autostop_t(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.autostop_t
 
     def get_pragma_comp_summary(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.comp_summary
 
     def get_pragma_fractional_mass(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.fractional_mass
 
     def get_pragma_live_info(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.live_info
 
     def get_pragma_live_info_ts(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.live_info_ts
 
     def get_pragma_probe_capture_init(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.probe_capture_init
 
     def get_pragma_rule_analysis_for_db_gen(self):
+        """See :meth:`~pram.sim.Simulation.get_pragma`."""
+
         return self.pragma.rule_analysis_for_db_gen
 
     def get_probe(self, name):
@@ -1436,23 +1687,21 @@ class Simulation(object):
     def get_probes(self):
         return self.probes
 
-    def get_state(self, do_camelize=True):
-        """
-        Args:
-
+    def get_state(self):
+        """Get the current state of the simulation.
 
         Returns:
-            self: For method call chaining.
+            Mapping[str, Mapping[str, Any]]
         """
 
         return {
             'sim': {
-                'runCnt': self.run_cnt,
+                'run-cnt': self.run_cnt,
                 'timer': {
                     'iter': (self.timer.i if self.timer else 0)
                 },
                 'run': {
-                    'isRunning': self.running.is_running,
+                    'is-running': self.running.is_running,
                     'progress': self.running.progress
                 },
                 'pragma': {
@@ -1470,9 +1719,9 @@ class Simulation(object):
                 }
             },
             'pop': {
-                'agentMass' : self.pop.get_mass(),
-                'groupCnt'  : self.pop.get_group_cnt(),
-                'siteCnt'   : self.pop.get_site_cnt()
+                'agent-mass' : self.pop.get_mass(),
+                'group-cnt'  : self.pop.get_group_cnt(),
+                'site-cnt'   : self.pop.get_site_cnt()
             },
             'probes': {
                 'ls': [{ 'name': p.name } for p in self.probes]
@@ -1486,33 +1735,34 @@ class Simulation(object):
                             'unused' : list(self.analysis.rule_static.attr_unused)
                         },
                         'rel': {
-                            'used'    : list(self.analysis.rule_static.rel_used),
-                            'unused'  : list(self.analysis.rule_static.rel_unused)
+                            'used'   : list(self.analysis.rule_static.rel_used),
+                            'unused' : list(self.analysis.rule_static.rel_unused)
                         }
                     },
                     'dynamic': {
-                        'attrUsed' : list(self.analysis.rule_dynamic.attr_used),
-                        'relUsed'  : list(self.analysis.rule_dynamic.rel_used),
-                        'attrUnused' : list(self.analysis.rule_dynamic.attr_unused),
-                        'relUnused'  : list(self.analysis.rule_dynamic.rel_unused )
+                        'attr-used'   : list(self.analysis.rule_dynamic.attr_used),
+                        'rel-used'    : list(self.analysis.rule_dynamic.rel_used),
+                        'attr-unused' : list(self.analysis.rule_dynamic.attr_unused),
+                        'rel-unused'  : list(self.analysis.rule_dynamic.rel_unused )
                     }
                 }
             }
         }
 
     def get_var(self, name):
+        """Get value of the designated simulation variable.
+
+        Args:
+            name (str): The variable.
+
+        Returns:
+            Any
+        """
+
         return self.vars.get(name)
 
     @staticmethod
     def _load(fpath, fn):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
         with fn(fpath, 'rb') as f:
             gc.disable()
             sim = pickle.load(f)
@@ -1521,59 +1771,95 @@ class Simulation(object):
 
     @staticmethod
     def load(fpath):
-        """
-        Args:
+        """Deserialize simulation from a file.
 
+        Args:
+            fpath (str): Source file path.
 
         Returns:
-            self: For method call chaining.
+            Simulation
         """
 
         return Simulation._unpickle(fpath, open)
 
     @staticmethod
     def load_bz2(fpath):
-        """
-        Args:
+        """Deserialize simulation from a bzip2-compressed file.
 
+        Args:
+            fpath (str): Source file path.
 
         Returns:
-            self: For method call chaining.
+            Simulation
         """
 
         return Simulation._unpickle(fpath, bz2.BZ2File)
 
     @staticmethod
     def load_gz(fpath):
-        """
-        Args:
+        """Deserialize simulation from a gzip-compressed file.
 
+        Args:
+            fpath (str): Source file path.
 
         Returns:
-            self: For method call chaining.
+            Simulation
         """
 
         return Simulation._unpickle(fpath, gzip.GzipFile)
 
     def new_group(self, name=None, m=0.0):
-        # return Group(name or self.pop.get_next_group_name(), m, callee=self)
+        """Begins adding a new group.
+
+        After calling this method, the interaction is with the newly created group which will not have been added to
+        the simulation until :meth:`~pram.sim.Simulation.commit_group` is called, at which point the interaction
+        returns to the simulation object.  The :meth:`~pram.sim.Simulation.commit_group` isn't called directly;
+        instead, it's the :meth:`Group.done() <pram.entity.Group.done>` which calls it.
+
+        Below is a usage example::
+
+            (Simulation().
+                add().
+                    rule(...).
+                    probe(...).
+                    done().
+                new_group(1000).                     # a group of a 1000 agents
+                    set_attr('income', 'medium').    # with medium income
+                    set_rel(Site.AT, Site('home')).  # who are all currently located at a site called 'home'
+                    done().                          # back to the Simulation object
+                run(12)
+            )
+
+        Args:
+            name (str, optional): Group name.
+            m (float, int): Group mass.
+
+        Returns:
+            Group
+        """
+
         return Group(name, m, callee=self)
 
     def plot(self):
-        return SimulationPlotter(self)
-
-    def plot_group_size(self, do_log=False, fpath=None, title='Distribution of Group Size', nx=250):
-        """
-        Args:
-
+        """Simulation results plotter.
 
         Returns:
-            self: For method call chaining.
+            SimulationPlotter
         """
 
-        '''
-        nx - Number of x-axis points
-        '''
+        return SimulationPlotter(self)
+
+    def plot_group_size(self, fpath=None, title='Distribution of Group Size', nx=250):
+        """Plots the distribution of group sizes.
+
+        Args:
+            fpath (str, optional): Path to the plot file.
+            title (str): Plot title.
+            nx (int): Number of x-axis (i.e., the iteration axis) points.
+
+        Returns:
+            matplotlib figure object if ``fpath`` is None; ``self`` otherwise
+        """
 
         # Data:
         data = [g.n for g in self.pop.groups.values()]
@@ -1589,11 +1875,7 @@ class Simulation(object):
         plt.plot(x, density(x), lw=1, linestyle='-', c='#666666', mfc='none', antialiased=True)  # marker='o', markersize=5
         # plt.legend(['Susceptible', 'Exposed', 'Recovered'], loc='upper right')
         plt.ylabel('Density')
-        if do_log:
-            plt.xlabel('Group size (log)')
-            plt.xscale('log')
-        else:
-            plt.xlabel('Group size')
+        plt.xlabel('Group size')
         plt.grid(alpha=0.25, antialiased=True)
 
         # Return:
@@ -1603,18 +1885,17 @@ class Simulation(object):
         else:
             return fig
 
-    def plot_site_size(self, do_log=False, fpath=None, title='Distribution of Site Size', nx=250):
-        """
-        Args:
+    def plot_site_size(self, fpath=None, title='Distribution of Site Size', nx=250):
+        """Plots the distribution of site sizes.
 
+        Args:
+            fpath (str, optional): Path to the plot file.
+            title (str): Plot title.
+            nx (int): Number of x-axis (i.e., the iteration axis) points.
 
         Returns:
-            self: For method call chaining.
+            matplotlib figure object if ``fpath`` is None; ``self`` otherwise
         """
-
-        '''
-        nx - Number of x-axis points
-        '''
 
         # Data:
         data = [g.n for g in self.pop.groups.values()]
@@ -1629,11 +1910,7 @@ class Simulation(object):
             plt.title(title)
         plt.plot(x, density(x), lw=1, linestyle='-', c='#666666', mfc='none', antialiased=True)  # marker='o', markersize=5
         plt.ylabel('Density')
-        if do_log:
-            plt.xlabel('Group size (log)')
-            plt.xscale('log')
-        else:
-            plt.xlabel('Group size')
+        plt.xlabel('Group size')
         plt.grid(alpha=0.25, antialiased=True)
 
         # Return:
@@ -1644,43 +1921,46 @@ class Simulation(object):
             return fig
 
     def rem_probe(self, probe):
-        """
-        Args:
+        """Removes the designated probe.
 
+        Args:
+            probe (Probe): The probe.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.probes.discard(probe)
         return self
 
     def rem_rule(self, rule):
-        """
-        Args:
+        """Removes the designated rule.
 
+        Args:
+            rule (Rule): The rule.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
+
 
         self.rules.discard(rule)
         return self
 
     def remote_after(self):
-        """Restores the object after remote execution (i.e., parallelized to a cluster).
+        """Restores the object after remote execution (on a cluster).
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         return self
 
     def remote_before(self):
-        """Prepare the object for remote execution (i.e., parallelized to a cluster).
+        """Prepare the object for remote execution (on a cluster).
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         if self.traj_id is not None:
@@ -1689,12 +1969,17 @@ class Simulation(object):
         return self
 
     def reset_cb(self):
-        """
-        Args:
+        """Reset all callback functions.
 
+        The following callback functions are available:
+        - **after_iter**: Call after iteration.
+        - **before_iter**: Call before iteration.
+        - **check_work**:
+        - **save_state**:
+        - **upd_progress**:
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.cb = DotMap(
@@ -1707,12 +1992,12 @@ class Simulation(object):
         return self
 
     def reset_comp_hist(self):
-        """
-        Args:
+        """Reset computational history.
 
+        See :meth:`~pram.sim.Simulation.get_comp_hist`.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.comp_hist = DotMap(  # computational history
@@ -1723,12 +2008,13 @@ class Simulation(object):
         return self
 
     def reset_pop(self):
-        """
-        Args:
+        """Resets population.
 
+        All groups and sites are removed from the simulation and the simulation object is set back in the pre-setup
+        state.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.run_cnt = 0
@@ -1738,12 +2024,12 @@ class Simulation(object):
         return self
 
     def reset_pragmas(self):
-        """
-        Args:
+        """Reset all pragmas to their default values.
 
+        See :meth:`~pram.sim.Simulation.get_pragma`.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.pragma = DotMap(
@@ -1764,54 +2050,58 @@ class Simulation(object):
         return self
 
     def reset_probes(self):
-        """
-        Args:
-
+        """Removes all probes.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.probes = []
         return self
 
     def reset_rules(self):
-        """
-        Args:
-
+        """Removes all group rules.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.rules = []
         self.analysis.rule_static.reset()
         return self
 
-    def reset_vars(self):
-        """
+    def reset_sim_rules(self):
+        """Removes all simulation rules.
+
         Returns:
-            self: For method call chaining.
+            ``self``
+        """
+
+        self.sim_rules = []
+        return self
+
+    def reset_vars(self):
+        """Reset all simulation variables.
+
+        Returns:
+            ``self``
         """
 
         self.vars = {}
         return self
 
     def run(self, iter_or_dur=1, do_disp_t=False, do_disp_iter=False):
-        """
-        Args:
+        """Run the simulation.
 
+        Args:
+            iter_or_dur (int or str): Number of iterations or a string representation of duration (see
+                :meth:`util.Time.dur2ms() <pram.util.Time.dur2ms>`)
+            do_disp_t (bool): Display simulation time at every iteration?  Useful for debugging.
+            do_disp_iter (bool): Display simulation iteration at every iteration?  Useful for debugging.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
-
-        '''
-        One by-product of running the simulation is that the simulation stores all group attributes and relations that
-        are conditioned on by at least one rule.  After the run is over, a set of unused attributes and relations is
-        produced, unless silenced.  That output may be useful for making future simulations more efficient by allowing
-        the user to remove the unused bits which result in unnecessary group space partitioning.
-        '''
 
         ts_sim_0 = Time.ts()
 
@@ -2008,7 +2298,7 @@ class Simulation(object):
         return self
 
     def run__comp_summary(self):
-        """Called by run() to display computational summary."""
+        """Called by :meth:`~pram.sim.Simulation.run` to display computational summary."""
 
         if not self.pragma.comp_summary:
             return
@@ -2043,42 +2333,54 @@ class Simulation(object):
             pickle.dump(self, f)
 
     def save(self, fpath):
-        """
-        Args:
+        """Serialize simulation to a file.
 
+        Args:
+            fpath (str): Destination file path.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self._pickle(fpath, open)
         return self
 
     def save_bz2(self, fpath):
-        """
-        Args:
+        """Serialize simulation to a bzip2-compressed file.
 
+        Args:
+            fpath (str): Destination file path.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self._pickle(fpath, bz2.BZ2File)
         return self
 
     def save_gz(self, fpath):
-        """
-        Args:
+        """Serialize simulation to a gzip-compressed file.
 
+        Args:
+            fpath (str): Destination file path.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self._pickle(fpath, gzip.GzipFile)
         return self
 
     def save_state(self, mass_flow_specs=None):
+        """Call the save simulation state callback function.
+
+        Args:
+            mass_flow_specs(MassFlowSpecs, optional): Mass flow specs.
+
+        Returns:
+            ``self``
+        """
+
         # # if self.cb.save_state and mass_flow_specs:
         # #     self.cb.save_state(mass_flow_specs)
         #
@@ -2109,114 +2411,116 @@ class Simulation(object):
         return self
 
     def set(self):
+        """Simulation element setter.
+
+        Returns:
+            SimulationSetter
+        """
+
         return SimulationSetter(self)
 
     def set_cb_after_iter(self, fn):
-        """
-        Args:
+        """Set the callback function.
 
+        See :meth:`~pram.sim.Simulation.reset_cb`.
+
+        Args:
+            fn (Callable): The function.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.cb.after_iter = fn
         return self
 
     def set_cb_before_iter(self, fn):
-        """
-        Args:
+        """Set the callback function.
 
+        See :meth:`~pram.sim.Simulation.reset_cb`.
+
+        Args:
+            fn (Callable): The function.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.cb.before_iter = fn
         return self
 
     def set_cb_check_work(self, fn):
-        """
-        Args:
+        """Set the callback function.
 
+        See :meth:`~pram.sim.Simulation.reset_cb`.
+
+        Args:
+            fn (Callable): The function.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.cb.check_work = fn
         return self
 
     def set_cb_save_state(self, fn):
-        """
-        Args:
+        """Set the callback function.
 
+        See :meth:`~pram.sim.Simulation.reset_cb`.
+
+        Args:
+            fn (Callable): The function.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.cb.save_state = fn
         return self
 
     def set_cb_upd_progress(self, fn):
-        """
-        Args:
+        """Set the callback function.
 
+        See :meth:`~pram.sim.Simulation.reset_cb`.
+
+        Args:
+            fn (Callable): The function.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.cb.upd_progress = fn
         return self
 
     def set_fn_group_setup(self, fn):
-        """
-        Args:
+        """Set the group setup function.
 
+        The group setup function is the last function that is called before the simulatin is deemed ready for
+        execution.  An example of how that function could be used is to make a certain proportion of population
+        infected with a disease in a epidemiological modeling setting.
+
+        Args:
+            fn (Callable): The function.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.fn.group_setup = fn
         return self
 
-    def set_iter_cnt(self, iter_cnt):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
-        self.iter_cnt = iter_cnt
-        return self
-
-    def set_dur(self, dur):
-        """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
-        self.dur = dur
-        if self.timer:
-            self.timer.set_dur(dur)
-        return self
-
     def set_pragmas(self, analyze=None, autocompact=None, autoprune_groups=None, autostop=None, autostop_n=None, autostop_p=None, autostop_t=None, comp_summary=None, fractional_mass=None, live_info=None, live_info_ts=None, probe_capture_init=None, rule_analysis_for_db_gen=None):
-        """Sets multiple pragmas at one time.
+        """Sets values of multiple pragmas.
+
+        See :meth:`~pram.sim.Simulation.get_pragma`.
 
         Args:
             Names of all pragmas; values set only when not None (which is also the default value).
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         if analyze                  is not None: self.set_pragma_analyze(analyze),
@@ -2236,16 +2540,16 @@ class Simulation(object):
         return self
 
     def set_pragma(self, name, value):
-        """Set pragma.
+        """Set value of the designated pragma.
 
-        All ``set_pragma_X`` return ``self`` for method call chaining.
+        See :meth:`~pram.sim.Simulation.get_pragma`.
 
         Args:
-            name(str): Name
-            value(Any): Value
+            name(str): Pragma.
+            value(Any): Value.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         fn = {
@@ -2269,64 +2573,145 @@ class Simulation(object):
         return self
 
     def set_pragma_analyze(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.analyze = value
         return self
 
     def set_pragma_autocompact(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.autocompact = value
         return self
 
     def set_pragma_autoprune_groups(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.autoprune_groups = value
         return self
 
     def set_pragma_autostop(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.autostop = value
         return self
 
     def set_pragma_autostop_n(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.autostop_n = value
         return self
 
     def set_pragma_autostop_p(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.autostop_p = value
         return self
 
     def set_pragma_autostop_t(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.autostop_t = value
         return self
 
     def set_pragma_fractional_mass(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.fractional_mass = value
         return self
 
     def set_pragma_comp_summary(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.comp_summary = value
         return self
 
     def set_pragma_live_info(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.live_info = value
         return self
 
     def set_pragma_live_info_ts(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.live_info_ts = value
         return self
 
     def set_pragma_probe_capture_init(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.probe_capture_init = value
         return self
 
     def set_pragma_rule_analysis_for_db_gen(self, value):
+        """See :meth:`~pram.sim.Simulation.get_pragma`.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.rule_analysis_for_db_gen = value
         return self
 
-    def set_rand_seed(self, rand_seed):
-        """
-        Args:
+    def set_rand_seed(self, rand_seed=None):
+        """Set pseudo-random generator seed.
 
+        Both the ``random`` and ``numpy`` generators' seeds are set.
+
+        Args:
+            rand_seed (int, optional): The seed.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.rand_seed = rand_seed
@@ -2336,27 +2721,27 @@ class Simulation(object):
         return self
 
     def set_var(self, name, val):
-        """Sets a simulation variable.
+        """Set value of a simulation variable.
 
         Args:
-            name (str): Name
-            val (any): Value
+            name (str): The variable.
+            val (any): The value.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.vars[name] = val
         return self
 
     def set_vars(self, vars):
-        """Sets a simulation variable.
+        """Set values of multiple simulation variables.
 
         Args:
-            vars (dict): A dictionary of variable name-value pairs.
+            vars (Mapping[str, Any]): A dictionary of variable name-value pairs.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         for k,v in vars.items():
@@ -2364,12 +2749,12 @@ class Simulation(object):
         return self
 
     def show_rule_analysis(self):
-        """
-        Args:
+        """Display the results of both static and dynamic rule analyses.
 
+        See :class:`~pram.sim.StaticRuleAnalyzer` and :class:`~pram.sim.DynamicRuleAnalyzer`.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.show_static_rule_analysis()
@@ -2378,12 +2763,12 @@ class Simulation(object):
         return self
 
     def show_rule_analysis_dynamic(self):
-        """
-        Args:
+        """Display the results of dynamic rule analyses.
 
+        See :class:`~pram.sim.DynamicRuleAnalyzer`.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         rd = self.analysis.rule_dynamic
@@ -2402,12 +2787,12 @@ class Simulation(object):
         return self
 
     def show_rule_analysis_static(self):
-        """
-        Args:
+        """Display the results of static rule analyses.
 
+        See :class:`~pram.sim.StaticRuleAnalyzer`.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         ra = self.analysis.rule_static
@@ -2425,19 +2810,20 @@ class Simulation(object):
 
         return self
 
-    def summary(self, do_header=True, n_groups=8, n_sites=8, n_rules=8, n_probes=8, end_line_cnt=(0,0)):
-        """
-        Args:
+    def show_summary(self, do_header=True, n_groups=8, n_sites=8, n_rules=8, n_probes=8, end_line_cnt=(0,0)):
+        """Display simulation summary.
 
+        Args:
+            do_header (bool): Display header?
+            n_groups (int): Maximum number of groups to be displayed.
+            n_sites (int): Maximum number of groups to be displayed.
+            n_rules (int): Maximum number of groups to be displayed.
+            n_probes (int): Maximum number of groups to be displayed.
+            end_line_cnt (tuple[int,int]): The number of endline characters before and after the summary.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
-
-        '''
-        Prints the simulation summary.  The summary can be printed at any stage of a simulation (i.e., including at
-        the very beginning and end) and parts of the summary can be shown and hidden and have their length specified.
-        '''
 
         print('\n' * end_line_cnt[0], end='')
 

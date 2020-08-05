@@ -126,6 +126,7 @@ class Entity(ABC):
     Args:
         type (int): Entity type (see :class:`~pram.entity.EntityType` enum).
         id (str): Entity identifier string (currently not used and pending removal).
+        pop (Population, optional): The population object.
 
     Todo:
         Remove the ``id`` argument
@@ -151,7 +152,7 @@ class Entity(ABC):
             pop (GroupPopulation): The group population.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.pop = pop
@@ -174,7 +175,7 @@ class Resource(Entity, ABC):
     resource's capacity dicates how many agents can be accommodated at the same time.
 
     Args:
-        name (str): A resource's name.
+        name (str, optional): A resource's name.
         capacity_max (int): The maximum number of agents that can be using the resouce concurrently.
     """
 
@@ -188,10 +189,11 @@ class Resource(Entity, ABC):
         self.capacity_max = capacity_max
 
     def __eq__(self, other):
-        '''
+        """Checks equality of two objects.
+
         We will make two resources identical if their keys are equal (i.e., object identity is not necessary).  This
         will let us recognize resources even if they are instantiated multiple times.
-        '''
+        """
 
         return isinstance(self, type(other)) and (self.__key() == other.__key())
 
@@ -212,7 +214,7 @@ class Resource(Entity, ABC):
 
         Args:
             n (int): The number of agents.
-            do_all (bool): Flag: Accomodate all-or-nothing or any that the resourcs can accomodate.
+            do_all (bool): Accomodate all-or-nothing or any that the resourcs can accomodate.
 
         Returns:
             int: Number of not accomodated agents (i.e., those over the resource's max capacity).
@@ -319,7 +321,7 @@ class Resource(Entity, ABC):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class EntityJSONEncoder(json.JSONEncoder):
-    """JSON encoder used by the :meth:`~pram.entity.Group.gen_hash` method.
+    """JSON encoder used by :meth:`Group.gen_hash() <pram.entity.Group.gen_hash>`.
 
     JSON encoding is used when hashing :class:`~pram.enity.Group` objects.  Because those objects may hold references
     to :class:`~pram.enity.Site` and :class:`~pram.enity.Resource` objects, we accomodate them here.
@@ -420,7 +422,7 @@ class Site(Resource):
             group (Group): The group.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.groups.add(group)
@@ -428,8 +430,8 @@ class Site(Resource):
         self.m += group.m
         return self
 
-    def ga(self, name=None):
-        """See :meth:`~pram.entity.Site.get_attr` method."""
+    def ga(self, name):
+        """See :meth:`~pram.entity.Site.get_attr`."""
 
         return self.get_attr(name)
 
@@ -438,7 +440,7 @@ class Site(Resource):
         """Generates sites from a relational database.
 
         Args:
-            db (:class:`~pram.util.DB`): Database object.
+            db (DB): Database management system specific object.
             schema (str): Schema name.
             tbl (str): Table name.
             name_col (str): Table column storing names of sites.
@@ -450,8 +452,8 @@ class Site(Resource):
                 value of zero.  It is however useful for testing, especially with very large databases.
 
         Returns:
-            dict(str, Site): A dictonary of sites with the Site object's database IDs as keys.  Previously, Site hashes
-                were used as keys, but a recent change in the internal design did away with that.
+            Mapping[str, Site]: A dictonary of sites with the Site object's database IDs as keys.  Previously, Site
+                hashes were used as keys, but a recent change in the internal design did away with that.
         """
 
         sites = {}
@@ -465,14 +467,14 @@ class Site(Resource):
 
         return sites
 
-    def get_attr(self, name=None):
-        """Retrieves attribute's value.
+    def get_attr(self, name):
+        """Retrieves value of the designated attribute.
 
         Args:
-            name (str): Attribute's name.
+            name (str): The attribute.
 
         Returns:
-            Any: Attribute's value.
+            Any
         """
 
         return self.attr.get(name) if name is not None else self.attr
@@ -489,7 +491,7 @@ class Site(Resource):
                 this site.  For example, the user may be interested in retrieving only groups of agents infected with
                 the flu (which is a restriction on the group's attribute) or only groups of agents who attend a
                 specific school (which is a restriction on the group's relation).
-            non_empty_only (bool): Flag: Return only groups with non-zero agent population mass?
+            non_empty_only (bool): Return only groups with non-zero agent population mass?
 
         Returns:
             list[Group]: List of groups currently at this site.
@@ -575,7 +577,7 @@ class Site(Resource):
         """Resets the groups located at the site and other cache and memoization data structures.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.groups = set()
@@ -662,7 +664,7 @@ class Agent(Entity):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Classes based on attrs are not hashable.  This definitoin is kept here for later investigation, but moving to regular
+# Classes based on attrs are not hashable.  This definition is kept here for later investigation, but moving to regular
 # Python classes as of Mar 27, 2020.
 
 # @attrs(slots=True)
@@ -695,7 +697,7 @@ class Agent(Entity):
 #             callables which take one argument, the group.  Assuming the group argument is ``g``, the callables can then
 #             access the group's attributes and relations respectively as ``g.attr`` and ``g.rel``.  See the typical
 #             usage examples above.
-#         full (bool): Flag: Does the match need to be full?  To satisfy a full match, a group's attributes and relations
+#         full (bool): Does the match need to be full?  To satisfy a full match, a group's attributes and relations
 #             need to fully match the query.  Because PRAM cannot have two groups with the same attributes and relations,
 #             it follows that a full match can either return one group on no groups (if no match exists).  A partial
 #             match requires that a group's attributes _contain_ the query's attributes (and same for relations).
@@ -714,7 +716,7 @@ class GroupQry(object):
     Objects of this class are used to select groups from a group population using attribute- and relation-based search
     criteria.
 
-    Typical usage example for selecting groups of agents that meet certain criteria:
+    Typical usage example for selecting groups of agents that meet certain criteria::
 
         GroupQry(attr={ 'flu': 's' })                 # susceptible to the flu
         GroupQry(rel={ Site.AT: Site('school-83') })  # currently located at site 'school-83'
@@ -729,16 +731,16 @@ class GroupQry(object):
     (which is what a GroupPopulation object operates on internally).
 
     Args:
-        attr (Mapping[str, Any], optional): Group's attributes.
-        rel (Mapping[str, Any], optional): Group's relations.
-        cond (list(Callable), optional): Conditions on group's attributes and relations.  These conditions are given as
+        attr (Mapping[str, Any]): Group's attributes.
+        rel (Mapping[str, Any]): Group's relations.
+        cond (Iterable(Callable)): Conditions on group's attributes and relations.  These conditions are given as
             callables which take one argument, the group.  Assuming the group argument is ``g``, the callables can then
             access the group's attributes and relations respectively as ``g.attr`` and ``g.rel``.  See the typical
             usage examples above.
-        full (bool): Flag: Does the match need to be full?  To satisfy a full match, a group's attributes and relations
-            need to fully match the query.  Because PRAM cannot have two groups with the same attributes and relations,
-            it follows that a full match can either return one group on no groups (if no match exists).  A partial
-            match requires that a group's attributes _contain_ the query's attributes (and same for relations).
+        full (bool): Does the match need to be full?  To satisfy a full match, a group's attributes and relations need
+            to fully match the query.  Because PRAM cannot have two groups with the same attributes and relations, it
+            follows that a full match can either return one group on no groups (if no match exists).  A partial match
+            requires that a group's attributes _contain_ the query's attributes (and same for relations).
     """
 
     __slots__ = ('attr', 'rel', 'attr_enc', 'rel_enc', 'cond', 'full', 'is_enc', 'hash')
@@ -830,7 +832,9 @@ class GroupDBRelSpec(object):
     Args:
         name (str): Table name.
         col (str): Column name.
-        sites (Mapping[str, Site]):
+        fk_schema (str): Schema of the foreign key table.
+        fk_tbl (str): Foreign key table.
+        sites (Mapping[str, Site], optional):
     """
 
     name      : str  = attrib()
@@ -883,42 +887,40 @@ class Group(Entity):
 
         (Simulation().
             add().
-                rule(...).   # add a rule that encodes the dynamics of the simulation
-                probe(...).  # add a probe to monitor/save the results
+                rule(...).                       # add a rule that encodes the dynamics of the simulation
+                probe(...).                      # add a probe to display and persist the results
                 done().
-            new_group(1000).                      # a group of a 1000 agents
-                set_attr('income', 'medium').     # with medium income
-                set_rel(Site.AT, Site('home'])).  # who are all currently at a site called 'home'
-                done().                           # go back to the Simulation object
+            new_group(1000).                     # a group of a 1000 agents
+                set_attr('income', 'medium').    # with medium income
+                set_rel(Site.AT, Site('home')).  # who are all currently located at a site called 'home'
+                done().                          # back to the Simulation object
             run(12)
         )
 
-    Groups can also be created in a regular fashion like so::
+    In the example above, the ``Site('home')`` object will be added to the simulation automatically.  Groups can also
+    be created in a regular fashion like so::
 
         (Simulation().
             add([
                ...,  # a rule
                ...,  # a probe
-               Group(m=1000, attr={ 'income': 'medium' }, rel={ Site.AT: Site('home'] })
+               ...,  # a site
+               Group(m=1000, attr={ 'income': 'medium' }, rel={ Site.AT: Site('home') })
             ]).
             run(12)
         )
 
-    PyPRAM supports this sort of expressive plurarism because doing stuff in only one way doesn't always yield the
-    cleanest and most readible code.
-
     Args:
         name (str, optional): The name of the group.  This argument is inconsequential to PyPRAM's engine operation.
-        m (float): Agent population mass.  While it is not entirely logical to think about agent mass in terms of
-            fractional numbers, PRAM distributes population mass probabilistically and it doesn't guarantee
-            intra-group movement of "entire" agents.  What it does guarantee, however, is that the total mass being
-            moved adds up to one.  In large populations, treating agents as continuous mass rather than individuals is
-            inconsequential.
+        m (float): Population mass.  While it is not entirely logical to think about agent mass in terms of fractional
+            numbers, PRAM distributes population mass probabilistically and it doesn't guarantee intra-group movement
+            of "entire" agents.  What it does guarantee, however, is that the total mass being moved adds up to one.
+            In large populations, treating agents as continuous mass rather than individuals is inconsequential.
         attr (Mapping[str, Any]): The group's attributes.
         rel (Mapping[str, Site]): The group's relations.
         callee (object, optional): The object invoking the contructor.  This argument is used only throughout the
             process of creating a group.  The reference to the invoking object can is returned by
-            :meth:`Group.done() pram.entity.Group.done`.  See usage examples above.
+            :meth:`Group.done() <pram.entity.Group.done>`.  See usage examples above.
     """
 
     __slots__ = ('name', 'm', 'attr', 'rel', 'attr_enc', 'rel_enc', 'pop', 'is_enc', 'hash', 'callee')
@@ -1154,43 +1156,41 @@ class Group(Entity):
         Args:
             pop (GroupPopulation): The group population.
             rules (Iterable[Rule]): Rules to be applied.  Only rules compatible with the group will actually be applied
-                as determined by the :meth:`~pram.entity.Rule.is_applicable` method.
+                as determined by :meth:`Rule.is_applicable() <pram.entity.Rule.is_applicable>`.
             iter (int): Simulation iterations.
             t (int): Simulation time.
-            is_rule_setup (bool): Flag: Is this invocation of this method during rule setup stage of the simulation?
-            is_rule_cleanup (bool): Flag: Is this invocation of this method during rule cleanup stage of the
-                simulation?
-            is_sim_setup (bool): Flag: Is this invocation of this method during simulation setup stage?
+            is_rule_setup (bool): Is this invocation of this method during rule setup stage of the simulation?
+            is_rule_cleanup (bool): Is this invocation of this method during rule cleanup stage of the simulation?
+            is_sim_setup (bool): Is this invocation of this method during simulation setup stage?
 
         Todo:
             Think if the dependencies between rules could (or perhaps even should) be read from some sort of a graph.
             Perhaps then multiplying the probabilities would not be appropriate.
-
-
-        ----[ Possible future extension ]----
-
-        Superposition principle (or superposition property), states that, for all linear systems, the net response
-        caused by two or more stimuli is the sum of the responses that would have been caused by each stimulus
-        individually. So that if input A produces response X and input B produces response Y then input (A + B)
-        produces response (X + Y).
-
-        A function F(x) that satisfies the superposition principle is called a linear function. Superposition can be
-        defined by two simpler properties, additivity and homogeneity::
-
-            F(x1 + x2) = F(x1) + F(x2)   # additivity
-            F(ax) = aF(x)                # homogeneity
-
-        for scalar ``a``.
-
-        (...)
-
-        The superposition principle applies to any linear system, including algebraic equations, linear differential
-        equations, and systems of equations of those forms. The stimuli and responses could be numbers, functions,
-        vectors, vector fields, time-varying signals, or any other object that satisfies certain axioms. Note that when
-        vectors or vector fields are involved, a superposition is interpreted as a vector sum.
-
-        SRC: https://en.wikipedia.org/wiki/Superposition_principle
         """
+
+        # ----[ Possible future extension ]----
+        #
+        # Superposition principle (or superposition property), states that, for all linear systems, the net response
+        # caused by two or more stimuli is the sum of the responses that would have been caused by each stimulus
+        # individually. So that if input A produces response X and input B produces response Y then input (A + B)
+        # produces response (X + Y).
+        #
+        # A function F(x) that satisfies the superposition principle is called a linear function. Superposition can be
+        # defined by two simpler properties, additivity and homogeneity::
+        #
+        #     F(x1 + x2) = F(x1) + F(x2)   # additivity
+        #     F(ax) = aF(x)                # homogeneity
+        #
+        # for scalar ``a``.
+        #
+        # (...)
+        #
+        # The superposition principle applies to any linear system, including algebraic equations, linear differential
+        # equations, and systems of equations of those forms. The stimuli and responses could be numbers, functions,
+        # vectors, vector fields, time-varying signals, or any other object that satisfies certain axioms. Note that when
+        # vectors or vector fields are involved, a superposition is interpreted as a vector sum.
+        #
+        # SRC: https://en.wikipedia.org/wiki/Superposition_principle
 
         # (1) Apply all the rules and get their respective split specs (ss):
         if is_rule_setup:
@@ -1241,7 +1241,7 @@ class Group(Entity):
         Returns a shallow or deep copy of self.
 
         Args:
-            is_deep (bool): Flag: Is deep copy?
+            is_deep (bool): Perform deep copy?
 
         Returns:
             object (Group): A copy of self.
@@ -1252,8 +1252,10 @@ class Group(Entity):
     def done(self):
         """Ends creating the group by notifing the callee that has begun the group creation.
 
+        See :meth:`Simulation.new_group() <pram.sim.Simulation.new_group>` for explanation of the mechanism.
+
         Returns:
-            object: Reference to the object that initiated the group creation (can be None).
+            Simulation: Reference to the object that initiated the group creation (can be None).
         """
 
         if self.callee is None:
@@ -1265,7 +1267,7 @@ class Group(Entity):
         return c
 
     def ga(self, name=None):
-        """See :meth:`~pram.entity.Group.get_attr` method."""
+        """See :meth:`~pram.entity.Group.get_attr`."""
 
         return self.get_attr(name)
 
@@ -1278,14 +1280,14 @@ class Group(Entity):
         than 'set()', which is what an empty set is printed out as).
 
         This is a central method for generating complete group populations from relational databases in that it
-        automatically calls the :meth:`Site.gen_from_db() ~pram.entity.Site.gen_from_db` when necessary.
+        automatically calls :meth:`Site.gen_from_db() <pram.entity.Site.gen_from_db>` when necessary.
 
-        For usage example see :meth:`SimulationDBI.gen_groups() pram.sim.SimulationDBI.gen_groups` and
-        :meth:`Simulation.gen_groups_from_db() pram.sim.Simulation.gen_groups_from_db` methods; both invoke the current
-        method internally.
+        For usage example, see :meth:`SimulationDBI.gen_groups() <pram.sim.SimulationDBI.gen_groups>` and
+        :meth:`Simulation.gen_groups_from_db() <pram.sim.Simulation.gen_groups_from_db>`; both methods invoke the
+        current method internally.
 
         Args:
-            db (:class:`~pram.util.DB`): Database object.
+            db (DB): Database management system specific object.
             schema (str): Database schema.
             tbl (str): Table name.
             attr_db (Iterable[str]): Group attributes to be retrieved from the database (if extant).
@@ -1295,12 +1297,12 @@ class Group(Entity):
             attr_rm (Iterable[str]): Group attributes to NOT be retrieved from the database (overwrites all).
             rel_rm (Iterable[str]): Group relation to NOT be retrieved from the database (overwrites all).
             rel_at (Site, optional): A site to be set as every group's current location.
-            limit (int): The maximum number of groups to be generated.  Ordinarily, this is not changed from its
-                default value of zero.  It is however useful for testing, especially with very large databases.
-            fn_live_info (Callable): A callable expecting a single string argument for real-time printing.
+            limit (int): The maximum number of groups to be generated.  Ordinarily, this is not changed from
+                its default value of zero.  It is however useful for testing, especially with very large databases.
+            fn_live_info (Callable, optional): A callable expecting a single string argument for real-time printing.
 
         Returns:
-            list(Group): A list of groups generated.
+            list (Group): A list of groups generated.
         """
 
         ts_0 = Time.ts()
@@ -1431,165 +1433,6 @@ class Group(Entity):
 
         return groups
 
-    @classmethod
-    def gen_from_db_tmp1(cls, sim, db_fpath, tbl, attr={}, rel={}, attr_db=[], rel_db=[], rel_at=None, limit=0):
-        """A legacy method pending non-immediate removal.
-
-        An unsuccessful attempt to internalize generation of sites from the DB.  As of 2019.04.24 this is no longer the
-        main development route as another has proved more fruitful.  Keeping this method here in case it comes useful
-        at some point.
-
-        .. @attrs()
-        .. class GroupDBRelSpec(object):
-        ..     tbl      : str  = attrib()
-        ..     col_from : str  = attrib()
-        ..     col_to   : str  = attrib()
-        ..     name     : str  = attrib()
-        ..     sites    : dict = attrib(default=None)
-        """
-
-        if not os.path.isfile(db_fpath):
-            raise ValueError(f'The database does not exist: {db_fpath}')
-
-        # (1) Remove attribute that don't exist in the DB:
-        with DB.open_conn(db_fpath) as c:
-            columns = [i[1] for i in c.execute(f'PRAGMA table_info({tbl})')]
-            attr_db_keep = [a for a in attr_db if a in columns]
-
-        # (2) Contruct the query:
-        qry = 'SELECT COUNT(*) AS m{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
-            tbl=tbl,
-            cols=', '.join(attr_db_keep + [r.col_from for r in rel_db]),
-            cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr_db_keep + [r.col_from for r in rel_db]]),
-            comma='' if len(attr_db_keep + [r.col_from for r in rel_db]) == 0 else ', ',
-            limit='' if limit <= 0 else f' LIMIT {limit}'
-        )
-
-        for i in rel_db:
-            # i.sites = Site.gen_from_db(db_fpath, i.tbl, name_col=i.col_to, rel_name=i.name)
-            Site.gen_from_db(sim, db_fpath, i.tbl, name_col=i.col_to, rel_name=i.name)
-
-        # (3) Generate groups:
-        groups = []
-        with DB.open_conn(db_fpath) as c:
-            for row in c.execute(qry).fetchall():
-                g_attr = {}
-                g_rel  = {}
-
-                g_attr.update(attr)
-                g_rel.update(rel)
-
-                g_attr.update({ a: row[a] for a in attr_db_keep })
-                # g_rel.update({ i.name: i.entities[row[i.col]] for i in rel_db })  # original
-                # g_rel.update({ i.name: i.sites[row[i.col]] for i in rel_db })     # same but with sites internalized
-                for i in rel_db:                                                    # new
-                    # site = i.sites[row[i.col_from]]
-                    site = sim.pop.sites[row[i.col_from]]
-                    # g_rel.update({ Site.AT: site })
-                    g_rel.update({ i.name: site })
-                    # sim.add_site(site)
-
-                if rel_at is not None:
-                    g_rel.update({ Site.AT: g_rel.get(rel_at) })
-
-                print(f'A:{g_attr}  R:{g_rel}')
-                groups.append(cls(m=row['m'], attr=g_attr, rel=g_rel))
-
-        return groups
-
-    @classmethod
-    def gen_from_db_tmp2(cls, db_fpath, tbl, attr_db=[], rel_db=[], attr_fix={}, rel_fix={}, rel_at=None, limit=0, fn_live_info=None):
-        """A legacy method pending non-immediate removal.
-
-        Before generating sites based on the DB schema.  Works.
-
-        In this method, lists are sometimes converted to allow for set operations (e.g., union or difference) and the
-        results of those operations are converted back to lists for nice output printout (e.g., '[]' is more succinct
-        than 'set()', which is what an empty set is printed out as).
-        """
-
-        inf = fn_live_info  # shorthand
-
-        if not os.path.isfile(db_fpath):
-            raise ValueError(f'The database does not exist: {db_fpath}')
-
-        if inf:
-            inf('    Expected in table')
-            inf(f'        Attributes : {attr_db}')
-            inf(f'        Relations  : {[r.col for r in rel_db]}')
-
-        # (1) Sort out attributes and relations that do and do not exist in the table and reconcile them with the fixed ones:
-        # (1.1) Use table columns to identify the attributes and relations that do and do not exist:
-        with DB.open_conn(db_fpath) as c:
-            columns = [i[1] for i in c.execute(f'PRAGMA table_info({tbl})')]
-            attr_db_keep = [a for a in attr_db if a in columns]     # attributes to be kept based on the table schema
-            rel_db_keep  = [r for r in rel_db if r.col in columns]  # relations
-
-        if fn_live_info:
-            inf( '    Found in table')
-            inf(f'        Attributes : {attr_db_keep}')
-            inf(f'        Relations  : {[r.col for r in rel_db]}')
-            inf( '    Not found in table')
-            inf(f'        Attributes : {list(set(attr_db) - set(attr_db_keep))}')
-            inf(f'        Relations  : {list(set([r.col for r in rel_db]) - set([r.col for r in rel_db_keep]))}')
-            inf( '    Fixed manually')
-            inf(f'        Attributes : {attr_fix}')
-            inf(f'        Relations  : {rel_fix}')
-            if len(set(attr_db_keep) & set(attr_fix)) > 0:
-                inf( '    Warning: The following exist in the table but will be masked because are manually fixed')
-                inf(f'        Attributes : {list(set(attr_db_keep)             & set(attr_fix.keys()))}')
-                inf(f'        Relations  : {list(set([r.col for r in rel_db])  & set(rel_fix.keys()))}')
-
-        # (1.2) Remove the fixed attributes and relations:
-        attr_db_keep = list(set(attr_db_keep) - set(attr_fix.keys()))
-        rel_db_keep  = [r for r in rel_db_keep if not r.col in rel_fix.keys()]
-
-        if fn_live_info:
-            inf( '    Final combination used for group forming')
-            inf(f'        Attributes fixed      : {attr_fix}')
-            inf(f'        Attributes from table : {attr_db_keep}')
-            inf(f'        Relations  fixed      : {rel_fix}')
-            inf(f'        Relations  from table : {[r.col for r in rel_db]}')
-
-        # (2) Contruct the query:
-        qry = 'SELECT COUNT(*) AS n{comma}{cols} FROM {tbl} WHERE {cols_where} GROUP BY {cols}{limit}'.format(
-            tbl=tbl,
-            cols=', '.join(attr_db_keep + [r.col for r in rel_db]),
-            cols_where=' AND '.join([c + ' IS NOT NULL' for c in attr_db_keep + [r.col for r in rel_db]]),
-            comma='' if len(attr_db_keep + [r.col for r in rel_db]) == 0 else ', ',
-            limit='' if limit <= 0 else f' LIMIT {limit}'
-        )
-
-        # (3) Generate groups:
-        groups = []
-        grp_n_tot = 0
-
-        with DB.open_conn(db_fpath) as c:
-            row_cnt = DB.get_row_cnt(c, tbl)
-            for row in c.execute(qry).fetchall():
-                g_attr = {}  # group attributes
-                g_rel  = {}  # group relations
-
-                g_attr.update(attr_fix)
-                g_rel.update(rel_fix)
-
-                g_attr.update({ a: row[a] for a in attr_db_keep })
-                g_rel.update({ spec.name: spec.entities[row[spec.col]] for spec in rel_db })
-
-                if rel_at is not None:
-                    g_rel.update({ Site.AT: g_rel.get(rel_at) })
-
-                groups.append(cls(m=row['m'], attr=g_attr, rel=g_rel))
-                grp_n_tot += int(row['m'])
-
-        if inf:
-            inf( '    Summary')
-            inf(f'        Records in table: {row_cnt}')
-            inf(f'        Groups formed: {len(groups)}')
-            inf(f'        Agent population accounted for by the groups: {grp_n_tot}')
-
-        return groups
-
     @staticmethod
     # @lru_cache(maxsize=None)
     def gen_dict(d_in, d_upd=None, k_del=None):
@@ -1657,7 +1500,7 @@ class Group(Entity):
 
         Args:
             attr (Mapping[str, Any]): Group's attributes.
-            rel (Mapping[str, Site or int hash], optional): Group's relations (i.e., site objects or their hashes).
+            rel (Mapping[str, Site or int hash]): Group's relations (i.e., site objects or their hashes).
 
         Returns:
             int: A hash of the attributes and relations specified.
@@ -1689,7 +1532,7 @@ class Group(Entity):
         """Retrieves the group's attributes.
 
         Returns:
-            dict: Attribute.
+            Mapping[str, Any].
         """
 
         return self.attr
@@ -1751,25 +1594,25 @@ class Group(Entity):
         """Retrieves the group's relations.
 
         Returns:
-            dict: Relations.
+            Mapping[str, Site].
         """
 
         return self.rel
 
-    def gr(self, name=None):
-        """See :meth:`~pram.entity.Group.get_rel` method."""
+    def gr(self, name):
+        """See :meth:`~pram.entity.Group.get_rel`."""
 
         return self.get_rel(name)
 
     def ha(self, qry):
-        """See :meth:`~pram.entity.Group.has_attr` method."""
+        """See :meth:`~pram.entity.Group.has_attr`."""
 
         return self.has_attr(qry)
 
     def has_attr(self, qry):
         """Checks if the group has the specified attributes.
 
-        See :meth:`~pram.entity.Group._has` method for details on what ``qry`` can be and the specifics of the check.
+        See :meth:`~pram.entity.Group._has` for details on what ``qry`` can be and the specifics of the check.
 
         Returns:
             bool
@@ -1781,7 +1624,7 @@ class Group(Entity):
     def has_rel(self, qry):
         """Checks if the group has the specified relations.
 
-        See :meth:`~pram.entity.Group._has` method for details on what ``qry`` can be and the specifics of the check.
+        See :meth:`~pram.entity.Group._has` for details on what ``qry`` can be and the specifics of the check.
 
         Returns:
             bool
@@ -1804,7 +1647,7 @@ class Group(Entity):
         return self._has_rel(sites)
 
     def hr(self, qry):
-        """See :meth:`~pram.entity.Group.has_rel` method."""
+        """See :meth:`~pram.entity.Group.has_rel`."""
 
         return self.has_rel(qry)
 
@@ -1837,7 +1680,7 @@ class Group(Entity):
         """Links the group to the site it currently resides at.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         if len(self.rel) > 0:
@@ -1906,13 +1749,13 @@ class Group(Entity):
         Args:
             name (str): Attribute's name.
             value (Any): Attribute's value.
-            do_force (bool): Flag: Force despite the group being frozen? Don't set to True unless you like pain.
+            do_force (bool): Force despite the group being frozen?  Don't set to True unless you like pain.
 
         Raises:
             GroupFrozenError
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         if self.pop and not do_force:
@@ -1930,13 +1773,13 @@ class Group(Entity):
 
         Args:
             attr (Mapping[str, Any]): Attributes.
-            do_force (bool): Flag: Force despite the group being frozen?  Don't set to True unless you like pain.
+            do_force (bool): Force despite the group being frozen?  Don't set to True unless you like pain.
 
         Raises:
             GroupFrozenError
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         if len(attrs) == 0:
@@ -1956,13 +1799,13 @@ class Group(Entity):
         Args:
             name (str): Relation's name.
             value (Any): Relation's value.
-            do_force (bool): Flag: Force despite the group being frozen? Don't set to True unless you like pain.
+            do_force (bool): Force despite the group being frozen? Don't set to True unless you like pain.
 
         Raises:
             GroupFrozenError
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         if self.pop and not do_force:
@@ -1990,13 +1833,13 @@ class Group(Entity):
 
         Args:
             rels (Mapping[str, Entity]): Relations.
-            do_force (bool): Flag: Force despite the group being frozen? Don't set to True unless you like pain.
+            do_force (bool): Force despite the group being frozen? Don't set to True unless you like pain.
 
         Raises:
             GroupFrozenError
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         if len(rels) == 0:

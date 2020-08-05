@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+"""Contains trajectory and trajectory ensemble relevant code."""
+
 # Altair
 #     Docs
 #         Customization: https://altair-viz.github.io/user_guide/customization.html
@@ -59,10 +62,16 @@ class TrajectoryError(Exception): pass
 
 # ----------------------------------------------------------------------------------------------------------------------
 class TqdmUpdTo(tqdm.tqdm):
-    """Progress bar that can be updated to the specified position.
-    """
+    """Progress bar that can be updated to a specified position."""
 
     def update_to(self, to, total=None):
+        """Set the progess bar value.
+
+        Args:
+            to (int or float): Value to which the progres bar should move.
+            total (int or float, optional): The maximum value.
+        """
+
         if total is not None:
             self.total = total
         self.update(to - self.n)  # will also set self.n = blocks_so_far * block_size
@@ -70,20 +79,25 @@ class TqdmUpdTo(tqdm.tqdm):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Trajectory(object):
-    '''
-    A time-ordered sequence of system configurations that occur as the system state evolves.
+    """A time-ordered sequence of system configurations that occur as the system state evolves.
 
-    Also called orbit.  Can also be thought of as a sequence of vectors in the state space (or a point in a phase
-    space).
+    Also called orbit.  Can also be thought of as a sequence of points in the system's phase space.
 
-    This class delegates persistence management to the TrajectoryEnsemble class that contains it.
+    This class delegates persistence management to the TrajectoryEnsemble class that also contains it.
 
     This class keeps a reference to a simulation object, but that reference is only needed when running the simulation
-    is desired.  When working with a historical trajectory (i.e., the trace of past simulation run), 'self.sim' can be
+    is desired.  When working with an executed trajectory (i.e., the trace of past simulation run), 'self.sim' can be
     None.  For example, the mass graph created by the Trajectory class is not based on an instatiated Simulation object
     even if that object has been used to generate the substrate data; instead, the database content is the graph's
     basis.
-    '''
+
+    Args:
+        sim (Simulation): The simulation.
+        name (str): Trajectory name.
+        memo (str): Trajectory memo.
+        ensemble (TrajectoryEnsemble): The ensemble that contains this object.
+        id (Any): The trajectory ensemble database ID of the trajectory.
+    """
 
     def __init__(self, sim=None, name=None, memo=None, ensemble=None, id=None):
         self.sim  = sim
@@ -96,36 +110,53 @@ class Trajectory(object):
         self.mass_graph = None  # MassGraph object (instantiated when needed)
 
     def _check_ens(self):
+        """Ensure the trajectory is a part of an ensemble."""
+
         if self.ens is None:
             raise TrajectoryError('A trajectory can only perform this action if it is a part of an ensemble.')
 
     @staticmethod
     def comp_fft(y, T, N):
-        '''
-        Computes Fast Fourier Transform (FFT).
+        """Compute Fast Fourier Transform (FFT).
 
-        y - the signal
-        T - Nyquist sampling criterion
-        N - sampling rate
-        '''
+        Args:
+            y (numpy.ndarray): The signal.
+            T (float): Nyquist sampling criterion.
+            N (int): Sampling rate.
+
+        Returns:
+            float
+        """
 
         f = np.linspace(0.0, 1.0/(2.0*T), N//2)
         fft = 2.0/N * np.abs(fft(y)[0:N//2])
         return (f, fft)
 
     def compact(self):
+        """Compact the trajectory.
+
+        Returns:
+            ``self``
+        """
+
         self.mass_graph = None
         return self
 
     def gen_agent(self, n_iter=-1):
+        """See :meth:`TrajectoryEnsemble.gen_agent() <pram.traj.TrajectoryEnsemble.gen_agent>`."""
+
         self._check_ens()
         return self.ens.gen_agent(self, n_iter)
 
     def gen_agent_pop(self, n_agents=1, n_iter=-1):
+        """See :meth:`TrajectoryEnsemble.gen_agent_pop() <pram.traj.TrajectoryEnsemble.gen_agent_pop>`."""
+
         self._check_ens()
         return self.ens.gen_agent_pop(self, n_agents, n_iter)
 
     def gen_mass_graph(self):
+        """See :meth:`TrajectoryEnsemble.mass_graph() <pram.traj.TrajectoryEnsemble.mass_graph>`."""
+
         self._check_ens()
         if self.mass_graph is None:
             self.mass_graph = self.ens.gen_mass_graph(self)
@@ -133,22 +164,53 @@ class Trajectory(object):
         return self
 
     def get_signal(self, do_prob=False):
+        """See :meth:`TrajectoryEnsemble.get_signal() <pram.traj.TrajectoryEnsemble.get_signal>`."""
+
         self._check_ens()
         return self.ens.get_signal(self, do_prob)
 
     def get_sim(self):
+        """Get the simulation wrapped by this object.
+
+        Returns:
+            Simulation
+        """
+
         return self.sim
 
     def get_time_series(self, group_hash):
+        """See :meth:`TrajectoryEnsemble.get_time_series() <pram.traj.TrajectoryEnsemble.get_time_series>`."""
+
         self._check_ens()
         return self.ens.get_time_series(self, group_hash)
 
     def load_sim(self):
+        """Loads settings from the trajectory ensemble DB.
+
+        See :meth:`TrajectoryEnsemble.load_sim() <pram.traj.TrajectoryEnsemble.load_sim>`.
+
+        Returns:
+            ``self``
+        """
+
         self._check_ens()
         self.ens.load_sim(self)
         return self
 
-    def plot_heatmap(self, size, filepath):
+    def plot_heatmap(self, size, fpath):
+        """Plots heatmap.
+
+        Todo:
+            Finish this method.
+
+        Args:
+            size (tuple[int,int]): The figure size.
+            fpath (str): Destination filepath.
+
+        Returns:
+            ``self``
+        """
+
         self._check_ens()
 
         # data = np.zeros((self.n_iter, self.n_group, self.n_group), dtype=float)
@@ -170,87 +232,137 @@ class Trajectory(object):
         # c = alt.Chart(alt.Data(values=data)).mark_rect().encode(x='x:O', y='y:O', color='z:Q')
         c = alt.Chart(alt.Data(values=data)).mark_rect().encode(x='x:O', y='y:O', color=alt.Color('z:Q', scale=alt.Scale(type='linear', range=['#bfd3e6', '#6e016b'])))
         c.save(filepath, webdriver=self.__class__.WEBDRIVER)
+        return self
 
     def plot_mass_flow_time_series(self, scale=(1.00, 1.00), filepath=None, iter_range=(-1, -1), v_prop=False, e_prop=False):
+        """See :meth:`graph.MassGraph.plot_mass_flow_time_series() <pram.graph.MassGraph.plot_mass_flow_time_series>`."""
+
         self.gen_mass_graph()
         self.mass_graph.plot_mass_flow_time_series(scale, filepath, iter_range, v_prop, e_prop)
         return self
 
     def plot_mass_locus_fft(self, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
+        """See :meth:`TrajectoryEnsemble.plot_mass_locus_fft() <pram.traj.TrajectoryEnsemble.plot_mass_locus_fft>`."""
+
         self._check_ens()
         plot = self.ens.plot_mass_locus_fft(self, size, filepath, iter_range, sampling_rate, do_sort, do_ret_plot)
         return plot if do_ret_plot else self
 
     def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), stroke_w=1, col_scheme='set1', do_ret_plot=False):
+        """See :meth:`TrajectoryEnsemble.plot_mass_locus_line() <pram.traj.TrajectoryEnsemble.plot_mass_locus_line>`."""
+
         self._check_ens()
         plot = self.ens.plot_mass_locus_line(size, filepath, iter_range, self, 0, 1, stroke_w, col_scheme, do_ret_plot)
         return plot if do_ret_plot else self
 
     def plot_mass_locus_recurrence(self, size, filepath, iter_range=(-1, -1), neighbourhood=FixedRadius(), embedding_dimension=1, time_delay=2, do_ret_plot=False):
+        """See :meth:`TrajectoryEnsemble.plot_mass_locus_recurrence() <pram.traj.TrajectoryEnsemble.plot_mass_locus_recurrence>`."""
+
         self._check_ens()
         plot = self.ens.plot_mass_locus_recurrence(self, size, filepath, iter_range, neighbourhood, embedding_dimension, time_delay, do_ret_plot)
         return plot if do_ret_plot else self
 
     def plot_mass_locus_scaleogram(self, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
+        """See :meth:`TrajectoryEnsemble.plot_mass_locus_scaleogram() <pram.traj.TrajectoryEnsemble.plot_mass_locus_scaleogram>`."""
+
         self._check_ens()
         plot = self.ens.plot_mass_locus_scaleogram(self, size, filepath, iter_range, sampling_rate, do_sort, do_ret_plot)
         return plot if do_ret_plot else self
 
     def plot_mass_locus_spectrogram(self, size, filepath, iter_range=(-1, -1), sampling_rate=None, win_len=None, noverlap=None, do_sort=False, do_ret_plot=False):
+        """See :meth:`TrajectoryEnsemble.plot_mass_locus_spectrogram() <pram.traj.TrajectoryEnsemble.plot_mass_locus_spectrogram>`."""
+
         self._check_ens()
         plot = self.ens.plot_mass_locus_spectrogram(self, size, filepath, iter_range, sampling_rate, win_len, noverlap, do_sort, do_ret_plot)
         return plot if do_ret_plot else self
 
     def plot_mass_locus_streamgraph(self, size, filepath, iter_range=(-1, -1), do_sort=False, do_ret_plot=False):
+        """See :meth:`TrajectoryEnsemble.plot_mass_locus_streamgraph() <pram.traj.TrajectoryEnsemble.plot_mass_locus_streamgraph>`."""
+
         self._check_ens()
         plot = self.ens.plot_mass_locus_streamgraph(self, size, filepath, iter_range, do_sort, do_ret_plot)
         return plot if do_ret_plot else self
 
     def run(self, iter_or_dur=1):
+        """Run the associated simulation.
+
+        See :meth:`TrajectoryEnsemble.run() <pram.traj.TrajectoryEnsemble.run>`.
+
+        Args:
+            iter_or_dur (int or str): Number of iterations or a string representation of duration (see
+                :meth:`util.Time.dur2ms() <pram.util.Time.dur2ms>`)
+
+        Returns:
+            ``self``
+        """
+
         if self.sim is not None:
             self.sim.set_pragma_analyze(False)
             self.sim.run(iter_or_dur)
         return self
 
     def save_sim(self):
+        """Saves the associated simulation in the trajectory ensemble DB.
+
+        See :meth:`TrajectoryEnsemble.save_sim() <pram.traj.TrajectoryEnsemble.save_sim>`.
+
+        Returns:
+            ``self``
+        """
+
         self._check_ens()
         self.ens.save_sim(self)
         return self
 
     def save_state(self, mass_flow_specs=None):
+        """Save settings to the trajectory ensemble DB.
+
+        See :meth:`TrajectoryEnsemble.save_state() <pram.traj.TrajectoryEnsemble.save_state>`.
+
+        Returns:
+            ``self``
+        """
+
         self._check_ens()
         self.ens.save_state(self, mass_flow_specs)
         return self
 
     def set_id(self, id):
+        """Loads trajectory ID from the trajectory ensemble DB.
+
+        Returns:
+            ``self``
+        """
+
         self.id = id
         if self.sim is not None:
             self.sim.traj_id = id
+        return self
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class TrajectoryEnsemble(object):
-    '''
-    A collection of trajectories.
-
-    All database-related logic is implemented in this class, even if it might as well belong to the Trajectory class.
-    This provides an important benefit of keeping that logic from being spread all over the class hierarchy.
-
-    --------------------------------------------------------------------------------------------------------------------
-
-    Database design notes
-        - While having a 'traj_id' field in the 'grp_name' table seems like a reasonable choice, a trajectory ensemble
-          is assumed to hold only similar trajectories.  Therefore, the 'grp' and 'grp_name' tables can simply be
-          joined on the 'hash' field.
-
-    --------------------------------------------------------------------------------------------------------------------
+    """A collection of trajectories.
 
     In mathematical physics, especially as introduced into statistical mechanics and thermodynamics by J. Willard Gibbs
     in 1902, an ensemble (also statistical ensemble) is an idealization consisting of a large number of virtual copies
     (sometimes infinitely many) of a system, considered all at once, each of which represents a possible state that the
     real system might be in. In other words, a statistical ensemble is a probability distribution for the state of the
     system.
-    '''
+
+    For portability, SQLite3 is currently used RDBMS for trajectory ensemble database.
+
+    Database design notes:
+        - While having a 'traj_id' field in the 'grp_name' table seems like a reasonable choice, a trajectory ensemble
+          is assumed to hold only similar trajectories.  Therefore, the 'grp' and 'grp_name' tables can simply be
+          joined on the 'hash' field.
+
+    Args:
+        fpath_db (str, optional): Database filepath.
+        do_load_sims (bool): Load simulations?
+        cluster_inf (ClusterInf, optional): Computational cluster information.
+        flush_every (int): Data flushing frequency in iterations.
+    """
 
     SQL_CREATE_SCHEMA = '''
         CREATE TABLE traj (
@@ -365,10 +477,13 @@ class TrajectoryEnsemble(object):
         self.conn = None
 
     def _db_conn_open(self, fpath_db=None, do_load_sims=True):
-        '''
-        Opens the DB connection and, if the file exists already, populates the trajectories dictionary with those from
+        """Opens the DB connection and, if the file exists already, populates the trajectories dictionary with those from
         the DB.
-        '''
+
+        Args:
+            fpath_db (str, optional): Database filepath.
+            do_load_sims (bool): Load simulations?
+        """
 
         if fpath_db is None:
             fpath_db = ':memory:'
@@ -438,15 +553,32 @@ class TrajectoryEnsemble(object):
                 c.execute(qry, args)
 
     def add_trajectories(self, traj):
+        """Add trajectories.
+
+        Args:
+            traj (Iterable[Trajectory]): The trajectories.
+
+        Returns:
+            ``self``
+        """
+
         for t in traj:
             self.add_trajectory(t)
         return self
 
     def add_trajectory(self, t):
-        '''
-        For convenience, 't' can be either a Trajectory class instance of a Simulation class instance.  In the latter
-        case, a Trajectory object will automatically be created with the default values.
-        '''
+        """Add a trajectory.
+
+        For convenience, ``t`` can be either a :class:`~pram.traj.Trajectory` or :class:`~pram.sim.Simulation` class
+        instance.  In the latter case, a :class:`~pram.traj.Trajectory` object will automatically be created with the
+        default values.
+
+        Args:
+            t (Trajectory or Simulation): The trajectory or the simulation that should wrapped by a trajectory.
+
+        Returns:
+            ``self``
+        """
 
         if isinstance(t, Simulation):
             t = Trajectory(t)
@@ -467,27 +599,47 @@ class TrajectoryEnsemble(object):
         return self
 
     def clear_group_names(self):
+        """Removes group names from the trajectory ensemble database.
+
+        Returns:
+            ``self``
+        """
+
         with self.conn as c:
             c.execute('DELETE FROM grp_name', [])
         return self
 
     def compact(self):
+        """Compact the ensemble.
+
+        Returns:
+            ``self``
+        """
+
         for t in self.traj:
             t.compact()
         return self
 
     def gen_agent(self, traj, n_iter=-1):
-        '''
-        Generate a single agent's group transition path based on population-level mass dynamics that a PRAM simulation
-        operates on.
+        """Generate a single agent's group transition path based on population-level mass dynamics that a PRAM
+        simulation operates on.
 
         This is a two-step process:
 
-        (1) Pick the agent's initial group taking into account the initial mass distribution among the groups
-        (2) Pick the next group taking into account transition probabilities to all possible next groups
+        (1) Pick the agent's initial group respecting the initial mass distribution among the groups
+        (2) Pick the next group respecting transition probabilities to all possible next groups
 
-        Because step 1 always takes place, the resulting list of agent's states will be of size 'n_iter + 1'.
-        '''
+        Because step 1 always takes place, the resulting list of agent's states will be of size ``n_iter + 1``.
+
+        Args:
+            traj (Trajectory): The trajectory to use.
+            n_iter (int): Number of iterations to generate (use -1 for as many as many iterations there are in the
+                trajectory).
+
+        Returns:
+            Mapping[str, Mapping[str, Any]]: A dictionary with two keys, ``attr`` and ``rel`` which correspond to the
+                attributes and relations of the PRAM group that agent would be a part of if it were in a PRAM model.
+        """
 
         agent = { 'attr': {}, 'rel': {} }
         with self.conn as c:
@@ -517,9 +669,32 @@ class TrajectoryEnsemble(object):
         return agent
 
     def gen_agent_pop(self, traj, n_agents=1, n_iter=-1):
+        """Generate a agent population based on procedure described in :meth:`~pram.traj.TrajectoryEnsemble.gen_agent`.
+
+        Args:
+            traj (Trajectory): The trajectory to use.
+            n_agents (int): Size of resulting agent population.
+            n_iter (int): Number of iterations to generate (use -1 for as many as many iterations there are in the
+                trajectory).
+
+        Returns:
+            Iterable[Mapping[str, Mapping[str, Any]]]: Each item is a dict with two keys, ``attr`` and ``rel`` which
+                correspond to the attributes and relations of the PRAM group that agent would be a part of if it were
+                in a PRAM model.
+        """
+
         return [self.gen_agent(traj, n_iter) for _ in range(n_agents)]
 
     def gen_mass_graph(self, traj):
+        """Generate a mass graph.
+
+        Args:
+            traj (Trajectory): The trajectory being the graph's basis.
+
+        Returns:
+            MassGraph
+        """
+
         g = MassGraph()
         n_iter = self._db_get_one('SELECT MAX(i) FROM iter WHERE traj_id = ?', [traj.id])
         with self.conn as c:
@@ -549,9 +724,15 @@ class TrajectoryEnsemble(object):
         return g
 
     def get_signal(self, traj, do_prob=False):
-        '''
-        Returns time series of masses of all groups.  Proportions of the total mass can be requested as well.
-        '''
+        """Get time series of masses (or proportions of total mass) of all groups.
+
+        Args:
+            traj (Trajectory): The trajectory.
+            do_prob (bool): Do proportions of total mass?
+
+        Returns:
+            Signal
+        """
 
         n_iter_max = self._db_get_one('''
             SELECT MAX(n_iter) AS n_iter FROM (
@@ -569,8 +750,10 @@ class TrajectoryEnsemble(object):
 
         for g in self.conn.execute('SELECT DISTINCT g.hash, gn.name FROM grp g LEFT JOIN grp_name gn ON gn.hash = g.hash ORDER BY gn.ord, g.id').fetchall():
             s = np.full([1, n_iter_max], np.nan)  # account for missing values in the signal series
+                    # SELECT i.i + 1 AS i, g.{y} AS y FROM grp g
             for iter in self.conn.execute(f'''
-                    SELECT i.i + 1 AS i, g.{y} AS y FROM grp g
+                    SELECT i.i + 1 AS i, ml.{y} AS y
+                    FROM grp g
                     INNER JOIN mass_locus ml ON ml.grp_id = g.id
                     INNER JOIN iter i ON i.id = ml.iter_id
                     INNER JOIN traj t ON t.id = i.traj_id
@@ -583,6 +766,17 @@ class TrajectoryEnsemble(object):
         return signal
 
     def get_time_series(self, traj, group_hash):
+        """Get a time series of group mass dynamics.
+
+        Args:
+            traj (Trajectory): The trajectory.
+            group_hash (int or str): Group's hash obtained by calling
+                :meth:`Group.get_hash() <pram.entity.Group.get_hash>`.
+
+        Returns:
+            sqlite3.Row
+        """
+
         return self.conn.execute('''
             SELECT g.m, g.m_p, i.i FROM grp g
             INNER JOIN iter i ON i.id = g.iter_id
@@ -592,38 +786,68 @@ class TrajectoryEnsemble(object):
             ''', [traj.id, group_hash]).fetchall()
 
     def load_sim(self, traj):
+        """Load simulation for the designated trajectory from the ensemble database.
+
+        Args:
+            traj (Trajectory): The trajectory.
+
+        Returns:
+            ``self``
+        """
+
         traj.sim = DB.blob2obj(self.conn.execute('SELECT sim FROM traj WHERE id = ?', [traj.id]).fetchone()[0])
         if traj.sim:
             traj.sim.traj_id = traj.id  # restore the link severed at save time
         return self
 
     def load_sims(self):
+        """Load simulations for all ensemble trajectories from the ensemble database.
+
+        Args:
+            traj (Trajectory): The trajectory.
+
+        Returns:
+            ``self``
+        """
+
         gc.disable()
         for t in self.traj.values():
             self.load_sim(t)
         gc.enable()
         return self
 
-    def normalize_iter_range(self, range=(-1, -1), qry='SELECT MAX(i) FROM iter', qry_args=[]):
-        '''
-        The SQL query should return the maximum number of iterations, as desired.  That is overall within the ensemble
-        or for a given trajectory or a set thereof.
-        '''
+    def normalize_iter_range(self, range=(-1, -1), qry_n_iter='SELECT MAX(i) FROM iter', qry_args=[]):
+        """
+
+        Args:
+            range (tuple[int,int]): The range of values.
+            qry_n_iter (str): SQL query for obtaining total number of iterations.
+            qry_args (Iterable[str]): The SQL query arguments.
+
+        Returns:
+            tuple[int,int]
+        """
 
         l = max(range[0], -1)
 
-        n_iter = self._db_get_one(qry, qry_args)
+        n_iter = self._db_get_one(qry_n_iter, qry_args)
         if range[1] <= -1:
             u = n_iter
         else:
             u = min(range[1], n_iter)
 
         if l > u:
-            raise ValueError('Iteration range error: Lower bound cannot be larger than upper bound')
+            raise ValueError('Iteration range error: Lower bound cannot be larger than upper bound.')
 
         return (l,u)
 
-    def plot_mass_locus_bubble(self, size, filepath, iter_range=(-1, -1), do_sort=False, do_ret_plot=False):
+    def plot_mass_locus_bubble(self, size, filepath, iter_range=(-1, -1), do_ret_plot=False):
+        """Generate a mass locus bubble plot.
+
+        Todo:
+            Finish implementing.
+        """
+
         return self  # unfinished
 
         title = f'Trajectory Ensemble Mass Locus (Mean + Max; n={len(self.traj)})'
@@ -655,12 +879,20 @@ class TrajectoryEnsemble(object):
 
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_fft(self, traj, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
-        '''
-        Fast Fourier Transform (FFT)
+    def plot_mass_locus_fft(self, traj, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_ret_plot=False):
+        """Generate a plot of mass locus Fast Fourier Transform.
 
-        The Fourier Transform will work very well when the frequency spectrum is stationary.
-        '''
+        Args:
+            traj (Trajectory): The trajectory.
+            size (tuple[int,int]): Figure size.
+            filepath (str): Destination filepath.
+            iter_range (tuple[int,int]): Range of iterations.
+            sampling_rate (int): Sampling rate.
+            do_ret_plot (bool): Return plot?  If False, ``self`` is returned.
+
+        Returns:
+            ``self`` if ``do_ret_plot`` is False; altair chart object otherwise.
+        """
 
         # (1) Data:
         data = { 'td': {}, 'fd': {} }  # time- and frequency-domain
@@ -719,29 +951,38 @@ class TrajectoryEnsemble(object):
             # ...
 
         # (2) Plot:
-        alt.Chart(alt.Data(values=[x for xs in data['fd'].values() for x in xs])).properties(
-            title=title, width=size[0], height=size[1]
-        ).mark_line(
-            strokeWidth=1, opacity=0.75, interpolate='basis', tension=1
-        ).encode(
+        plot = alt.Chart(alt.Data(values=[x for xs in data['fd'].values() for x in xs]))
+        plot.properties(title=title, width=size[0], height=size[1])
+        plot.mark_line(strokeWidth=1, opacity=0.75, interpolate='basis', tension=1)
+        plot.encode(
             alt.X('x:Q', axis=alt.Axis(title='Frequency', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, sampling_rate // 2))),
             alt.Y('y:Q', axis=alt.Axis(title='Mass', domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15)),
             alt.Color('grp:N', legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15))
             # alt.Order('year(data):O')
-        ).configure_title(
-            fontSize=20
-        ).configure_view(
-        ).save(
-            filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
         )
+        plot.configure_title(fontSize=20)
+        plot.configure_view()
+        plot.save(filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER)
 
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_scaleogram(self, traj, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_sort=False, do_ret_plot=False):
-        '''
+    def plot_mass_locus_scaleogram(self, traj, size, filepath, iter_range=(-1, -1), sampling_rate=1, do_ret_plot=False):
+        """Generate a mass locus scalegram.
+
         Currently, Image Mark in not supported in Vega-Lite.  Consequently, raster images cannot be displayed via
         Altair.  The relevant issue is: https://github.com/vega/vega-lite/issues/3758
-        '''
+
+        Args:
+            traj (Trajectory): The trajectory.
+            size (tuple[int,int]): Figure size.
+            filepath (str): Destination filepath.
+            iter_range (tuple[int,int]): Range of iterations.
+            sampling_rate (int): Sampling rate.
+            do_ret_plot (bool): Return plot?  If False, ``self`` is returned.
+
+        Returns:
+            ``self`` if ``do_ret_plot`` is False; matplotlib figure object otherwise.
+        """
 
         # https://docs.obspy.org/tutorial/code_snippets/continuous_wavelet_transform.html
         # https://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.signal.cwt.html
@@ -793,26 +1034,40 @@ class TrajectoryEnsemble(object):
 
         return fig if do_ret_plot else self
 
-    def plot_mass_locus_spectrogram(self, traj, size, filepath, iter_range=(-1, -1), sampling_rate=None, win_len=None, noverlap=None, do_sort=False, do_ret_plot=False):
-        '''
-        Docs
-            https://kite.com/python/docs/matplotlib.mlab.specgram
-        Examples
-            https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/specgram_demo.html#sphx-glr-gallery-images-contours-and-fields-specgram-demo-py
-            https://stackoverflow.com/questions/35932145/plotting-with-matplotlib-specgram
-            https://pythontic.com/visualization/signals/spectrogram
-            http://www.toolsmiths.com/wavelet/wavbox
-        TODO
-            http://ataspinar.com/2018/12/21/a-guide-for-using-the-wavelet-transform-in-machine-learning/
+    def plot_mass_locus_spectrogram(self, traj, size, filepath, iter_range=(-1, -1), sampling_rate=None, win_len=None, noverlap=None, do_ret_plot=False):
+        """Generate a mass locus spectrogram (Short-Time Fourier Transform).
 
-            https://www.sciencedirect.com/topics/neuroscience/signal-processing
-            https://www.google.com/search?client=firefox-b-1-d&q=Signal+Processing+for+Neuroscientists+pdf
+        Args:
+            traj (Trajectory): The trajectory.
+            size (tuple[int,int]): Figure size.
+            filepath (str): Destination filepath.
+            iter_range (tuple[int,int]): Range of iterations.
+            sampling_rate (int): Sampling rate.
+            win_len (int): Length of the windowing segments.
+            noverlap (int): Windowing segment overlap.
+            do_ret_plot (bool): Return plot?  If False, ``self`` is returned.
 
-            https://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.signal.cwt.html
-            https://www.semanticscholar.org/paper/A-wavelet-based-tool-for-studying-non-periodicity-Ben%C3%ADtez-Bol%C3%B3s/b7cb0789bd2d29222f2def7b70095f95eb72358c
-            https://www.google.com/search?q=time-frequency+plane+decomposition&client=firefox-b-1-d&source=lnms&tbm=isch&sa=X&ved=0ahUKEwiDxu3R9bXkAhWXqp4KHUSuBqYQ_AUIEigB&biw=1374&bih=829#imgrc=q2MCGaBIY3lrSM:
-            https://www.mathworks.com/help/wavelet/examples/classify-time-series-using-wavelet-analysis-and-deep-learning.html;jsessionid=de786cc8324218efefc12d75c292
-        '''
+        Returns:
+            ``self`` if ``do_ret_plot`` is False; matplotlib figure object otherwise.
+        """
+
+        # Docs
+        #     https://kite.com/python/docs/matplotlib.mlab.specgram
+        # Examples
+        #     https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/specgram_demo.html#sphx-glr-gallery-images-contours-and-fields-specgram-demo-py
+        #     https://stackoverflow.com/questions/35932145/plotting-with-matplotlib-specgram
+        #     https://pythontic.com/visualization/signals/spectrogram
+        #     http://www.toolsmiths.com/wavelet/wavbox
+        # TODO
+        #     http://ataspinar.com/2018/12/21/a-guide-for-using-the-wavelet-transform-in-machine-learning/
+        #
+        #     https://www.sciencedirect.com/topics/neuroscience/signal-processing
+        #     https://www.google.com/search?client=firefox-b-1-d&q=Signal+Processing+for+Neuroscientists+pdf
+        #
+        #     https://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.signal.cwt.html
+        #     https://www.semanticscholar.org/paper/A-wavelet-based-tool-for-studying-non-periodicity-Ben%C3%ADtez-Bol%C3%B3s/b7cb0789bd2d29222f2def7b70095f95eb72358c
+        #     https://www.google.com/search?q=time-frequency+plane+decomposition&client=firefox-b-1-d&source=lnms&tbm=isch&sa=X&ved=0ahUKEwiDxu3R9bXkAhWXqp4KHUSuBqYQ_AUIEigB&biw=1374&bih=829#imgrc=q2MCGaBIY3lrSM:
+        #     https://www.mathworks.com/help/wavelet/examples/classify-time-series-using-wavelet-analysis-and-deep-learning.html;jsessionid=de786cc8324218efefc12d75c292
 
         # (1) Data:
         data = { 'td': {}, 'fd': {} }  # time- and frequency-domain
@@ -864,13 +1119,25 @@ class TrajectoryEnsemble(object):
 
         return fig if do_ret_plot else self
 
-    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), traj=None, nsamples=0, opacity_min=0.1, stroke_w=1, col_scheme='set1', do_ret_plot=False):
-        '''
-        If 'traj' is not None, only that trajectory is plotted.  Otherwise, 'nsample' determines the number of
-        trajectories plotted.  Specifically, if smaller than or equal to zero, all trajectories are plotted; otherwise,
-        the given number of trajectories is selected randomly.  If the number provided exceeds the number of
-        trajectories present in the ensamble, all of them are plotted.
-        '''
+    def plot_mass_locus_line(self, size, filepath, iter_range=(-1, -1), traj=None, n_traj=0, opacity_min=0.1, stroke_w=1, col_scheme='set1', do_ret_plot=False):
+        """Generate a mass locus line plot (individual series).
+
+        Args:
+            size (tuple[int,int]): Figure size.
+            filepath (str): Destination filepath.
+            iter_range (tuple[int,int]): Range of iterations.
+            traj (Trajectory, optional): The trajectory.  If None, ``n_traj`` trajectories will be plotted.
+            n_traj (int): Number of trajectories to sample from the ensemble.  All trajectories will be plotted if the
+                value is non-positive or if it exceeds the total number of trajectories in the ensemble.
+            opacity_min (float): Minimum line opacity.  Actual opacity value is scaled by the number of trajectories
+                plotted; the more there are, the more transparent the lines will be.
+            stroke_w (float): Line width.
+            col_scheme (str): Color scheme name.
+            do_ret_plot (bool): Return plot?  If False, ``self`` is returned.
+
+        Returns:
+            ``self`` if ``do_ret_plot`` is False; altair chart object otherwise.
+        """
 
         # (1) Sample trajectories (if necessary) + set title + set line alpha:
         if traj is not None:
@@ -879,11 +1146,11 @@ class TrajectoryEnsemble(object):
             opacity = 1.00
         else:
             traj_sample = []
-            if nsamples <=0 or nsamples >= len(self.traj):
+            if n_traj <=0 or n_traj >= len(self.traj):
                 traj_sample = self.traj.values()
                 title = f'Trajectory Ensemble Mass Locus (n={len(self.traj)})'
             else:
-                traj_sample = random.sample(list(self.traj.values()), nsamples)
+                traj_sample = random.sample(list(self.traj.values()), n_traj)
                 title = f'Trajectory Ensemble Mass Locus (Random Sample of {len(traj_sample)} from {len(self.traj)})'
             opacity = max(opacity_min, 1.00 / len(traj_sample))
 
@@ -931,31 +1198,35 @@ class TrajectoryEnsemble(object):
                 )
             )
 
-        plot = alt.layer(
-            *plots
-        ).properties(
-            title=title, width=size[0], height=size[1]
-        ).configure_view(
-            # strokeWidth=1
-        ).configure_title(
-            fontSize=20
-        ).resolve_scale(
-            color='independent'
-        )
-        # .save(
-        #     filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
-        # )
-
+        plot = alt.layer(*plots)
+        plot.properties(title=title, width=size[0], height=size[1])
+        plot.configure_view()  # strokeWidth=1
+        plot.configure_title(fontSize=20)
+        plot.resolve_scale(color='independent')
+        # plot.save(filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER)
         alt_save.save(plot, filepath)
 
         return plot if do_ret_plot else self
 
     def plot_mass_locus_line_aggr(self, size, filepath, iter_range=(-1, -1), band_type='ci', stroke_w=1, col_scheme='set1', do_ret_plot=False):
-        '''
-        Ordering the legend of a composite chart
-            https://stackoverflow.com/questions/55783286/control-legend-color-and-order-when-joining-two-charts-in-altair
-            https://github.com/altair-viz/altair/issues/820
-        '''
+        """Generate a mass locus line plot (aggregated).
+
+        Args:
+            size (tuple[int,int]): Figure size.
+            filepath (str): Destination filepath.
+            iter_range (tuple[int,int]): Range of iterations.
+            band_type (str): Band type.
+            stroke_w (float): Line width.
+            col_scheme (str): Color scheme name.
+            do_ret_plot (bool): Return plot?  If False, ``self`` is returned.
+
+        Returns:
+            ``self`` if ``do_ret_plot`` is False; altair chart object otherwise.
+        """
+
+        # Ordering the legend of a composite chart
+        #     https://stackoverflow.com/questions/55783286/control-legend-color-and-order-when-joining-two-charts-in-altair
+        #     https://github.com/altair-viz/altair/issues/820
 
         title = f'Trajectory Ensemble Mass Locus (Mean + {band_type.upper()}; n={len(self.traj)})'
 
@@ -1000,31 +1271,39 @@ class TrajectoryEnsemble(object):
                 alt.Color('grp:N', scale=alt.Scale(scheme=col_scheme), legend=None, sort=sort)
             )
 
-        plot = alt.layer(
-            plot_band, plot_line, data=alt.Data(values=data)
-        ).properties(
-            title=title, width=size[0], height=size[1]
-        ).configure_view(
-        ).configure_title(
-            fontSize=20
-        ).resolve_scale(
-            color='independent'
-        )
-        # .save(
-        #     filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
-        # )
-
+        plot = alt.layer(plot_band, plot_line, data=alt.Data(values=data))
+        plot.properties(title=title, width=size[0], height=size[1])
+        plot.configure_view()
+        plot.configure_title(fontSize=20)
+        plot.resolve_scale(color='independent')
+        # plot.save(filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER)
         alt_save.save(plot, filepath)
 
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_line_probe(self, size, filepath, probe_name, series, iter_range=(-1, -1), traj=None, nsamples=0, opacity_min=0.1, stroke_w=1, col_scheme='set1', do_ret_plot=False):
-        '''
-        If 'traj' is not None, only that trajectory is plotted.  Otherwise, 'nsample' determines the number of
-        trajectories plotted.  Specifically, if smaller than or equal to zero, all trajectories are plotted; otherwise,
-        the given number of trajectories is selected randomly.  If the number provided exceeds the number of
-        trajectories present in the ensamble, all of them are plotted.
-        '''
+    def plot_mass_locus_line_probe(self, size, filepath, probe_name, series, iter_range=(-1, -1), traj=None, n_traj=0, opacity_min=0.1, stroke_w=1, col_scheme='set1', do_ret_plot=False):
+        """Generate a mass locus line plot (probe).
+
+        Args:
+            size (tuple[int,int]): Figure size.
+            filepath (str): Destination filepath.
+            probe_name (str): The probe's name.
+            series (Iterable[Mapping[str,str]]): Series to be plotted from the ones recorded by the probe.  Each series
+                is a dict with two keys, ``var`` and ``lbl``.  The first selects the variable to be plotted while the
+                seconds controls its name on the plot.
+            iter_range (tuple[int,int]): Range of iterations.
+            traj (Trajectory, optional): The trajectory.  If None, ``n_traj`` trajectories will be plotted.
+            n_traj (int): Number of trajectories to sample from the ensemble.  All trajectories will be plotted if the
+                value is non-positive or if it exceeds the total number of trajectories in the ensemble.
+            opacity_min (float): Minimum line opacity.  Actual opacity value is scaled by the number of trajectories
+                plotted; the more there are, the more transparent the lines will be.
+            stroke_w (float): Line width.
+            col_scheme (str): Color scheme name.
+            do_ret_plot (bool): Return plot?  If False, ``self`` is returned.
+
+        Returns:
+            ``self`` if ``do_ret_plot`` is False; altair chart object otherwise.
+        """
 
         # (1) Sample trajectories (if necessary) + set title + set line alpha:
         if traj is not None:
@@ -1033,11 +1312,11 @@ class TrajectoryEnsemble(object):
             opacity = 1.00
         else:
             traj_sample = []
-            if nsamples <=0 or nsamples >= len(self.traj):
+            if n_traj <= 0 or n_traj >= len(self.traj):
                 traj_sample = self.traj.values()
                 title = f'Trajectory Ensemble Mass Locus (n={len(self.traj)})'
             else:
-                traj_sample = random.sample(list(self.traj.values()), nsamples)
+                traj_sample = random.sample(list(self.traj.values()), n_traj)
                 title = f'Trajectory Ensemble Mass Locus (Random Sample of {len(traj_sample)} from {len(self.traj)})'
             opacity = max(opacity_min, 1.00 / len(traj_sample))
 
@@ -1077,34 +1356,44 @@ class TrajectoryEnsemble(object):
                 )
             )
 
-        plot = alt.layer(
-            *plots
-        ).properties(
-            title=title, width=size[0], height=size[1]
-        ).configure_view(
-            # strokeWidth=1
-        ).configure_title(
-            fontSize=20
-        ).resolve_scale(
-            color='independent'
-        ).save(
-            filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
-        )
+        plot = alt.layer(*plots)
+        plot.properties(title=title, width=size[0], height=size[1])
+        plot.configure_view()  # strokeWidth=1
+        plot.configure_title(fontSize=20)
+        plot.resolve_scale(color='independent')
+        # plot.save(filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER)
+        alt_save.save(plot, filepath)
 
         return plot if do_ret_plot else self
 
-    def plot_mass_locus_polar(self, size, filepath, iter_range=(-1, -1), nsamples=0, n_iter_per_rot=0, do_sort=False, do_ret_plot=False):
-        '''
-        Altair does not currently support projections, so we must revert to good old matplotlib.
-        '''
+    def plot_mass_locus_polar(self, size, filepath, iter_range=(-1, -1), n_traj=0, n_iter_per_rot=0, do_ret_plot=False):
+        """Generate a mass locus polar plot.
+
+        Note:
+            Altair does not currently support projections, so we have to use matplotlib.
+
+        Args:
+            size (tuple[int,int]): Figure size.
+            filepath (str): Destination filepath.
+            iter_range (tuple[int,int]): Range of iterations.
+            n_traj (int): Number of trajectories to sample from the ensemble.  All trajectories will be plotted if the
+                value is non-positive or if it exceeds the total number of trajectories in the ensemble.
+                plotted; the more there are, the more transparent the lines will be.
+            n_iter_per_rot (int): Number of iterations that one rotation should comprise.  If zero, it gets determined
+                automatically based on ``iter_range``.
+            do_ret_plot (bool): Return plot?  If False, ``self`` is returned.
+
+        Returns:
+            ``self`` if ``do_ret_plot`` is False; matplotlib figure object otherwise.
+        """
 
         # (1) Sample trajectories (if necessary) + set parameters and plot title:
         traj_sample = []
-        if nsamples <=0 or nsamples >= len(self.traj):
+        if n_traj <=0 or n_traj >= len(self.traj):
             traj_sample = self.traj.values()
             title = f'Trajectory Ensemble Mass Locus (n={len(self.traj)}; '
         else:
-            traj_sample = random.sample(list(self.traj.values()), nsamples)
+            traj_sample = random.sample(list(self.traj.values()), n_traj)
             title = f'Trajectory Ensemble Mass Locus (Random Sample of {len(traj_sample)} from {len(self.traj)}; '
 
         iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [next(iter(traj_sample)).id])
@@ -1143,16 +1432,31 @@ class TrajectoryEnsemble(object):
         return fig if do_ret_plot else self
 
     def plot_mass_locus_recurrence(self, traj, size, filepath, iter_range=(-1, -1), neighbourhood=FixedRadius(), embedding_dimension=1, time_delay=2, do_ret_plot=False):
-        '''
-        https://en.wikipedia.org/wiki/Recurrence_plot
+        """Generate a mass locus recurrence plot.
 
-        TODO: Multivariate extensions of recurrence plots include cross recurrence plots and joint recurrence plots.
-        '''
+        See `PyRQA <https://pypi.org/project/PyRQA>`_ for information on parameterizing the plot.
+
+        Todo:
+            Implement multivariate extensions of recurrence plots (including cross recurrence plots and joint
+            recurrence plots).
+
+        Args:
+            traj (Trajectory): The trajectory.
+            size (tuple[int,int]): Figure size.
+            filepath (str): Destination filepath.
+            iter_range (tuple[int,int]): Range of iterations.
+            neighbourhood (pyrqa.abstract_classes.AbstractNeighbourhood): Neighbourhood condition.
+            embedding_dimension (int): Embedding dimension.
+            time_delay (int): Time delay.
+            do_ret_plot (bool): Return plot?  If False, ``self`` is returned.
+
+        Returns:
+            ``self`` if ``do_ret_plot`` is False; pyrqa RPComputation object otherwise.
+        """
 
         from pyrqa.time_series     import TimeSeries
         from pyrqa.settings        import Settings
         from pyrqa.computing_type  import ComputingType
-        # from pyrqa.neighbourhood   import FixedRadius
         from pyrqa.metric          import EuclideanMetric
         from pyrqa.computation     import RQAComputation
         from pyrqa.computation     import RPComputation
@@ -1174,12 +1478,13 @@ class TrajectoryEnsemble(object):
 
         settings = Settings(ts, computing_type=ComputingType.Classic, neighbourhood=neighbourhood, similarity_measure=EuclideanMetric, theiler_corrector=1)
 
-        computation = RQAComputation.create(settings, verbose=True)
-        result = computation.run()
-        result.min_diagonal_line_length = 2
-        result.min_vertical_line_length = 2
-        result.min_white_vertical_line_lelngth = 2
-        print(result)
+        # Debug:
+        # computation = RQAComputation.create(settings, verbose=True)
+        # result = computation.run()
+        # result.min_diagonal_line_length = 2
+        # result.min_vertical_line_length = 2
+        # result.min_white_vertical_line_lelngth = 2
+        # print(result)
 
         computation = RPComputation.create(settings)
         result = computation.run()
@@ -1187,7 +1492,20 @@ class TrajectoryEnsemble(object):
 
         return result if do_ret_plot else self
 
-    def plot_mass_locus_streamgraph(self, traj, size, filepath, iter_range=(-1, -1), do_sort=False, do_ret_plot=False):
+    def plot_mass_locus_streamgraph(self, traj, size, filepath, iter_range=(-1, -1), do_ret_plot=False):
+        """Generate a mass locus steamgraph.
+
+        Args:
+            traj (Trajectory): The trajectory.
+            size (tuple[int,int]): Figure size.
+            filepath (str): Destination filepath.
+            iter_range (tuple[int,int]): Range of iterations.
+            do_ret_plot (bool): Return plot?  If False, ``self`` is returned.
+
+        Returns:
+            ``self`` if ``do_ret_plot`` is False; altair chart object otherwise.
+        """
+
         # (1) Data:
         data = []
         with self.conn as c:
@@ -1213,80 +1531,41 @@ class TrajectoryEnsemble(object):
                 data.append({ 'grp': r['name'], 'i': r['i'] + 1, 'm': r['m'] })
 
             # (1.4) Group sorting (needs to be done here due to Altair's peculiarities):
-            if do_sort:
-                sort = [r['name'] for r in c.execute('SELECT name FROM grp_name ORDER BY ord')]
-                # sort = [r['name'] for r in c.execute('SELECT COALESCE(gn.name, g.hash) AS name FROM grp g LEFT JOIN grp_name gn ON gn.hash = g.hash ORDER BY gn.ord, g.id')]
-                plot_color = alt.Color('grp:N', scale=alt.Scale(scheme='category20b'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
-            else:
-                plot_color = alt.Color('grp:N', scale=alt.Scale(scheme='category20b'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15))
+            sort = [r['name'] for r in c.execute('SELECT name FROM grp_name ORDER BY ord')]
+            # sort = [r['name'] for r in c.execute('SELECT COALESCE(gn.name, g.hash) AS name FROM grp g LEFT JOIN grp_name gn ON gn.hash = g.hash ORDER BY gn.ord, g.id')]
+            plot_color = alt.Color('grp:N', scale=alt.Scale(scheme='category20b'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15), sort=sort)
+
+            # plot_color = alt.Color('grp:N', scale=alt.Scale(scheme='category20b'), legend=alt.Legend(title='Group', labelFontSize=15, titleFontSize=15))  # the do-not-sort version
 
         # (2) Plot:
-        alt.Chart(alt.Data(values=data)).properties(
-            title='Trajectory Mass Locus', width=size[0], height=size[1]
-        ).mark_area().encode(
+        plot = alt.Chart(alt.Data(values=data))
+        plot.properties(title='Trajectory Mass Locus', width=size[0], height=size[1])
+        plot.mark_area().encode(
             alt.X('i:Q', axis=alt.Axis(domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), scale=alt.Scale(domain=(0, iter_range[1]))),
             alt.Y('sum(m):Q', axis=alt.Axis(domain=False, tickSize=0, grid=False, labelFontSize=15, titleFontSize=15), stack='center', scale=alt.Scale(domain=(0, m_max))),
             plot_color
             # alt.Order('year(data):O')
-        ).configure_view(
-            strokeWidth=0
-        ).save(
-            filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER
         )
+        plot.configure_view(strokeWidth=0)
+        # plot.save(filepath, scale_factor=2.0, webdriver=self.__class__.WEBDRIVER)
+        alt_save.save(plot, filepath)
 
         return plot if do_ret_plot else self
 
-    def plot_matplotlib(self, size, filepath, iter_range=(-1, -1), do_sort=False):
-        ''' TODO: Remove (a more general version has been implemented, albeit one that uses altair). '''
-
-        import matplotlib.pyplot as plt
-        from .entity  import Group
-
-        # Plot:
-        cmap = plt.get_cmap('tab20')
-        fig = plt.figure(figsize=size)
-        # plt.legend(['Susceptible', 'Infectious', 'Recovered'], loc='upper right')
-        plt.xlabel('Iteration')
-        plt.ylabel('Mass')
-        plt.grid(alpha=0.25, antialiased=True)
-
-        # Series:
-        with self.conn as c:
-            for t in self.traj.values():
-                data = []
-
-                iter_range = self.normalize_iter_range(iter_range, 'SELECT MAX(i) FROM iter WHERE traj_id = ?', [t.id])
-
-                data_iter = []
-                data_s    = []
-                data_i    = []
-                data_r    = []
-
-                hash_s = Group.gen_hash(attr={ 'flu': 's' })
-                hash_i = Group.gen_hash(attr={ 'flu': 'i' })
-                hash_r = Group.gen_hash(attr={ 'flu': 'r' })
-
-                for i in range(iter_range[0], iter_range[1]):
-                    m_s = self._db_get_one('SELECT g.m FROM grp g INNER JOIN iter i ON i.id = g.iter_id WHERE i.traj_id = ? AND i.i = ? AND g.hash = ?', [t.id, i, hash_s])
-                    m_i = self._db_get_one('SELECT g.m FROM grp g INNER JOIN iter i ON i.id = g.iter_id WHERE i.traj_id = ? AND i.i = ? AND g.hash = ?', [t.id, i, hash_i])
-                    m_r = self._db_get_one('SELECT g.m FROM grp g INNER JOIN iter i ON i.id = g.iter_id WHERE i.traj_id = ? AND i.i = ? AND g.hash = ?', [t.id, i, hash_r])
-
-                    data_iter.append(i + 1)
-
-                    data_s.append(m_s)
-                    data_i.append(m_i)
-                    data_r.append(m_r)
-
-                plt.plot(data_iter, data_s, lw=1, linestyle='--', color=cmap(0), alpha=0.1, mfc='none', antialiased=True)
-                plt.plot(data_iter, data_i, lw=1, linestyle='-',  color=cmap(4), alpha=0.1, mfc='none', antialiased=True)
-                plt.plot(data_iter, data_r, lw=1, linestyle=':',  color=cmap(6), alpha=0.1, mfc='none', antialiased=True)
-
-        # Save:
-        fig.savefig(filepath, dpi=300)
-
-        return self
-
     def run(self, iter_or_dur=1):
+        """Run the ensemble.
+
+        The ensemble will be executed on a computational cluster if the cluster info has been associated with it or
+        sequentially otherwise.
+
+        Args:
+            iter_or_dur (int or str): Number of iterations or a string representation of duration (see
+                :meth:`util.Time.dur2ms() <pram.util.Time.dur2ms>`)
+
+        Returns:
+            ``self``
+        """
+
         if iter_or_dur < 1:
             return
 
@@ -1296,6 +1575,16 @@ class TrajectoryEnsemble(object):
             return self.run__par(iter_or_dur)
 
     def run__seq(self, iter_or_dur=1):
+        """Run the ensemble sequentially.
+
+        Args:
+            iter_or_dur (int or str): Number of iterations or a string representation of duration (see
+                :meth:`util.Time.dur2ms() <pram.util.Time.dur2ms>`)
+
+        Returns:
+            ``self``
+        """
+
         ts_sim_0 = Time.ts()
         self.unpersisted_probes = []  # added only for congruency with self.run__par()
         traj_col = len(str(len(self.traj)))
@@ -1314,6 +1603,16 @@ class TrajectoryEnsemble(object):
         return self
 
     def run__par(self, iter_or_dur=1):
+        """Run the ensemble on a computational cluster.
+
+        Args:
+            iter_or_dur (int or str): Number of iterations or a string representation of duration (see
+                :meth:`util.Time.dur2ms() <pram.util.Time.dur2ms>`)
+
+        Returns:
+            ``self``
+        """
+
         ts_sim_0 = Time.ts()
         try:
             ray.init(**self.cluster_inf.get_args())
@@ -1371,11 +1670,14 @@ class TrajectoryEnsemble(object):
         return self
 
     def save_sim(self, traj):
-        '''
-        To pickle the Simulation object, we need to temporarily disconnect it from its Trajectory object container.
-        This is because the Trajectory object is connected to the TrajectoryEnsemble object which holds a database
-        connection object and those objects cannot be pickled.  Besides, there is no point in saving that anyway.
-        '''
+        """Persist the simulation associated with the designated trajectory in the trajectory ensemble database.
+
+        Args:
+            traj (Trajectory): The trajectory.
+
+        Returns:
+            ``self``
+        """
 
         traj.sim.traj = None  # sever the link to avoid "pickling SQL connection" error (the link is restored at load time)
         # import dill
@@ -1389,25 +1691,50 @@ class TrajectoryEnsemble(object):
         return self
 
     def save_sims(self):
+        """Persist simulations associated with all ensemble trajectories in the trajectory ensemble database.
+
+        Returns:
+            ``self``
+        """
+
         for t in self.traj.values():
             self.save_sim(t)
         return self
 
     def save_iter(self, traj_id, iter, host_name, host_ip, conn):
-        ''' Returns iter_id. '''
+        """Persist the simulation associated with the designated trajectory in the trajectory ensemble database.
+
+        Args:
+            traj_id (int or str): The trajectory's database ID.
+            iter (int): Iteration.
+            host_name (str): Name of host executing the iteration.
+            host_ip (str): IP address of host executing the iteration.
+            conn (sqlite3.Connection): The SQLite3 connection object.
+
+        Returns:
+            int: Iteration database ID.
+        """
 
         return self._db_ins('INSERT INTO iter (traj_id, i, host_name, host_ip) VALUES (?,?,?,?)', [traj_id, iter, host_name, host_ip], conn)
 
     def save_groups(self, sim, iter_id, conn):
-        '''
-        Inserts all groups for the given iteration and trajectory.  This captures the current simulation state (at
-        least to the degree that we care about for the time being).
-
-        https://stackoverflow.com/questions/198692/can-i-pickle-a-python-dictionary-into-a-sqlite3-text-field
+        """Persist all groups of the designated simulation and iteration in the trajectory ensemble database.
 
         Note:
-            Currently unused; check implementation when needed.
-        '''
+            Currently unused.
+
+        Args:
+            traj_id (int or str): The trajectory's database ID.
+            iter (int): Iteration.
+            host_name (str): Name of host executing the iteration.
+            host_ip (str): IP address of host executing the iteration.
+            conn (sqlite.Connection): The SQLite3 connection object.
+
+        Returns:
+            ``self``
+        """
+
+        # https://stackoverflow.com/questions/198692/can-i-pickle-a-python-dictionary-into-a-sqlite3-text-field
 
         # m_pop = traj.sim.pop.get_mass()  # to get proportion of mass flow
         # for g in traj.sim.pop.groups.values():
@@ -1425,12 +1752,23 @@ class TrajectoryEnsemble(object):
         return self
 
     def save_mass_flow(self, iter_id, mass_flow_specs, conn):
-        '''
-        Inserts the mass flow among all groups for the given iteration and trajectory.  Mass flow is present for all
-        but the initial state of a simulation.
+        """Persist the mass flow in the designated simulation and iteration in the trajectory ensemble database.
 
-        Has to be called after self.save_mass_locus() which adds all the groups to the DB.
-        '''
+        Mass flow is present for all but the initial state of a simulation.
+
+        Note:
+            This method has to be called *after* either :meth:`~pram.traj.TrajectoryEnsemble.save_mass_locus__seq()` or
+            :meth:`~pram.traj.TrajectoryEnsemble.save_mass_locus__par()` which add all the groups to the ensemble
+            database.
+
+        Args:
+            iter_id (int or str): Iteration database ID.
+            mass_flow_specs (MassFlowSpec): Mass flow specs.
+            conn (sqlite3.Connection): The SQLite3 connection object.
+
+        Returns:
+            ``self``
+        """
 
         if mass_flow_specs is None:
             return self
@@ -1448,15 +1786,23 @@ class TrajectoryEnsemble(object):
         return self
 
     def save_mass_locus__seq(self, pop, iter_id, conn):
-        '''
-        Persists all new groups and masses of all groups participating in the current iteration and trajectory.  The
-        attributes and relations of all groups are saved in the database which enables restoring the state of the
-        simulation at any point in time.
+        """Persist all new groups (and their attributes and relations) as well as masses of all groups participating
+        in the designated iteration (sequential execution).
 
-        Has to be called before self.save_mass_flow() so that all groups are added to the DB.
+        Note:
+            This method has to be called *before* :meth:`~pram.traj.TrajectoryEnsemble.save_mass_flow()` to ensure all
+            groups are already present in the database.
 
-        https://stackoverflow.com/questions/198692/can-i-pickle-a-python-dictionary-into-a-sqlite3-text-field
-        '''
+        Args:
+            pop (GroupPopulation): The group population.
+            iter_id (int or str): Iteration database ID.
+            conn (sqlite3.Connection): The SQLite3 connection object.
+
+        Returns:
+            ``self``
+        """
+
+        # https://stackoverflow.com/questions/198692/can-i-pickle-a-python-dictionary-into-a-sqlite3-text-field
 
         m_pop = pop.get_mass()  # to get proportion of mass flow
         for g in pop.groups.values():
@@ -1495,20 +1841,29 @@ class TrajectoryEnsemble(object):
         return self
 
     def save_mass_locus__par(self, pop_m, groups, iter_id, conn):
-        '''
-        Persists all new groups and masses of all groups participating in the current iteration and trajectory.  The
-        attributes and relations of all groups are saved in the database which enables restoring the state of the
-        simulation at any point in time.
+        """Persist all new groups (and their attributes and relations) as well as masses of all groups participating
+        in the designated iteration (parallelized execution).
 
-        Has to be called before self.save_mass_flow() so that all groups are added to the DB.
+        Note:
+            This method has to be called *before* :meth:`~pram.traj.TrajectoryEnsemble.save_mass_flow()` to ensure all
+            groups are already present in the database.
 
-        TODO:
-            - Currently, group attributes and relations aren't added to the DB.  This is to increase the bandwidth.
-              Should there be another actor responsible for collecting all group info and adding them to the DB at the
-              end of a TrajEns run?
+        Todo:
+            Currently, group attributes and relations aren't added to the database.  This is to increase network
+            bandwidth.  Should there be another actor responsible for collecting all group info and adding them to the
+            database at the end of an ensemble execution?
 
-        https://stackoverflow.com/questions/198692/can-i-pickle-a-python-dictionary-into-a-sqlite3-text-field
-        '''
+        Args:
+            pop_m (float): Total population mass.
+            groups (Iterable[Mapping[str,Any]]): Each item is a dict with keys ``hash``, ``m``, ``attr``, and ``rel``.
+            iter_id (int or str): Iteration database ID.
+            conn (sqlite3.Connection): The SQLite3 connection object.
+
+        Returns:
+            ``self``
+        """
+
+        # https://stackoverflow.com/questions/198692/can-i-pickle-a-python-dictionary-into-a-sqlite3-text-field
 
         for g in groups:
             group_hash = g['hash']
@@ -1546,7 +1901,7 @@ class TrajectoryEnsemble(object):
     #     ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
     #
     #     with self.conn as c:
-    #         self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
+    #         self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
     #         # self.save_groups(traj, iter_id, c)
     #         self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
     #         self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
@@ -1557,7 +1912,7 @@ class TrajectoryEnsemble(object):
     #     ''' For saving both initial and regular states of simulations (i.e., ones involving mass flow). '''
     #
     #     with self.conn as c:
-    #         # self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter_reg_init(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
+    #         # self.curr_iter_id = self.save_iter(traj.id, traj.sim.get_iter(), None, None, c)  # remember curr_iter_id so that probe persistence can use it (yeah... nasty solution)
     #         # # self.save_groups(traj, iter_id, c)
     #         # self.save_mass_locus__seq(traj.sim.pop, self.curr_iter_id, c)
     #         # self.save_mass_flow(self.curr_iter_id, mass_flow_specs, c)
@@ -1570,6 +1925,21 @@ class TrajectoryEnsemble(object):
     #     return self
 
     def save_work(self, work):
+        """Persist payload delivered by a remote worker.
+
+        Two types of payload are persisted: Simulation state or probe-recorded information.  Those payloads are
+        delivered as dictionaries in the following formats::
+
+            { 'type': 'state', 'host_name': '...', 'host_ip': '...', 'traj_id': 3, 'iter': 4, 'pop_m': 10, 'groups': [...], 'mass_flow_specs': MassFlowSpec(...) }
+            { 'type': 'probe', 'qry': '...', 'vals': ['...', ...] }
+
+        Args:
+            work (Iterable[Mapping[str,Any]]): The payload.
+
+        Returns:
+            ``self``
+        """
+
         with self.conn as c:
             for (i,p) in enumerate(self.unpersisted_probes):
                 try:
@@ -1607,6 +1977,21 @@ class TrajectoryEnsemble(object):
         return self
 
     def set_group_name(self, ord, name, hash):
+        """Set one group hash-to-name association.
+
+        If names are present in the trajectory ensemble database, they will be used when plotting or exporting mass
+        dynamics time series.
+
+        Args:
+            ord (int): Desired ordinal number of the group.
+            name (str): Name.
+            hash (int or str): Hash.  The best way to obtain a hash is by calling
+                :meth:`Group.get_hash() <pram.entity.Group.get_hash()>`
+
+        Returns:
+            ``self``
+        """
+
         with self.conn as c:
             id = self._db_get_id('grp_name', f'hash = "{hash}"', conn=c)
             if id is None:
@@ -1617,15 +2002,47 @@ class TrajectoryEnsemble(object):
         return self
 
     def set_group_names(self, ord_name_hash):
+        """Set multiple group hash-to-name associations.
+
+        If names are present in the trajectory ensemble database, they will be used when plotting or exporting mass
+        dynamics time series.
+
+        Args:
+            ord_name_hash (Iterable[tuple[int,str,int or str]]): Each item is a tuple corresponding to the arguments of
+                the :meth:`~pram.traj.TrajectoryEnsemble.set_group_name>` method.
+
+        Returns:
+            ``self``
+        """
+
         for (o,n,h) in ord_name_hash:
             self.set_group_name(o,n,h)
         return self
 
     def set_pragma_memoize_group_ids(self, value):
+        """Set value of the *memoize_group_ids* pragma.
+
+        Group databased IDs can be memoized (i.e., kept in memory).  That yields faster ensemble runs, especially that
+        ensembles share group IDs because they are assumed to contain similar trajectories.  The downside is increased
+        memory utilization.
+
+        Args:
+            value (bool): The value.
+
+        Returns:
+            ``self``
+        """
+
         self.pragma.memoize_group_ids = value
         return self
 
-    def stats(self):
+    def show_stats(self):
+        """Display ensemble statistics.
+
+        Returns:
+            ``self``
+        """
+
         iter = [r['i_max'] for r in self.conn.execute('SELECT MAX(i.i) + 1 AS i_max FROM iter i GROUP BY traj_id', [])]
 
         print('Ensemble statistics')
@@ -1641,14 +2058,44 @@ class TrajectoryEnsemble(object):
 # ----------------------------------------------------------------------------------------------------------------------
 @ray.remote
 class WorkCollector(object):
-    def __init__(self, max=0):
+    """Work collecting ray actor.
+
+    This actor does not inspect or process payloads directly.  However, :meth:`~pram.traj.WorkCollector.get` returns
+    the entirety of work collected and by default clears the payload storage (although this behavior can be changed).
+
+    Currently, two types of payloads can be collected (per the actor's API): Simulation states
+    (:meth:`~pram.traj.WorkCollector.save_state`) and simulation probe info
+    (:meth:`~pram.traj.WorkCollector.save_probe`).
+
+    Args:
+        max_capacity (int): Maximum capacity of the collector.  Once reached, work collector will suggest workers to
+            wait until the work collected has been processed by the head process.  Workers can check for go/wait
+            suggestion by calling :meth:`~pram.traj.WorkCollector.do_wait`.
+    """
+
+    def __init__(self, max_capacity=0):
         self.work = []
-        self.max = max
+        self.max_capacity = max_capacity
 
     def do_wait(self):
-        return self.max > 0 and len(self.work) >= self.max
+        """Indicate whether workers should keep doing work or wait.
+
+        Returns:
+            bool
+        """
+
+        return self.max_capacity > 0 and len(self.work) >= self.max_capacity
 
     def get(self, do_clear=True):
+        """Retrieve all work collected so far.
+
+        Args:
+            do_clear (bool): Clear payload storage?
+
+        Returns:
+            Iterable[Any]
+        """
+
         if do_clear:
             gc.collect()
             ret = self.work
@@ -1657,49 +2104,132 @@ class WorkCollector(object):
         else:
             return self.work
 
-    def save_probe(self, qry, vals):
+    def save_probe(self, qry, vals=[]):
+        """Save a simulation probe.
+
+        Args:
+            qry (str): Probe's SQL query.
+            vals (Iterable[Any]): Values for the SQL query's parameters.
+        """
+
         self.work.append({ 'type': 'probe', 'qry': qry, 'vals': vals })
 
     def save_state(self, state):
+        """Save simulation state.
+
+        Args:
+            state (object): The state.
+        """
+
         self.work.append(state)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 @ray.remote
 class ProgressMonitor(object):
+    """Progress monitoring ray actor.
+
+    This actor monitors progress of workers.  Workers need to be added for the monitor to be aware of them and they
+    should be removed after they're done.  This will ensure the monitor is aware of all active workers.  If that is so,
+    it can provide aggregate work statistics (e.g., the total number of worker steps and the current progress towards
+    that total goal).  Workers can be added and removed at any point as they are spawned or destroyed.
+    """
+
     def __init__(self):
         self.workers = SortedDict()
 
     def add_worker(self, w_id, n, host_ip, host_name):
+        """Add a worker.
+
+        Args:
+            w_id (int or str): Worker ID.
+            n (int): Total number of work steps (i.e., simulation iterations).
+            host_ip (str): Worker's host IP address.
+            host_name (str): Worker's host name.
+        """
+
         self.workers[w_id] = { 'n': n, 'i': 0, 'host_ip': host_ip, 'host_name': host_name }
 
     def get_i(self, w_id=None):
+        """Get the number of steps completed for the designated worker or all workers.
+
+        Args:
+            w_id (int or str, optional): Worker ID.  If None, the sum of all workers' steps completed is returned.
+
+        Returns:
+            int
+        """
+
         if w_id is not None:
             return self.workers[w_id]['i']
         else:
             return sum([w['i'] for w in self.workers.values()])
 
     def get_n(self, w_id=None):
+        """Get the total number of steps for the designated worker or all workers.
+
+        Args:
+            w_id (int or str, optional): Worker ID.  If None, the sum of all workers' total steps is returned.
+
+        Returns:
+            int
+        """
+
         if w_id is not None:
             return self.workers[w_id]['n']
         else:
             return sum([w['n'] for w in self.workers.values()])
 
     def get_rep(self):
+        """Get progress report.
+
+        Note:
+            This method is no longer used; text report has been replaced by a progress bar.
+
+        Returns:
+            str
+        """
+
         return '    '.join([f'{k:>3}: {v["i"]:>2} of {v["n"]:>2}' for (k,v) in self.workers.items()])
 
     def rem_all_workers(self):
         self.workers.clear()
 
     def rem_worker(self, w_id):
+        """Remove worker.
+
+        Args:
+            w_id (int or str): Worker ID.
+        """
+
         del self.workers[w_id]
 
     def upd_worker(self, w_id, i):
+        """Update worker's progress.
+
+        This method should be called by worker actors as they chew through their tasks (i.e., running simulations).
+
+        Args:
+            w_id (int or str): Worker ID.
+            i (int): Number of steps completed.
+        """
+
         self.workers[w_id]['i'] = i
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Worker(object):
+    """Working ray actor.
+
+    Args:
+        id (int or str): Worker ID.  This is an arbitrary value that must be hashable (because it's used as a dict
+            key), and uniquely identify a worker.
+        traj_id (int or str): Trajectory ensemble database ID of a trajectory associated with the worker.
+        sim (Simulation): The simulation.
+        work_collector (WorkCollector): Work collecting actor.
+        progress_mon (ProgressMonitor): Progress monitoring actor.
+    """
+
     def __init__(self, id, traj_id, sim, n, work_collector=None, progress_mon=None):
         self.id             = id
         self.traj_id        = traj_id
@@ -1712,13 +2242,26 @@ class Worker(object):
         self.host_ip   = None  # ^
 
     def do_wait_work(self):
-        ''' Wait until work can continue. '''
+        """Check if the worker should work or wait.
+
+        Returns:
+            bool
+        """
 
         if not self.work_collector:
             return False
         return self.work_collector.do_wait.remote()
 
-    def save_state(self, mass_flow_specs):  # TODO: Change name to save_mass_flow_specs()?
+    def save_state(self, mass_flow_specs):
+        """Save simulation state.
+
+        Todo:
+            Change method name to ``save_mass_flow_specs()``?
+
+        Args:
+            mass_flow_specs (MassFlowSpec): Mass flow specs.
+        """
+
         # json = json.dumps(mass_flow_specs).encode('utf-8')  # str -> bytes
 
         # compressedFile = StringIO.StringIO()
@@ -1731,17 +2274,31 @@ class Worker(object):
                 'host_name'       : self.host_name,
                 'host_ip'         : self.host_ip,
                 'traj_id'         : self.traj_id,
-                'iter'            : self.sim.get_iter_reg_init(),
+                'iter'            : self.sim.get_iter(),
                 'pop_m'           : self.sim.pop.m,
                 'groups'          : [{ 'hash': g.get_hash(), 'm': g.m } for g in self.sim.pop.groups.values()],
                 'mass_flow_specs' : pickle.dumps(mass_flow_specs)
             })
 
     def upd_progress(self, i, n):
+        """Update worker's progress towards the goal.
+
+        Args:
+            i (int): Numer of steps completed.
+            n (int): Total number of steps.
+        """
+
         if self.progress_mon:
             self.progress_mon.upd_worker.remote(self.id, i+1)
 
     def run(self):
+        """Initialize and start the worker.
+
+        Collect all necessary environment info (e.g., host IP address), set all :class:`~pram.sim.Simulation` object
+        callbacks, and begin the simulation.  A short and random sleep time is exercised at the end of this method to
+        lower the chance of simulations ending at the exact same time which is possible for highly similar models.
+        """
+
         # (1) Initialize:
         # (1.1) Self:
         self.host_name = socket.gethostname()
@@ -1767,11 +2324,17 @@ class Worker(object):
         # the progress calculation.  Consequently, workers are removed all at once in TrajectoryEnsemble.run__par().
         # NBD either way.
 
-        time.sleep(random.random() * 2)  # lower the chance of simulations ending at the exact same time (possible in cases of very similar models)
+        time.sleep(random.random() * 2)  # lower the chance of simulations ending at the exact same time (possible for highly similar models)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 @ray.remote(max_calls=1)  # ensure the worker is not reused to prevent Python and/or ray memory issues
 def start_worker(w):
+    """Start a worker.
+
+    Returns:
+        Worker
+    """
+
     w.run()
     return w

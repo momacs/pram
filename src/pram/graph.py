@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Contains graph related code."""
 
-
 import math
 import networkx as nx
 
@@ -21,38 +20,36 @@ class MassGraph(object):
     desirable.
     """
 
-    '''
-    Good visualization options
-        Sankey diagram
-            https://www.data-to-viz.com/graph/sankey.html
-            https://medium.com/@plotlygraphs/4-interactive-sankey-diagram-made-in-python-3057b9ee8616
-            http://www.sankey-diagrams.com
-        Chord diagram
-            https://www.data-to-viz.com/graph/chord.html
-        Edge bundling diagram
-            https://www.data-to-viz.com/graph/edge_bundling.html
-        Arc diagram
-            https://www.data-to-viz.com/graph/arc.html
-        Galleries
-            https://observablehq.com/@vega
-
-    TODO
-        Performance
-            https://stackoverflow.com/questions/36193773/graph-tool-surprisingly-slow-compared-to-networkx/36202660#36202660
-        Other
-            https://graph-tool.skewed.de/static/doc/draw.html
-            https://graph-tool.skewed.de/static/doc/flow.html
-
-    Ideas
-        Determine groups involved in large mass dynamics and only show those
-            Filter via range parameter (could be a statistic, e.g., IRQ)
-        Automatically prune time ranges with little-to-no changes in mass dynamics
-        Incorporate autocorrelation
-        Calculate mass flow and summarize it statistically
-        Heatmap for group-group mass flow
-            - A big heatmap with mass flow traveling in the direction of the diagonal is diagnostic of new groups
-              being created and old ones not used and is a prime example of why autocompacting is a thing.
-    '''
+    # Good visualization options:
+    #     Sankey diagram
+    #         https://www.data-to-viz.com/graph/sankey.html
+    #         https://medium.com/@plotlygraphs/4-interactive-sankey-diagram-made-in-python-3057b9ee8616
+    #         http://www.sankey-diagrams.com
+    #     Chord diagram
+    #         https://www.data-to-viz.com/graph/chord.html
+    #     Edge bundling diagram
+    #         https://www.data-to-viz.com/graph/edge_bundling.html
+    #     Arc diagram
+    #         https://www.data-to-viz.com/graph/arc.html
+    #     Galleries
+    #         https://observablehq.com/@vega
+    #
+    # Todo:
+    #     Performance
+    #         https://stackoverflow.com/questions/36193773/graph-tool-surprisingly-slow-compared-to-networkx/36202660#36202660
+    #     Other
+    #         https://graph-tool.skewed.de/static/doc/draw.html
+    #         https://graph-tool.skewed.de/static/doc/flow.html
+    #
+    # Ideas
+    #     Determine groups involved in large mass dynamics and only show those
+    #         Filter via range parameter (could be a statistic, e.g., IRQ)
+    #     Automatically prune time ranges with little-to-no changes in mass dynamics
+    #     Incorporate autocorrelation
+    #     Calculate mass flow and summarize it statistically
+    #     Heatmap for group-group mass flow
+    #         - A big heatmap with mass flow traveling in the direction of the diagonal is diagnostic of new groups
+    #           being created and old ones not used and is a prime example of why autocompacting is a thing.
 
     def __init__(self):
         self.g = nx.DiGraph()
@@ -81,7 +78,7 @@ class MassGraph(object):
         """
         Because this method plots a time series which can be of arbitrary length, there is no figure size argument.
         Instead, scale factor for the width and height of the figure is expected and defaults to no scaling.  The
-        method decided on the figure size automatically, based on the iteration range given and the maximum number of
+        method decides on the figure size automatically based on the iteration range given and the maximum number of
         groups in any iteration from that range.
         """
 

@@ -5,7 +5,7 @@ One purpose of simulating a model is to elucidate the dynamics captured by that 
 organic example of such dynamics is agent mass dynamics, i.e., the ways in which agent mass moves between groups as a
 result of the application of rules.  PyPRAM's *probes* are the facility the user can deploy to capture the interesting
 aspects of the model's dynamics.  For example, a probe could monitor and persist the sizes of all groups at every step
-of the simulation.
+of the simulation or it could only focus on the ones the user has interest in.
 """
 
 import matplotlib.pyplot as plt
@@ -141,7 +141,7 @@ class ProbePersistenceFS(ProbePersistence):
 
         Args:
             probe (Probe): The probe.
-            do_overwrite (bool): Flag: Should an already registered probe with the same name be overwriten?
+            do_overwrite (bool): Should an already registered probe with the same name be overwriten?
         """
 
         pass
@@ -503,7 +503,7 @@ class ProbePersistenceDB(ProbePersistence):
 
         Args:
             probe (Probe): The probe.
-            do_overwrite (bool): Flag: Should an already registered probe with the same name be overwriten?
+            do_overwrite (bool): Should an already registered probe with the same name be overwriten?
         """
 
         if self.traj_ens:
@@ -517,7 +517,7 @@ class ProbePersistenceDB(ProbePersistence):
 
         Args:
             probe (Probe): The probe.
-            do_overwrite (bool): Flag: Should an already registered probe with the same name be overwriten?
+            do_overwrite (bool): Should an already registered probe with the same name be overwriten?
 
         Throws:
             ValueError
@@ -556,7 +556,7 @@ class ProbePersistenceDB(ProbePersistence):
 
         Args:
             probe (Probe): The probe.
-            do_overwrite (bool): Flag: Should an already registered probe with the same name be overwriten?
+            do_overwrite (bool): Should an already registered probe with the same name be overwriten?
 
         Throws:
             ValueError
@@ -593,7 +593,7 @@ class ProbePersistenceDB(ProbePersistence):
 
         Args:
             probe (Probe): The probe.
-            do_overwrite (bool): Flag: Should an already registered probe with the same name be overwriten?
+            do_overwrite (bool): Should an already registered probe with the same name be overwriten?
 
         Throws:
             ValueError
@@ -950,7 +950,7 @@ class GroupProbe(Probe, ABC):
         """Retrieve all cumulated messages.
 
         Args:
-            do_join (bool): Flag: Join the messages with the new-line character?
+            do_join (bool): Join the messages with the new-line character?
 
         Returns:
             str: The message.

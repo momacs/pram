@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
-#
-# TODO
-#     Python 3.3
-#         datetime.timestamp()  # the number of seconds from 1970-01-01 UTC
-#
-# ----------------------------------------------------------------------------------------------------------------------
+"""Contains utilities code."""
 
 import bz2
 import copy
@@ -36,6 +31,9 @@ from pathlib     import Path
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Data(object):
+    """Data utilities.
+    """
+
     @staticmethod
     def rand_bin_lst(n):
         return [random.randint(0, 1) for b in range(n)]
@@ -49,6 +47,9 @@ class Data(object):
 DB_FK = namedtuple('DB_FK', ['schema_from', 'schema_to'])
 
 class DB(ABC):
+    """Database interface base class.
+    """
+
     VALID_CHARS = f'_{string.ascii_letters}{string.digits}'
 
     PATT_VALID_NAME = re.compile('^[a-zA-Z][a-zA-Z0-9_]*$')
@@ -140,6 +141,9 @@ class DB(ABC):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class PgDB(DB):
+    """PostgreSQL database interface.
+    """
+
     # def __init__(self, host, port, usr, pwd, db, cursor_factory=psycopg2.extras.NamedTupleCursor):
     def __init__(self, host, port, usr, pwd, db, cursor_factory=psycopg2.extras.DictCursor):
         super().__init__()
@@ -228,6 +232,9 @@ class PgDB(DB):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SQLiteDB(DB):
+    """SQLite3 database interface.
+    """
+
     def __init__(self, fpath):
         super().__init__()
 
@@ -295,6 +302,9 @@ class Err(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class FS(object):
+    """Filesystem utilities.
+    """
+
     @staticmethod
     def bz2(fpath_src, fpath_dst=None, compress_lvl=9, do_del=False):
         # TODO: Add support for directories.
@@ -478,18 +488,11 @@ class FS(object):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-class Hash(object):
-    # TODO: Implement. (https://stackoverflow.com/questions/5884066/hashing-a-dictionary)
-	pass
-
-
-# ----------------------------------------------------------------------------------------------------------------------
 class MPCounter(object):
-    '''
-    Fixes issues with locking of multiprocessing's Value object.
+    """Fixes issues with locking of multiprocessing's Value object.
 
     Source: eli.thegreenplace.net/2012/01/04/shared-counter-with-pythons-multiprocessing
-    '''
+    """
 
     def __init__(self, val_init=0):
         self.val  = multiprocessing.RawValue('i', val_init)
@@ -510,6 +513,9 @@ class MPCounter(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Size(object):
+    """File size utilities.
+    """
+
     PREFIX_BIN = { 'K': 1024, 'M': 1048576, 'G': 1073741824, 'T': 1099511627776, 'P': 1125899906842624, 'E': 1152921504606846976, 'Z': 1180591620717411303424, 'Y': 1208925819614629174706176 }
     PREFIX_DEC = { 'K': 1000, 'M': 1000000, 'G': 1000000000, 'T': 1000000000000, 'P': 1000000000000000, 'E': 1000000000000000000, 'Z': 1000000000000000000000, 'Y': 1000000000000000000000000 }
 
@@ -597,6 +603,9 @@ class Size(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Str(object):
+    """String utilities.
+    """
+
     @staticmethod
     def float(s):
         '''
@@ -608,12 +617,11 @@ class Str(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Tee(object):
-    '''
-    Script output forker.
+    """Script output forker.
 
     When instantiated, this class writes the output of the script to stdout and to a file at the same time (much like
     the UNIX command line utility by the same name).
-    '''
+    """
 
     def __init__(self, fname, fmode='a'):
         self.file = open(fname, fmode)
@@ -640,12 +648,13 @@ class Tee(object):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Time(object):
-    '''
+    """Time utilities.
+
     POSIX (or UNIX) time (i.e., Jan 1, 1970) is the point of reference for this class.
 
     All timestamps and datetime differences default to milliseconds (as opposed to seconds, which is what the
-    'datetime' module seems to prefer).
-    '''
+    ``datetime`` module seems to prefer).
+    """
 
     DOTW_NUM2STR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']  # day-of-the-week number-to-string list
 
@@ -687,64 +696,80 @@ class Time(object):
         return datetime.datetime.now()
 
     @staticmethod
+    def dur2ms(s):
+        m = __class__.PATT_STR_DUR.match(s)
+
+        # Extract the parts:
+        if len(m.groups()) != 2:
+            raise ValueError(f'Incorrect duration specification: {s}')
+
+        # The number part:
+        try:
+            n = int(m[1])
+        except:
+            raise ValueError(f'Incorrect duration number: {s}')
+
+        # The unit part:
+        if m[2] not in __class__.MS:
+            raise ValueError(f'Incorrect duration unit: {m[2]}')
+        ms = __class__.MS[m[2]]
+
+        return n * ms
+
+    @staticmethod
     def ts(do_ms=True):
-        ''' Timestamp now. '''
+        """Timestamp now."""
 
         if do_ms: return (datetime.datetime.now() - Time.POSIX_DT).total_seconds() * 1000
         else:     return (datetime.datetime.now() - Time.POSIX_DT).total_seconds()
 
     @staticmethod
     def ts_sec(sec, do_ms=True):
-        ''' Timestamp at the specified number of seconds. '''
+        """Timestamp at the specified number of seconds."""
 
         if do_ms: return datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=sec) * 1000
         else:     return datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=sec)
 
     @staticmethod
     def dt2ts(dt, do_ms=True):
-        ''' Datetime to timestamp. '''
+        """Datetime to timestamp."""
 
         if do_ms: return (dt - Time.POSIX_TS).total_seconds() * 1000
         else:     return (dt - Time.POSIX_TS).total_seconds()
 
     @staticmethod
     def ts2dt(dt, is_ts_ms=True):
-        ''' Timestamp to datetime. '''
+        """Timestamp to datetime."""
 
         if is_ts_ms: return datetime.datetime.utcfromtimestamp(dt / 1e3)
         else:        return datetime.datetime.utcfromtimestamp(dt)
 
     @staticmethod
     def diff(dt_0, dt_1, do_ms=True):
-        '''
-        Difference between two datetime objects ('dt_0' being the earlier one). There is no point in providing a 'diff'
-        method for timestamps because being floats they can simply be subtracted.
-        '''
+        """Difference between two datetime objects ('dt_0' being the earlier one). There is no point in providing a 'diff'
+        method for timestamps because being floats they can simply be subtracted."""
 
         if do_ms: return round((dt_1 - dt_0).total_seconds() * 1000, 3)
         else:     return       (dt_1 - dt_0).total_seconds()
 
     @staticmethod
     def diffs(dt_0, dt_1, do_ms=True):
-        '''
-        Casts the return of 'diff()' to string. This method is useful because it guarantees a proper formatting of the
-        resulting float (i.e., no scientific notation and trailing zeros stripped) making it a good choice for the
-        purpose of display, log, etc.
-        '''
+        """Casts the return of :meth:`~pram.util.Time.diff` to string.
+
+        This method is useful because it guarantees a proper formatting of the resulting float (i.e., no scientific
+        notation and trailing zeros stripped) making it a good choice for the purpose of display, log, etc."""
 
         return str(Time.diff(dt_0, dt_1, do_ms))  # TODO: Use Str.float() instead of str() if this doesn't work.
 
     @staticmethod
     def dotw(dt):
-        ''' String short name of day-of-the-week. '''
+        """String short name of day-of-the-week."""
 
         return Time.DOTW_NUM2STR[int(dt.strftime('%w'))]
 
     @staticmethod
     def tsdiff2human(ts_diff, do_print_ms=True):
-        '''
-        Convert timestamp difference to 'D days, HH:MM:SS.FFF'.
-        '''
+        """Convert timestamp difference to 'D days, HH:MM:SS.FFF'."""
 
         ms, s = math.modf(round(ts_diff) / 1000)
         m, s = divmod(s, 60)
@@ -765,15 +790,14 @@ class Time(object):
 
     @staticmethod
     def sec2time(sec, n_msec=0):
-        '''
-        Convert seconds to 'D days, HH:MM:SS.FFF'
+        """Convert seconds to 'D days, HH:MM:SS.FFF'
 
-        References
-            stackoverflow.com/questions/775049/python-time-seconds-to-hms
-            humanfriendly.readthedocs.io/en/latest/#humanfriendly.format_timespan
-            stackoverflow.com/questions/41635547/convert-python-datetime-to-timestamp-in-milliseconds/41635888
-            datetime.datetime.fromtimestamp(self.pop.sim.last_iter.t).strftime('%H:%M:%S.%f')
-        '''
+        References:
+            - stackoverflow.com/questions/775049/python-time-seconds-to-hms
+            - humanfriendly.readthedocs.io/en/latest/#humanfriendly.format_timespan
+            - stackoverflow.com/questions/41635547/convert-python-datetime-to-timestamp-in-milliseconds/41635888
+            - datetime.datetime.fromtimestamp(self.pop.sim.last_iter.t).strftime('%H:%M:%S.%f')
+        """
 
         if hasattr(sec,'__len__'): return [sec2time(s) for s in sec]
 
@@ -790,27 +814,6 @@ class Time(object):
             return pattern % (h, m, s)
 
         return ('%d days, ' + pattern) % (d, h, m, s)
-
-    @staticmethod
-    def dur2ms(s):
-        m = __class__.PATT_STR_DUR.match(s)
-
-        # Extract the parts:
-        if len(m.groups()) != 2:
-            raise ValueError(f'Incorrect duration specification: {s}')
-
-        # The number part:
-        try:
-            n = int(m[1])
-        except:
-            raise ValueError(f'Incorrect duration number: {s}')
-
-        # The unit part:
-        if m[2] not in __class__.MS:
-            raise ValueError(f'Incorrect duration unit: {m[2]}')
-        ms = __class__.MS[m[2]]
-
-        return n * ms
 
 
 # ----------------------------------------------------------------------------------------------------------------------

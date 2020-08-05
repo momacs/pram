@@ -40,7 +40,7 @@ class Signal(object):
     mass locus of a simulation.
 
     Args:
-        series (Signal, numpy.ndarray, optional): Data for one or more series.
+        series (Signal or numpy.ndarray, optional): Data for one or more series.
         names (list(str), optional): Names of all the series specified.
 
     Raises:

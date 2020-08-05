@@ -1,8 +1,5 @@
-'''
-Nomenclature disambiguation
-    Markov Process, Markov Chain
-        https://math.stackexchange.com/questions/2071285/markov-process-markov-chain
-'''
+# -*- coding: utf-8 -*-
+"""Contains rule code."""
 
 import math
 import matplotlib.pyplot as plt
@@ -22,25 +19,29 @@ from .entity import Group, GroupQry, GroupSplitSpec, Site
 from .util   import Err, Time as TimeU
 
 
-# from enum        import IntEnum
-# A = IntEnum('State', 'S E I R')
-# print(list(A))
-# b = [member.value for name, member in A.__members__.items()]
-# print(b)
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 @attrs(slots=True)
-class Iter(ABC): pass
+class Iter(ABC):
+    """Iteration selector base class."""
+
+    pass
 
 
 @attrs(slots=True)
 class IterAlways(Iter):
+    """Iteration selector compatible with all iterations."""
+
     pass
 
 
 @attrs(slots=True)
 class IterPoint(Iter):
+    """Iteration selector compatible with only one iteration.
+
+    Args:
+        i (int): Iteration number.
+    """
+
     i: int = attrib(default=0, converter=int)
 
     def __attrs_post_init__(self):
@@ -50,6 +51,13 @@ class IterPoint(Iter):
 
 @attrs(slots=True)
 class IterInt(Iter):
+    """Iteration selector compatible with a range of iterations.
+
+    Args:
+        i0 (int): Lower bound iteration number.
+        i1 (int): Upper bound iteration number.
+    """
+
     i0: int = attrib(default=  0, converter=int)
     i1: int = attrib(default=100, converter=int)
 
@@ -60,6 +68,12 @@ class IterInt(Iter):
 
 @attrs(slots=True)
 class IterSet(Iter):
+    """Iteration selector compatible with an enumeration of iterations.
+
+    Args:
+        i (set[int]): Iteration numbers.
+    """
+
     i: set = attrib(factory=set, converter=converters.default_if_none(factory=set))
 
     def __attrs_post_init__(self):
@@ -69,16 +83,27 @@ class IterSet(Iter):
 
 # ----------------------------------------------------------------------------------------------------------------------
 @attrs(slots=True)
-class Time(ABC): pass
+class Time(ABC):
+    """Time selector base class."""
+
+    pass
 
 
 @attrs(slots=True)
 class TimeAlways(Time):
+    """Time selector compatible with all times."""
+
     pass
 
 
 @attrs(slots=True)
 class TimePoint(Time):
+    """Time selector compatible with only one time.
+
+    Args:
+        t (float): Time.
+    """
+
     t: float = attrib(default=0.00, converter=float)
 
     def __attrs_post_init__(self):
@@ -88,6 +113,13 @@ class TimePoint(Time):
 
 @attrs(slots=True)
 class TimeInt(Time):
+    """Time selector compatible with a range of times.
+
+    Args:
+        t0 (float): Lower bound time.
+        t1 (float): Upper bound time.
+    """
+
     t0: float = attrib(default= 0.00, converter=float)
     t1: float = attrib(default=24.00, converter=float)
 
@@ -98,6 +130,12 @@ class TimeInt(Time):
 
 @attrs(slots=True)
 class TimeSet(Time):
+    """Time selector compatible with an enumeration of times.
+
+    Args:
+        t (set[int]): Times.
+    """
+
     t: set = attrib(factory=set, converter=converters.default_if_none(factory=set))
 
     def __attrs_post_init__(self):
@@ -128,15 +166,23 @@ class ForkDirective(Directive):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Rule(ABC):
-    '''
-    A rule that can be applied to a group and may augment that group or split it into multiple subgroups.
+    """A group rule.
+
+    A rule that can be applied to a group and may split it into multiple groups.
 
     A rule will be applied if the simulation timer's time (external to this class) falls within the range defined by
     the time specification 't'.  Every time a rule is applied, it is applied to all groups it is compatible with.  For
     instance, a rule that renders a portion of a group infection-free (i.e., marks it as recovered) can be applied to a
     group of humans currently infected with some infectious disease.  The same rule, however, would not be applied to
     a group of city buses.  Each rule knows how to recognize a compatible group.
-    '''
+
+    Args:
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
 
     T_UNIT_MS = TimeU.MS.h
     NAME = 'Rule'
@@ -145,14 +191,13 @@ class Rule(ABC):
     pop = None
     compile_spec = None
 
-    def __init__(self, name='rule', t=TimeAlways(), i=IterAlways(), group_qry=None, name_human=None, memo=None):
+    def __init__(self, name='rule', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
         # Err.type(t, 't', Time, True)
         # Err.type(i, 'i', Iter, True)
 
         self.name = name
         self.group_qry = group_qry
         self.memo = memo
-        self.name_human = name_human or name
 
         self._set_t(t)
         self._set_i(i)
@@ -183,12 +228,18 @@ class Rule(ABC):
         if isinstance(self.t, TimeInt):
             return 'Rule  name: {:16}  t: ({:>4},{:>4})'.format(self.name, round(self.t.t0, 1), round(self.t.t1, 1))
 
-    def _set_i(self, i):
+    def _set_i(self, i=None):
+        """Decode and set iteration selector.
+
+        Args:
+            i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int], optional): Iteration selector.
+        """
+
         ii = isinstance
-        if ii(i, Iter):
-            self.i = i
-        elif i is None:
+        if i is None:
             self.i = IterAlways()
+        elif ii(i, Iter):
+            self.i = i
         elif ii(i, int):
             self.i = IterPoint(i)
         elif (ii(i, list) or ii(i, tuple) or ii(i, np.ndarray)) and len(i) == 2 and ii(i[0], int) and ii(i[1], int):
@@ -198,12 +249,18 @@ class Rule(ABC):
         else:
             raise ValueError("Wrong type of the argument 'i' specified.")
 
-    def _set_t(self, t):
+    def _set_t(self, t=None):
+        """Decode and set time selector.
+
+        Args:
+            t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int], optional): Time selector.
+        """
+
         ii = isinstance
-        if ii(t, Time):
-            self.t = t
-        elif t is None:
+        if t is None:
             self.t = TimeAlways()
+        elif ii(t, Time):
+            self.t = t
         elif ii(t, int):
             self.t = TimePoint(t)
         elif (ii(t, list) or ii(t, tuple) or ii(t, np.ndarray)) and len(t) == 2 and ii(t[0], int) and ii(t[1], int):
@@ -215,29 +272,90 @@ class Rule(ABC):
 
     @abstractmethod
     def apply(self, pop, group, iter, t):
+        """Apply the rule.
+
+        This method is called automatically for every group at every simulation iteration provided the rule is
+        compatible with the iteration, time, and the group.
+
+        Args:
+            pop (GroupPopulation): Population.
+            group (Group): Group.
+            iter (int): Iteration.
+            time (float): Time.
+
+        Returns:
+            Iterable[GroupSplitSpect] or None: Specs groups the current group should be split into.
+        """
+
         pass
 
     def cleanup(self, pop, group):
-        '''
-        Run once at the end of a simulation run.  Symmetrical to the setup() method.  Also uses the group-Splitting
+        """Rule cleanup.
+
+        Run once at the end of a simulation run.  Symmetrical to :meth:`~pram.rule.Rule.setup`.  Uses group-splitting
         mechanism.
-        '''
+
+        Args:
+            pop (GroupPopulation): Population.
+            group (Group): Group.
+
+        Returns:
+            Iterable[GroupSplitSpect] or None: Specs groups the current group should be split into.
+        """
 
         pass
 
     @staticmethod
     def get_rand_name(name, prefix='__', rand_len=12):
+        """Generate a random rule name.
+
+        Args:
+            prefix (str): Name prefix.
+            rand_len (int): Number of random characters to be generated.
+
+        Returns:
+            str
+        """
+
         return f'{prefix}{name}_' + ''.join(random.sample(string.ascii_letters + string.digits, rand_len))
 
     def get_inner_rules(self):
+        """Get a rule's inner rules.
+
+        A rule's inner rules allow a rule dependency hierarchy to be specified.
+
+        Returns:
+            Iterable[Rule] or None
+        """
+
         return self.rules
 
     def is_applicable(self, group, iter, t):
-        ''' Verifies if the rule is applicable to the group at the current iteration and current time. '''
+        """Verifies if the rule is applicable to the specified group at the specified iteration and time.
+
+        This method is called automatically and a rule will only be applied if this method returns ``True``.
+
+        Args:
+            group (Group): Group.
+            iter (:class:`~pram.rule.Iter`): Iteration.
+            time (:class:`~pram.rule.Time`): Time.
+
+        Returns:
+            bool: True if applicable, False otherwise.
+        """
 
         return self.is_applicable_iter(iter) and self.is_applicable_time(t) and self.is_applicable_group(group)
 
     def is_applicable_iter(self, iter):
+        """Verifies if the rule is applicable at the specified iteration.
+
+        Args:
+            i (:class:`~pram.rule.Iter`, int, tuple[int,int], set): Iteration selector.
+
+        Returns:
+            bool: True if applicable, False otherwise.
+        """
+
         if isinstance(self.i, IterAlways):
             return True
         elif isinstance(self.i, IterPoint):
@@ -253,6 +371,15 @@ class Rule(ABC):
             raise TypeError("Type '{}' used for specifying rule iteration not yet implemented (Rule.is_applicable).".format(type(self.i).__name__))
 
     def is_applicable_time(self, t):
+        """Verifies if the rule is applicable at the specified time.
+
+        Args:
+            t (:class:`~pram.rule.Time`, int, tuple[int,int], set): Time selector.
+
+        Returns:
+            bool: True if applicable, False otherwise.
+        """
+
         if isinstance(self.t, TimeAlways):
             return True
         elif isinstance(self.t, TimePoint):
@@ -265,55 +392,99 @@ class Rule(ABC):
             raise TypeError("Type '{}' used for specifying rule timing not yet implemented (Rule.is_applicable).".format(type(self.t).__name__))
 
     def is_applicable_group(self, group):
+        """Verifies if the rule is applicable to the the specified group.
+
+        If the :attr:`~pram.rule.Rule.group_qry` is None, the group is applicable automatically.
+
+        Args:
+            group (Group): Group.
+
+        Returns:
+            bool: True if applicable, False otherwise.
+        """
+
         if not self.group_qry:
             return True
         else:
             return group.matches_qry(self.group_qry)
 
     def set_params(self):
+        """Set rule's parameters."""
+
         pass
 
     def set_t_unit(self, ms):
+        """Set timer units.
+
+        Args:
+            ms (int): Number of milliseconds per timer unit.  Values from :attr:`pram.util.Time.MS <util.Time.MS>` can
+                be used for convenience.
+        """
+
         self.t_unit_ms = ms
         self.t_mul = float(self.__class__.T_UNIT_MS) / float(self.t_unit_ms)
 
     def setup(self, pop, group):
-        '''
-        A rule's setup place.  If the rule relies on groups having a certain set of attributes and relations, this is
-        where they should be set.  For example, a rule might set an attribute of all the groups like so:
+        """Rule setup.
+
+        If a set of attributes and relations should be part of a group's definition, that set should be specified here.
+        For example, the following sets the attribute ``did-attend-school-today`` of all the groups::
 
             return [GroupSplitSpec(p=1.0, attr_set={ 'did-attend-school-today': False })]
 
-        This reuses the group splitting mechanism; here, each group will be split into a (possibly non-extant) new
-        group and the entirety of the group's mass will be moved into that new group.
+        Each group will be split into a (possibly non-extant) new group via the group-splitting mechanism and the
+        entirety of the group's mass will be moved into that new group.
 
-        This is also where a rule should do any other population initialization required.  For example, a rule that may
-        introduce a new Site object to the simulation, should make the population object aware of that site like so:
+        This method is also where a rule should do any other population initialization required.  For example, a rule
+        that introduces a new Site object to the simulation, should make the population object aware of that site like
+        so::
 
             pop.add_site(Site('new-site'))
 
-        Every rule's setup() method is called only once by Simulation.run() method before a simulation run commences.
-        '''
+        Args:
+            pop (GroupPopulation): Population.
+            group (Group): Group.
+
+        Returns:
+            Iterable[GroupSplitSpect] or None: Specs groups the current group should be split into.
+        """
 
         pass
 
     @staticmethod
     def tp2rv(tp, a=0, b=23):
-        ''' Converts a time probability distribution function (PDF) to a discrete random variable. '''
+        """Converts a time probability distribution function (PDF) to a scipy's discrete random variable.
+
+        Args:
+            tp (Mapping): Time-probability mapping, e.g., ``{ 1: 0.05, 3: 0.2, 4: 0.25, 5: 0.2, 6: 0.1, 7: 0.2 }``.
+            a (int): Lower bound.
+            b (int): Upper bound.
+
+        Returns
+            scipy.stats.rv_discrete
+        """
 
         return rv_discrete(a,b, values=(tuple(tp.keys()), tuple(tp.values())))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SimRule(Rule, ABC):
-    """Simulation rule, i.e., one that is run at the end of every simulation iteration (i.e., after the mass transfer
-    has concluded).  These sort of rules are especially useful for implementing policy-level like intervention.  For
-    example, should schools in a county, state, or the entire country be closed in response to an epidemic.  This sort
-    of mitigation measure might be in effect after, say, 6% of the population has become infected.
+    """Simulation rule.
+
+    A simulation rule is run at the end of every simulation iteration (i.e., after the mass transfer for that iteration
+    has concluded).  These sort of rules are useful for implementing policy-level intervention.  For example, should
+    schools in a county, state, or the entire country be closed in response to an epidemic?  This sort of
+    mitigation measure might be in effect after, say, 6% of the population has become infected.
 
     Upon adding an instance of this class to the :class:`~pram.sim.Simulation` object, the latter will add all
     'self.vars' as simulation variables.  Consequently, this ABC's constructor should ordinarily be called as the first
     step in the child's constructor so that the dict is not overwritten.
+
+    Args:
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Iteration selector.
+        memo (str): Description.
     """
 
     def __init__(self, name='rule', t=TimeAlways(), i=IterAlways(), memo=None):
@@ -329,27 +500,45 @@ class SimRule(Rule, ABC):
 
     @abstractmethod
     def apply(self, sim, iter, t):
+        """Apply the rule.
+
+        This method is called automatically for every group at every simulation iteration provided the rule is
+        compatible with the iteration, time, and the group.
+
+        Args:
+            sim (Simulation): Simulation.
+            iter (int): Iteration.
+            time (float): Time.
+
+        Returns:
+            Iterable[GroupSplitSpect] or None: Specs groups the current group should be split into.
+        """
+
         pass
 
     def is_applicable(self, group, iter, t):
-        ''' Verifies if the rule is applicable at the current iteration and current time. '''
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
 
         return super().is_applicable_iter(iter) and super().is_applicable_time(t)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class Noop(Rule):
-    '''
-    NO-OP, i.e., a rule that does not do anything.
+    """NO-OP, i.e., a rule that does not do anything.
 
-    Useful for testing simulations that require no rules because at least one rule need to be present in a simulation
-    in order for groups to be added.
-    '''
+    Useful for testing simulations that require no rules (because at least one rule need to be present in a simulation
+    in order for groups to be added).
+
+    Args:
+        name (str): Name.
+    """
 
     def __init__(self, name='noop'):
         super().__init__(name)
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         return None
 
 
@@ -388,14 +577,10 @@ class Intervention(Rule, ABC):
     pass
 
 class Action(Rule, ABC):
-    '''
-    In physics, action is an attribute of the dynamics of a physical system from which the equations of motion of the
-    system can be derived. It is a mathematical functional which takes the trajectory, also called path or history, of
-    the system as its argument and has a real number as its result. Generally, the action takes different values for
-    different paths.[1]
+    """A physical action.
 
-    Source: https://en.wikipedia.org/wiki/Action_(physics)
-    '''
+    `Wikipedia: Action (physics) <https://en.wikipedia.org/wiki/Action_(physics)>`_
+    """
 
     pass
 
@@ -406,12 +591,10 @@ class Model(Rule, ABC):
     pass
 
 class ChaoticMap(Rule, ABC):
-    '''
-    The simplest dynamical system that has relevant features of chaotic Hamiltonian systems.
+    """The simplest dynamical system that has relevant features of chaotic Hamiltonian systems.
 
-    List of chaotic maps
-        https://en.wikipedia.org/wiki/List_of_chaotic_maps
-    '''
+    `Wikipedia: List of chaotic maps <https://en.wikipedia.org/wiki/List_of_chaotic_maps>`_
+    """
 
     pass
 
@@ -425,7 +608,11 @@ class GroupMassDecByNumRule(Rule):
 
     Args:
         m (float): The mass to remove.
-        Other argument from :class:`~pram.data.Rule`.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
     """
 
     def __init__(self, m, name='grp-mass-dec-by-num', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
@@ -433,6 +620,8 @@ class GroupMassDecByNumRule(Rule):
         self.m = m
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         p = min(max(self.m / group.m, 0), 1)
         return [
             GroupSplitSpec(p=    p, attr_set=Group.VOID),
@@ -446,7 +635,11 @@ class GroupMassDecByPropRule(Rule):
 
     Args:
         p (float): The proportion of mass to remove.
-        All argument from :class:`~pram.data.Rule`.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
     """
 
     def __init__(self, p, name='grp-mass-dec-by-prop', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
@@ -454,6 +647,8 @@ class GroupMassDecByPropRule(Rule):
         self.p = p
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         return [
             GroupSplitSpec(p=    self.p, attr_set=Group.VOID),
             GroupSplitSpec(p=1 - self.p)
@@ -466,7 +661,11 @@ class GroupMassIncByNumRule(Rule):
 
     Args:
         m (float): The mass to remove.
-        Other argument from :class:`~pram.data.Rule`.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
     """
 
     def __init__(self, m, name='grp-mass-inc-by-num', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
@@ -474,6 +673,8 @@ class GroupMassIncByNumRule(Rule):
         self.m = m
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         g = group.copy()
         g.m = self.m
         pop.add_vita_group(g)
@@ -486,7 +687,11 @@ class GroupMassIncByPropRule(Rule):
 
     Args:
         p (float): The proportion of mass to remove.
-        All argument from :class:`~pram.data.Rule`.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
     """
 
     def __init__(self, p, name='grp-mass-inc-by-prop', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
@@ -494,6 +699,8 @@ class GroupMassIncByPropRule(Rule):
         self.p = p
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         g = group.copy()
         g.m = group.m * self.p
         pop.add_vita_group(g)
@@ -502,23 +709,17 @@ class GroupMassIncByPropRule(Rule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class StochasticProcess(Rule, ABC):
-    '''
-    A stochastic process is a collection of random variables indexed by time or space.
-    '''
+    """A stochastic process is a collection of random variables indexed by time or space."""
 
     pass
 
 class MarkovProcess(StochasticProcess, ABC):
-    '''
-    A stochastic process that satisfies the Markov property.
-    '''
+    """A stochastic process that satisfies the Markov property."""
 
     pass
 
 class StationaryProcess(StochasticProcess, ABC):
-    '''
-    A stochastic process whose unconditional joint probability distribution does not change when shifted in time.
-    '''
+    """A stochastic process whose unconditional joint probability distribution does not change when shifted in time."""
 
     pass
 
@@ -532,49 +733,63 @@ class ContinuousSpacetimeStochasticProcess         (StochasticProcess, ABC): pas
 
 # ----------------------------------------------------------------------------------------------------------------------
 class TimeSeriesFn(Rule, ABC):
-    '''
-    Function-based time series.
-    '''
+    """Function-based time series."""
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class TimeSeriesObs(Rule, ABC):
-    '''
-    Observation-based time series.
+    """Observation-based time series.
 
-    A rule that generates a time series given by a stochastic vector or a stochastic matrix of explicit observations
-    (e.g., historical data).  The following matrix
+    A rule that replays a time series given by a stochastic vector or a stochastic matrix of explicit observations
+    (e.g., historical data).  The following matrix::
 
             t1 t2 t3
         x1   1  2  3
         x2   4  5  6
 
-    should be provided as
+    should be provided as::
 
         { 'x1': [1,2,3], 'x2': [4,5,6] }
-    '''
 
-    def __init__(self, x, name='time-series', t=TimeAlways(), i=IterAlways(), memo=None):
-        super().__init__(name, t, i, memo)
+    Args:
+        x (Mapping[str,Iterable[number]]): Time series to replay.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
+
+    def __init__(self, x, name='time-series', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
         self.x = x  # f(t)
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         # self.x[iter]
         pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class DistributionProcess(Process, ABC):
-    '''
-    A maximum of 'p_max' proportion of mass should be converted (i.e., at the mode of the distribution).  The
-    distribution that describes mass conversion is internally scaled to match that argument.  If 'None', no scaling is
-    performed
-    '''
+    """Generic distribution process.
 
-    def __init__(self, name='distrib-proc', t=TimeAlways(), i=IterAlways(), p_max=None, memo=None):
-        super().__init__(name=name, t=t, i=i, memo=memo)
+    Args:
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Iteration selector.
+        p_max (float): The maximum proportion of mass that should be converted (i.e., at the mode of the distribution).
+            The distribution that describes mass conversion is internally scaled to match that argument.  If 'None', no
+            scaling is performed.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
+
+    def __init__(self, name='distrib-proc', t=TimeAlways(), i=IterAlways(), p_max=None, group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
 
         self.p_max = p_max
         self.dist = None    # the scipy distribution object (the extending class needs to call set_dist() to set this)
@@ -606,6 +821,13 @@ class DistributionProcess(Process, ABC):
         return fig
 
     def set_dist(self, dist, mode):
+        """Sets the distribution.
+
+        Args:
+            dist (scipy.stats.rv_generic): Distribution.
+            mode (float): The mode of the distribution.
+        """
+
         self.dist = dist
         self.mode = mode
         self.p_mult = 1.0 if self.p_max is None else self.p_max / self.dist.pdf(self.mode)
@@ -614,8 +836,24 @@ class DistributionProcess(Process, ABC):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class GammaDistributionProcess(DistributionProcess, ABC):
-    def __init__(self, name='gamma-distrib-proc', t=TimeAlways(), i=IterAlways(), p_max=None, a=1.0, loc=0.0, scale=1.0, label=None, memo=None):
-        super().__init__(name=name, t=t, i=i, p_max=p_max, memo=memo)
+    """Gamma distribution process.
+
+    Args:
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Iteration selector.
+        p_max (float, optional): The maximum proportion of mass that should be converted (i.e., at the mode of the distribution).
+            The distribution that describes mass conversion is internally scaled to match that argument.  If 'None', no
+            scaling is performed.
+        a (float): A paramater.
+        loc (float): Location parameter.
+        scale (float): Scale parameter.
+        label (str, optional): Plot label.
+        memo (str, optional): Description.
+    """
+
+    def __init__(self, name='gamma-distrib-proc', t=TimeAlways(), i=IterAlways(), p_max=None, a=1.0, loc=0.0, scale=1.0, label=None, group_qry=None, memo=None):
+        super().__init__(name, t, i, p_max, group_qry, memo)
 
         self.a = a
         self.loc = loc
@@ -627,8 +865,24 @@ class GammaDistributionProcess(DistributionProcess, ABC):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class NormalDistributionProcess(DistributionProcess, ABC):
-    def __init__(self, name='norm-distrib-proc', t=TimeAlways(), i=IterAlways(), p_max=None, loc=0.0, scale=1.0, label=None, memo=None):
-        super().__init__(name=name, t=t, i=i, p_max=p_max, memo=memo)
+    """Normal distribution process.
+
+    Args:
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Iteration selector.
+        p_max (float): The maximum proportion of mass that should be converted (i.e., at the mode of the distribution).
+            The distribution that describes mass conversion is internally scaled to match that argument.  If 'None', no
+            scaling is performed.
+        loc (float): Location parameter.
+        scale (float): Scale parameter.
+        label (str, optional): Plot label.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
+
+    def __init__(self, name='norm-distrib-proc', t=TimeAlways(), i=IterAlways(), p_max=None, loc=0.0, scale=1.0, label=None, group_qry=None, memo=None):
+        super().__init__(name, t, i, p_max, group_qry, memo)
 
         self.loc = loc
         self.scale = scale
@@ -639,20 +893,30 @@ class NormalDistributionProcess(DistributionProcess, ABC):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class FibonacciSeq(Sequence, DifferenceEquation):
-    '''
-    The Fibonacci numbers sequence.
+    """The Fibonacci numbers sequence.
 
-    F0-F20: 0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597 2584 4181 6765
-    '''
+    This rule updates the designated group attribute with sequential Fibonacci numbers, one number per iteration.
 
-    def __init__(self, attr='fib', name='fibonacci-seq', t=TimeAlways(), i=IterAlways()):
-        super().__init__(name, t, i)
+    Args:
+        attr (str): The attribute name to store the sequence in.  The state of the sequence is stored in the group's
+            attribute space using two extra attributes: ``attr_1`` and ``attr_2``.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
+
+    def __init__(self, attr='fib', name='fibonacci-seq', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
 
         self.attr   = attr                             # n
         self.attr_1 = Rule.get_rand_name(f'{attr}_1')  # n-1
         self.attr_2 = Rule.get_rand_name(f'{attr}_2')  # n-2
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         n  = group.ga(self.attr)
         n1 = group.ga(self.attr_1) or 0
         n2 = group.ga(self.attr_2) or 0
@@ -674,22 +938,32 @@ class FibonacciSeq(Sequence, DifferenceEquation):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class CompoundInterstSeq(Sequence, DifferenceEquation):
-    '''
-    Applies the comound interest formula to the designated attribute.
+    """Applies the comound interest formula to the designated attribute.
 
-    In:
-        r - nominal annual interest rate
-        n - compund frequency [months]
-    '''
+    The sequence state is store in the rule object and not the group attribute space.  Consequently, one instance of
+    the rule should associated with only one group.
 
-    def __init__(self, attr, r, n, name='compund-interst-seq', t=TimeAlways(), i=IterAlways()):
-        super().__init__(name, t, i)
+    Args:
+        attr (str): Attribute name to store the value in.
+        r (float): Nominal annual interest rate.
+        n (int): Compund frequency in months.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
+
+    def __init__(self, attr, r, n, name='compund-interst-seq', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
 
         self.attr = attr
         self.r = r
         self.n = n
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         p0 = group.ga(self.attr)
         t = 1  # we do this every single iteration
         p = p0 * (1 + self.r / self.n) ** (self.n * t)
@@ -699,9 +973,7 @@ class CompoundInterstSeq(Sequence, DifferenceEquation):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbabilisticEquation(Equation):
-    '''
-    An algebraic equation p(t), where $p(t) \in [0,1]$ (i.e., it yields a probability).
-    '''
+    """An algebraic equation p(t), where $p(t) \in [0,1]$ (i.e., it yields a probability)."""
 
     pass
 
@@ -713,14 +985,27 @@ class ODeltaESystem(Rule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ODEDerivatives(ABC):
+    """Ordinary differential equations system's derivatives.
+
+    This object is one of the parameters to the :class:`~pram.rule.ODESystemMass` constructor.
+    """
+
     def __init__(self):
         self.params = DotMap()
 
     @abstractmethod
     def get_fn(t, state):
+        """Get the variable values of the system given state.
+
+        Args:
+            state (Iterable[float]): List of variable values.
+        """
+
         pass
 
     def set_params(self, **kwargs):
+        """Set a subset of superset of the parameters."""
+
         for (k,v) in kwargs.items():
             if v is not None:
                 self.params[k] = v
@@ -728,61 +1013,43 @@ class ODEDerivatives(ABC):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ODESystem(Rule):
-    '''
+    """Ordinary differential equations system.
+
     Wraps a numeric integrator to solve a system of ordinary differential equations (ODEs) that do not interact with
-    anything else in the simulation.
+    anything else in the simulation.  The non-interactivity stems from the derivatives being kept internally to the
+    integrator only.  This is useful when computations need to happen on a step-by-step basis, consistent with the rest
+    of the simulation, but the results should not affect the group attribute space.  One consequnce of this
+    operationalization is that the rule need to fire only once per iteration, which this rule does.
 
-    The non-interactivity stems from the derivatives being kept internally to the integrator only.  This is useful when
-    computations need to happen on a step-by-step basis, consistent with the rest of the simulation, but the results do
-    not pollute the group attribute space.
+    Args:
+        fn_deriv (Callable): Derivative-computing function.
+        y0 (Iterable[float]): Initial condition.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        dt (float): Time step size.
+        ni_name (str): Name of numeric integrator.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
 
-    One consequnce of this operationalization is that the rule need to fire only once per iteration.  Because PRAM
-    fires each rule for every compatible group, the implementation of the present rule ensures that the computation
-    will only happen exactly once; anything more than that would be computing the same thing again (i.e., an utter
-    waste of perfectly good CPU time).
-
-    Currently uses scipy's numerical integrators, but could switch to assimulo in the future.
-
-    In
-        f  - derivative-computing function
-        y0 - initial condition (i.e., a list of values)
-
-    --------------------------------------------------------------------------------------------------------------------
-
-    Finite-dimensional linear systems can always be modeled using a set of differential (or difference) equations as
-    follows:
-
-        d/dt x(t) = A(t) x(t) + B(t) u(t)
-             y(t) = C(t) x(t) + D(t) u(t)
-
-    in continuous time, or the following equivalent equations in discreet time:
-
-        x[k+1] = A[k] x[k] + B[k] u[k]
-          y[k] = C[k] x[k] + D[k] u[k]
-
-    The above equations are called linearized equations or equations of first variation.
-    '''
-
-    def __init__(self, fn_deriv, y0, name='ode-system', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
-        super().__init__(name, t, i, memo)
+    def __init__(self, fn_deriv, y0, name='ode-system', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
 
         self.y0 = y0  # initial condition
         self.dt = dt  # TODO: should change with the change in the timer
         self.ni_name = ni_name
 
-        self.ni = ode(fn_deriv).set_integrator(self.ni_name, method='bdf')  # numeric integrator
+        self.ni = ode(fn_deriv).set_integrator(self.ni_name, method='bdf')
         self.ni.set_initial_value(self.y0, 0)
-
-        if f_params is not None:
-            self.ni.set_f_params(f_params)
-        if jac_params is not None:
-            self.ni.set_jac_params(jac_params)
 
         self.hist = DotMap(t=[], y=[])  # history
 
         self.iter_last = -1  # keep the last-computed iterations to avoid multiple computations (due to multiple groups)
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         if iter != self.iter_last:  # only integrate if not done for this iteration
             self.ni.integrate(self.ni.t + self.dt)
 
@@ -796,7 +1063,7 @@ class ODESystem(Rule):
         return None
 
     def get_hist(self):
-        ''' Returns the history of times and derivatives computed at those times. '''
+        """Get the history of times and derivatives computed at those times."""
 
         t = [0.00] + self.hist.t
         y = [[self.y0[i]] + [y[i].tolist().real for y in self.hist.y] for i in range(len(self.y0))]
@@ -804,24 +1071,28 @@ class ODESystem(Rule):
         return [t,y]
 
     def set_params(self, fn_deriv):
-        self.ni = ode(f).set_integrator(self.ni_name, method='bdf')
+        self.ni = ode(fn_deriv).set_integrator(self.ni_name, method='bdf')
         self.ni.set_initial_value(self.hist.y[-1], 0)  # TODO: Test this
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ODESystemAttr(Rule):
-    '''
+    """Ordinary differential equations system on group attributes.
+
     Wraps a numeric integrator to solve a system of ordinary differential equations (ODEs) and store its state in the
     group attribute space.
 
-    Currently uses scipy's numerical integrators, but could switch to assimulo in the future.
+    Args:
+        fn_deriv (Callable): Derivative-computing function.
+        y0 (Iterable[float]): Initial condition.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
 
-    In
-        f  - derivative-computing function
-        y0 - initial condition attributes (i.e., a list of group attribute names)
-    '''
-
-    def __init__(self, fn_deriv, y0, name='ode-system', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
+    def __init__(self, fn_deriv, y0, name='ode-system', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', memo=None):
         super().__init__(name, t, i, memo)
 
         self.y0 = y0
@@ -831,15 +1102,12 @@ class ODESystemAttr(Rule):
         self.ni = ode(fn_deriv).set_integrator(ni_name, method='bdf')  # numeric integrator
         # self.ni.set_initial_value(self.y0, 0)
 
-        if f_params is not None:
-            self.ni.set_f_params(f_params)
-        if jac_params is not None:
-            self.ni.set_jac_params(jac_params)
-
         self.hist = DotMap(t=[], y=[])  # history
         self.f = f
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         # Previous version (no initial condition update after the first one):
         # if self.y0_val is None:
         #     self.y0_val = [group.attr[y] for y in self.y0]
@@ -860,7 +1128,7 @@ class ODESystemAttr(Rule):
         return [GroupSplitSpec(p=1.00, attr_set={ self.y0[i]: self.ni.y[i].real for i in range(len(self.y0))})]
 
     def get_hist(self):
-        ''' Returns the history of times and derivatives computed at those times. '''
+        """Get the history of times and derivatives computed at those times."""
 
         t = [0.00] + self.hist.t
         y = [[self.y0_val[i]] + [y[i].tolist().real for y in self.hist.y] for i in range(len(self.y0))]
@@ -868,15 +1136,18 @@ class ODESystemAttr(Rule):
         return [t,y]
 
     def is_applicable(self, group, iter, t):
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
         return super().is_applicable(group, iter, t) and group.ha(self.y0)
 
     def set_params(self, fn_deriv):
-        self.ni = ode(f).set_integrator(self.ni_name, method='bdf')
+        self.ni = ode(fn_deriv).set_integrator(self.ni_name, method='bdf')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ODESystemMass(Rule):
-    '''
+    """Ordinary differential equations system on group mass.
+
     Wraps a numeric integrator to solve a system of ordinary differential equations (ODEs) that drive mass shifts.
 
     The initial state is deterimed by the group landscape.
@@ -886,29 +1157,29 @@ class ODESystemMass(Rule):
     this solution is correct and stems from the fact that the new group sizes are calculated for the iteration step
     (i.e., for all groups) and not for individual group.
 
-    Currently uses scipy's numerical integrators, but could switch to assimulo in the future.
+    Args:
+        derivatives (ODEDerivatives): Derivatives object.
+        group_queries (Iterable[GroupQry]): Group selectors.  The number and order must correspond to the
+            ``derivatives``.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        dt (float): Time step size.
+        ni_name (str): Name of numeric integrator.
+        memo (str, optional): Description.
+    """
 
-    In
-        f  - derivative-computing function
-        y0 - initial condition (i.e., a list of group attribute names)
-    '''
-
-    def __init__(self, derivatives, queries, name='ode-system-mass', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', f_params=None, jac_params=None, memo=None):
+    def __init__(self, derivatives, group_queries, name='ode-system-mass', t=TimeAlways(), i=IterAlways(), dt=1.0, ni_name='zvode', memo=None):
         super().__init__(name, t, i, memo)
 
         self.derivatives = derivatives
-        self.queries = queries
+        self.group_queries = group_queries
         self.y0_mass = None  # initial condition
         self.dt = dt  # TODO: should change with the change in the timer
         self.ni_name = ni_name
 
         self.ni = ode(self.derivatives.get_fn()).set_integrator(self.ni_name, method='bdf')  # numeric integrator
         # self.ni.set_initial_value(self.y0, 0)
-
-        if f_params is not None:
-            self.ni.set_f_params(f_params)
-        if jac_params is not None:
-            self.ni.set_jac_params(jac_params)
 
         self.hist = DotMap(t=[], y=[])  # history
 
@@ -917,10 +1188,12 @@ class ODESystemMass(Rule):
         self.tmp = DotMap()  # scratchpad to remember computation throughout an iteration (remember, one computation per iteration)
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         if iter != self.iter_last:  # only integrate once per iteration
             # Previous version (no initial condition update after the first one):
             # if self.y0_mass is None:
-            #     self.y0_mass = [sum([0] + [g.m for g in pop.get_groups(q)]) for q in self.queries]
+            #     self.y0_mass = [sum([0] + [g.m for g in pop.get_groups(q)]) for q in self.group_queries]
             #     # print(f'y0 : {self.y0_mass}')
             #     self.ni.set_initial_value(self.y0_mass, 0)
             #
@@ -929,8 +1202,8 @@ class ODESystemMass(Rule):
             # self.hist.t.append(self.ni.t)
             # self.hist.y.append(self.ni.y)
 
-            # self.y0_mass = [sum([0] + [g.n for g in pop.get_groups(q)]) for q in self.queries]
-            self.y0_mass = [sum([0] + [g.m for g in pop.get_groups(GroupQry(attr=q.attr))]) for q in self.queries]
+            self.y0_mass = [sum([0] + [g.m for g in pop.get_groups(q)]) for q in self.group_queries]
+            # self.y0_mass = [sum([0] + [g.m for g in pop.get_groups(GroupQry(attr=q.attr))]) for q in self.group_queries]
             self.ni.set_initial_value(self.y0_mass, 0)
             self.ni.integrate(self.dt)
 
@@ -942,7 +1215,7 @@ class ODESystemMass(Rule):
             # self.tmp.ps = min(1.00, max(0.00, self.ni.y[0].tolist().real / self.tmp.n))
             # self.tmp.pi = min(1.00, max(0.00, self.ni.y[1].tolist().real / self.tmp.n))
             # self.tmp.pr = 1.00 - self.tmp.ps - self.tmp.pi
-            self.tmp.p = [min(1.00, max(0.00, self.ni.y[i].tolist().real / self.tmp.m)) for i in range(len(self.queries) - 1)]
+            self.tmp.p = [min(1.00, max(0.00, self.ni.y[i].tolist().real / self.tmp.m)) for i in range(len(self.group_queries) - 1)]
             self.tmp.p.append(1.00 - sum(self.tmp.p))
 
         # return [
@@ -951,18 +1224,20 @@ class ODESystemMass(Rule):
         #     GroupSplitSpec(p=self.tmp.pr, attr_set={ 'flu': 'r' })
         # ]
 
-        return [GroupSplitSpec(p=self.tmp.p[i], attr_set=self.queries[i].attr) for i in range(len(self.queries))]
+        return [GroupSplitSpec(p=self.tmp.p[i], attr_set=self.group_queries[i].attr) for i in range(len(self.group_queries))]
 
     def get_hist(self):
-        ''' Returns the history of times and derivatives computed at those times. '''
+        """Get the history of times and derivatives computed at those times."""
 
         t = [0.00] + self.hist.t
-        y = [[self.y0_mass[i]] + [y[i].tolist().real for y in self.hist.y] for i in range(len(self.queries))]
+        y = [[self.y0_mass[i]] + [y[i].tolist().real for y in self.hist.y] for i in range(len(self.group_queries))]
 
         return [t,y]
 
-    # def is_applicable(self, group, iter, t):
-    #     return super().is_applicable(group, iter, t) and group.ha(self.y0)
+    def is_applicable(self, group, iter, t):
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
+        return super().is_applicable(group, iter, t) and group.ha(self.y0)
 
     def set_params(self, **kwargs):
         self.derivatives.set_params(**kwargs)
@@ -971,223 +1246,234 @@ class ODESystemMass(Rule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class LogisticMap(Sequence, ChaoticMap):
-    '''
-    x_{n+1} = r x_n (1 - x_n),
-
-    where $r \n [2,4]$ and $x \in [0,1]$.
-
-    --------------------------------------------------------------------------------------------------------------------
-
-    Time domain                : Discrete
-    Space domain               : Real
-    Number of space dimensions : 1
-    Number of parameters       : 1
-    '''
+    # x_{n+1} = r x_n (1 - x_n),
+    #
+    # where $r \n [2,4]$ and $x \in [0,1]$.
+    #
+    # --------------------------------------------------------------------------------------------------------------------
+    #
+    # Time domain                : Discrete
+    # Space domain               : Real
+    # Number of space dimensions : 1
+    # Number of parameters       : 1
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class LotkaVolterraSystem(ChaoticMap, ODESystem):
-    '''
-    Population dynamics model.
-
-    a is the natural growth rate of rabbits in the absence of predation,
-    c is the natural death rate of foxes in the absence of food (rabbits),
-    b is the death rate per encounter of rabbits due to predation,
-    e is the efficiency of turning predated rabbits into foxes.
-
-    --------------------------------------------------------------------------------------------------------------------
-
-    Time domain                : Continuous
-    Space domain               : Real
-    Number of space dimensions : 3
-    Number of parameters       : 4
-    '''
+    # A classic population dynamics model.
+    #
+    # a is the natural growth rate of rabbits in the absence of predation,
+    # c is the natural death rate of foxes in the absence of food (rabbits),
+    # b is the death rate per encounter of rabbits due to predation,
+    # e is the efficiency of turning predated rabbits into foxes.
+    #
+    # --------------------------------------------------------------------------------------------------------------------
+    #
+    # Time domain                : Continuous
+    # Space domain               : Real
+    # Number of space dimensions : 3
+    # Number of parameters       : 4
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class LorenzSystem(ChaoticMap, ODESystem):
-    '''
-    Atmospheric convection model.
-
-    A simplified mathematical model for atmospheric convection specified by the Lorenz equations:
-
-        dx/dt = sigma * (y - x)
-        dy/dt = x * (rho - z) - y
-        dz/dt = xy - beta * z
-
-    The equations relate the properties of a two-dimensional fluid layer uniformly warmed from below and cooled from above.
-    In particular, the equations describe the rate of change of three quantities with respect to time: x is proportional to
-    the rate of convection, y to the horizontal temperature variation, and z to the vertical temperature variation. The
-    constants sigma, rho, and beta are system parameters proportional to the Prandtl number, Rayleigh number, and certain
-    physical dimensions of the layer itself.
-
-    From a technical standpoint, the Lorenz system is nonlinear, non-periodic, three-dimensional and deterministic.
-
-    SRC: https://en.wikipedia.org/wiki/Lorenz_system
-
-    --------------------------------------------------------------------------------------------------------------------
-
-    Time domain                : Continuous
-    Space domain               : Real
-    Number of space dimensions : 3
-    Number of parameters       : 3
-    '''
+    # Atmospheric convection model.
+    #
+    # A simplified mathematical model for atmospheric convection specified by the Lorenz equations:
+    #
+    #     dx/dt = sigma * (y - x)
+    #     dy/dt = x * (rho - z) - y
+    #     dz/dt = xy - beta * z
+    #
+    # The equations relate the properties of a two-dimensional fluid layer uniformly warmed from below and cooled from above.
+    # In particular, the equations describe the rate of change of three quantities with respect to time: x is proportional to
+    # the rate of convection, y to the horizontal temperature variation, and z to the vertical temperature variation. The
+    # constants sigma, rho, and beta are system parameters proportional to the Prandtl number, Rayleigh number, and certain
+    # physical dimensions of the layer itself.
+    #
+    # From a technical standpoint, the Lorenz system is nonlinear, non-periodic, three-dimensional and deterministic.
+    #
+    # SRC: https://en.wikipedia.org/wiki/Lorenz_system
+    #
+    # --------------------------------------------------------------------------------------------------------------------
+    #
+    # Time domain                : Continuous
+    # Space domain               : Real
+    # Number of space dimensions : 3
+    # Number of parameters       : 3
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class ProbabilisticAutomaton(Rule, ABC):
-    '''
-    Probabilistic automaton.
-    '''
-
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class MarkovChain(MarkovProcess, ProbabilisticAutomaton, ABC):
-    '''
-    Markov process with a discrete state space.
-    '''
+    """Markov process with a discrete state space."""
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class DiscreteInvMarkovChain(MarkovChain, DiscreteSpacetimeStochasticProcess, StationaryProcess):
-    '''
-    Discrete-time time-homogenous Markov chain with finite state space.
+    """Discrete-time time-homogenous Markov chain with finite state space.
 
-    The following sample transition model for the variables named X:
+    The following sample transition model for the variables named X::
 
                    x_1^t   x_2^t
         x_1^{t+1}    0.1     0.3
         x_2^{t+1}    0.9     0.7
 
-    Should be specified as the following list of stochastic vectors:
+    should be specified as the following list of stochastic vectors::
 
         { 'x1': [0.1, 0.9], 'x2': [0.3, 0.7] }
 
-    ----[ Definition ]--------------------------------------------------------------------------------------------------
+    Definition:
 
-    A stochastic process $X = \{X_n:n \geq 0\}$ on a countable set $S$ is a Markov Chain if, for any $i,j \in S$ and
-    $n \geq 0$,
+        A stochastic process $X = \{X_n:n \geq 0\}$ on a countable set $S$ is a Markov Chain if, for any $i,j \in S$
+        and $n \geq 0$,
 
-    P(X_{n+1} = j | X_0, \ldots, X_n) = P(X_{n+1} = j | X_n)
-    P(X_{n+1} = j | X_n = i) = p_{ij}
+        P(X_{n+1} = j | X_0, \ldots, X_n) = P(X_{n+1} = j | X_n)
+        P(X_{n+1} = j | X_n = i) = p_{ij}
 
-    The $p_{ij} is the probability that the Markov chain jumps from state $i$ to state $j$.  These transition
-    probabilities satisfy $\sum_{j \in S} p_{ij} = 1, i \in S$, and the matrix $P=(pij)$ is the transition matrix of
-    the chain.
+        The $p_{ij} is the probability that the Markov chain jumps from state $i$ to state $j$.  These transition
+        probabilities satisfy $\sum_{j \in S} p_{ij} = 1, i \in S$, and the matrix $P=(pij)$ is the transition matrix
+        of the chain.
 
-    ----[ Notation A ]----
+    Rule notation A::
 
-    code:
-        DiscreteInvMarkovChain('flu', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.80, 0.10], 'r': [0.10, 0.00, 0.90] })
+        code:
+            DiscreteInvMarkovChain('flu', { 's': [0.95, 0.05, 0.00], 'i': [0.00, 0.80, 0.10], 'r': [0.10, 0.00, 0.90] })
 
-    init:
-        tm = {
-            s: [0.95, 0.05, 0.00],
-            i: [0.00, 0.80, 0.20],
-            r: [0.10, 0.00, 0.90]
-        }  # right stochastic matrix
+        init:
+            tm = {
+                s: [0.95, 0.05, 0.00],
+                i: [0.00, 0.80, 0.20],
+                r: [0.10, 0.00, 0.90]
+            }  # right stochastic matrix
 
-    is-applicable:
-        has-attr: flu
+        is-applicable:
+            has-attr: flu
 
-    apply:
-        curr_state = group.attr.flu
-        new_state_sv = tm[]  # stochastic vector
-        move-mass:
-            new_state_sv[0] -> A:flu = 's'
-            new_state_sv[1] -> A:flu = 'i'
-            new_state_sv[2] -> A:flu = 'r'
+        apply:
+            curr_state = group.attr.flu
+            new_state_sv = tm[]  # stochastic vector
+            move-mass:
+                new_state_sv[0] -> A:flu = 's'
+                new_state_sv[1] -> A:flu = 'i'
+                new_state_sv[2] -> A:flu = 'r'
 
+    Rule notation B::
 
-    ----[ Notation B ]----
+        tm_i = tm[group.attr.flu]
+        tm_i[0] -> A:flu = 's'
+        tm_i[1] -> A:flu = 'i'
+        tm_i[2] -> A:flu = 'r'
 
-    tm_i = tm[group.attr.flu]
-    tm_i[0] -> A:flu = 's'
-    tm_i[1] -> A:flu = 'i'
-    tm_i[2] -> A:flu = 'r'
-    '''
+    Args:
+        attr (str): Name of state attribute.
+        tm (Mapping[str,Iterable[float]]): Transition matrix.  Keys correspond to state names and values to lists of
+            transition probabilities.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+        cb_before_apply (Callable, optional): Function called before the group is split.  The signature is
+            ``fn(group, attr_val, tm)``.
+    """
 
-    def __init__(self, var, tm, name='markov-chain', t=TimeAlways(), i=IterAlways(), memo=None, cb_before_apply=None):
+    def __init__(self, attr, tm, name='markov-chain', t=TimeAlways(), i=IterAlways(), memo=None, cb_before_apply=None):
         super().__init__(name, t, i, memo)
 
         if sum([i for x in list(tm.values()) for i in x]) != float(len(tm)):
             raise ValueError(f"'{self.__class__.__name__}' class: Probabilities in the transition model must add up to 1")
 
-        self.var = var
+        self.attr = attr
         self.tm = tm
         self.states = list(self.tm.keys())  # simplify and speed-up lookup in apply()
         self.cb_before_apply = cb_before_apply
 
     def apply(self, pop, group, iter, t):
-        attr_val = group.get_attr(self.var)
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
+        attr_val = group.get_attr(self.attr)
         tm = self.tm.get(attr_val)
         if tm is None:
-            raise ValueError(f"'{self.__class__.__name__}' class: Unknown state '{group.get_attr(self.var)}' for attribute '{self.var}'")
+            raise ValueError(f"'{self.__class__.__name__}' class: Unknown state '{group.get_attr(self.attr)}' for attribute '{self.attr}'")
         if self.cb_before_apply:
             tm = self.cb_before_apply(group, attr_val, tm) or tm
-        return [GroupSplitSpec(p=tm[i], attr_set={ self.var: self.states[i] }) for i in range(len(self.states)) if tm[i] > 0]
+        return [GroupSplitSpec(p=tm[i], attr_set={ self.attr: self.states[i] }) for i in range(len(self.states)) if tm[i] > 0]
 
     def get_states(self):
+        """Get list of states."""
+
         return self.states
 
     def is_applicable(self, group, iter, t):
-        return super().is_applicable(group, iter, t) and group.has_attr([ self.var ])
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
+        return super().is_applicable(group, iter, t) and group.has_attr([ self.attr ])
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class DiscreteVarMarkovChain(MarkovChain, DiscreteSpacetimeStochasticProcess):
-    '''
-    Discrete-time non-time-homogenous Markov chain with finite state space.
+    """Discrete-time non-time-homogenous Markov chain with finite state space.
 
+    Rule notation A::
 
-    ----[ Notation A ]----
+        code:
+            fn_flu_s_sv:
+                p_inf = n@_{attr.flu = 'i'} / n@
+                return [1 - p_inf, p_inf, 0.00]
 
-    code:
-        fn_flu_s_sv:
-            p_inf = n@_{attr.flu = 'i'} / n@
-            return [1 - p_inf, p_inf, 0.00]
+            TimeVarMarkovChain('flu', { 's': fn_flu_s_sv, 'i': [0.00, 0.80, 0.20], 'r': [0.10, 0.00, 0.90] })
 
-        TimeVarMarkovChain('flu', { 's': fn_flu_s_sv, 'i': [0.00, 0.80, 0.20], 'r': [0.10, 0.00, 0.90] })
+        ext:
+            p_inf
 
-    ext:
-        p_inf
+        init:
+            tm = {
+                s: [1 - p_inf, p_inf, 0.00],
+                i: [0.00, 0.80, 0.20],
+                r: [0.10, 0.00, 0.90]
+            }  # right stochastic matrix
 
-    init:
-        tm = {
-            s: [1 - p_inf, p_inf, 0.00],
-            i: [0.00, 0.80, 0.20],
-            r: [0.10, 0.00, 0.90]
-        }  # right stochastic matrix
+        is-applicable:
+            has-attr: flu
 
-    is-applicable:
-        has-attr: flu
+        apply:
+            tm_i = tm[group.attr.flu]
+            move-mass:
+                tm_i[0] -> A: flu = s
+                tm_i[1] -> A: flu = i
+                tm_i[2] -> A: flu = r
 
-    apply:
+    Rule notation B::
+
         tm_i = tm[group.attr.flu]
-        move-mass:
-            tm_i[0] -> A: flu = s
-            tm_i[1] -> A: flu = i
-            tm_i[2] -> A: flu = r
+        tm_i[0] -> A:flu = 's'
+        tm_i[1] -> A:flu = 'i'
+        tm_i[2] -> A:flu = 'r'
 
-    ----[ Notation B ]----
+    Args:
+        attr (str): Name of state attribute.
+        tm (Mapping[str,Iterable[float]]): Transition matrix.  Keys correspond to state names and values to lists of
+            transition probabilities.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        memo (str, optional): Description.
+    """
 
-    tm_i = tm[group.attr.flu]
-    tm_i[0] -> A:flu = 's'
-    tm_i[1] -> A:flu = 'i'
-    tm_i[2] -> A:flu = 'r'
-    '''
-
-    def __init__(self, var, tm, name='markov-chain', t=TimeAlways(), memo=None):
+    def __init__(self, attr, tm, name='markov-chain', t=TimeAlways(), i=IterAlways(), memo=None):
         super().__init__(name, t, memo)
 
         for sv in tm.values():  # stochastic vectors or function pointers
@@ -1195,44 +1481,54 @@ class DiscreteVarMarkovChain(MarkovChain, DiscreteSpacetimeStochasticProcess):
                 if sum(sv) != 1.00:
                     raise ValueError(f"'{self.__class__.__name__}' class: Probabilities in the transition model must add up to 1")
 
-        self.var = var
+        self.attr = attr
         self.tm = tm
         self.states = list(self.tm.keys())  # simplify and speed-up lookup in apply()
 
     def apply(self, pop, group, iter, t):
-        tm = self.tm.get(group.get_attr(self.var))
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
+        tm = self.tm.get(group.get_attr(self.attr))
         if tm is None:
-            raise ValueError(f"'{self.__class__.__name__}' class: Unknown state '{group.get_attr(self.var)}' for attribute '{self.var}'")
+            raise ValueError(f"'{self.__class__.__name__}' class: Unknown state '{group.get_attr(self.attr)}' for attribute '{self.attr}'")
         if hasattr(tm, '__call__'):
             tm = tm(pop, group, iter, t)
-        return [GroupSplitSpec(p=tm[i], attr_set={ self.var: self.states[i] }) for i in range(len(self.states)) if tm[i] > 0]
+        return [GroupSplitSpec(p=tm[i], attr_set={ self.attr: self.states[i] }) for i in range(len(self.states)) if tm[i] > 0]
 
     def get_states(self):
+        """Get list of states."""
+
         return self.states
 
     def is_applicable(self, group, iter, t):
-        return super().is_applicable(group, iter, t) and group.has_attr([ self.var ])
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
+        return super().is_applicable(group, iter, t) and group.has_attr([ self.attr ])
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class CotinuousMarkovChain(MarkovChain, DiscreteSpaceContinuousTimeStochasticProcess):
-    '''
-    Continuous-time Markov chain with finite state space.
-    '''
+    """Continuous-time Markov chain with finite state space."""
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class BernoulliScheme(DiscreteInvMarkovChain):
-    '''
-    Bernoulli scheme or Bernoulli shift is a generalization of the Bernoulli process to more than two possible
+    """Bernoulli scheme or Bernoulli shift is a generalization of the Bernoulli process to more than two possible
     outcomes.
 
     A Bernoulli scheme is a special case of a Markov chain where the transition probability matrix has identical rows,
     which means that the next state is even independent of the current state (in addition to being independent of the
     past states).
-    '''
+
+    Args:
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
 
     def __init__(self, attr='state', vals=(0,1), name='bernoulli-process', t=TimeAlways(), i=IterAlways(), memo=None):
         super().__init__(var, { vals[0]: [1-p, p], vals[1]: [1-p, p] }, name, t, i, memo)
@@ -1240,14 +1536,21 @@ class BernoulliScheme(DiscreteInvMarkovChain):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class BernoulliProcess(BernoulliScheme):
-    '''
+    """
     A Bernoulli process is a sequence of independent trials in which each trial results in a success or failure with
     respective probabilities $p$ and $q=1−p$.
 
     A Bernoulli scheme with only two possible states is known as a Bernoulli process.
 
     Binomial Markov Chain.
-    '''
+
+    Args:
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
 
     def __init__(self, p=0.5, attr='state', vals=(0,1), name='bernoulli-process', t=TimeAlways(), i=IterAlways(), memo=None):
         super().__init__(attr, { vals[0]: [1-p, p], vals[1]: [1-p, p] }, name, t, i, memo)
@@ -1255,143 +1558,125 @@ class BernoulliProcess(BernoulliScheme):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class RandomWalk(DiscreteInvMarkovChain):
-    '''
-    Markov processes in discreet time.
+    """A Markov processes in discreet time.
 
     The results of discretizing both time and space of a diffusion equation.
-    '''
+    """
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class LevyProcess(MarkovProcess):
-    '''
-    The continuous-time analog of a random walk.
-    '''
+    """The continuous-time analog of a random walk."""
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class DiffusionProcess(MarkovProcess):
-    '''
-    A continuous-time Markov process with almost surely continuous sample paths.
+    """A continuous-time Markov process with almost surely continuous sample paths.
 
     A solution to a stochastic differential equation (in short form),
 
         d X_t = \mu(X_t, t)dt + \sigma X_t(X_t, t)dB_t,
 
     where $B$ is a standard Brownian motion.
-    '''
+    """
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class WienerProcess(LevyProcess, DiffusionProcess):
-    '''
-    Markov processes in continuous time.
+    """Markov processes in continuous time.
 
     Brownian motion process or Brownian motion.
 
     A limit of simple random walk.
-    '''
+    """
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class OrnsteinUhlenbeckProcess(LevyProcess, DiffusionProcess):
-    '''
-    A stationary Gauss–Markov mean-reverting process.
-    '''
+    """A stationary Gauss–Markov mean-reverting process."""
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class PoissonProcess(LevyProcess):
-    '''
-    Poisson point process.
+    """Poisson point process.
 
     Markov processes in continuous time.
-
-    On the real line, the Poisson process is a type of continuous-time Markov process known as a birth-death process
-    (with just births and zero deaths) and is called a pure [67] or simple birth process.[68] More complicated
-    processes with the Markov property, such as Markov arrival processes, have been defined where the Poisson process
-    is a special case.[54]
-    [https://en.wikipedia.org/wiki/Poisson_point_process]
-    '''
+    """
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class JumpProcess(PoissonProcess):
-    '''
+    """Jump process.
+
     A jump process is a type of stochastic process that has discrete movements, called jumps, with random arrival
     times, rather than continuous movement, typically modelled as a simple or compound Poisson process.
-    '''
+    """
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class CoxProcess(PoissonProcess):
-    '''
+    """Cox process.
+
     A point process which is a generalization of a Poisson process where the time-dependent intensity is itself a
     stochastic process.
 
     Also known as a doubly stochastic Poisson process.
-    '''
+    """
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class CellularAutomaton(StochasticProcess):
-    '''
+    """Cellular automaton.
+
     Cellular automata are a discrete-time dynamical system of interacting entities, whose state is discrete.
-    '''
+    """
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class StochasticCellularAutomaton(CellularAutomaton):
-    '''
-    Probabilistic cellular automata (PCA), random cellular automata, or locally interacting Markov chains.
-
-
-    '''
+    """Probabilistic cellular automata (PCA), random cellular automata, or locally interacting Markov chains."""
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class InteractingParticleSystem(StochasticProcess):
-    '''
-    Continuous-time Markov jump processes describing the collective behavior of stochastically interacting components.
-    IPS are the continuous-time analogue of stochastic cellular automata.
-    '''
+    """Continuous-time Markov jump processes describing the collective behavior of stochastically interacting
+    components.  IPS are the continuous-time analogue of stochastic cellular automata."""
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class BirthDeathProcess(PoissonProcess):
-    '''
-    A jump process is a type of stochastic process that has discrete movements, called jumps, with random arrival
-    times, rather than continuous movement, typically modelled as a simple or compound Poisson process.
-    '''
+    """A jump process is a type of stochastic process that has discrete movements, called jumps, with random arrival
+    times, rather than continuous movement, typically modelled as a simple or compound Poisson process."""
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class BirthDeathProcess(MarkovProcess):
-    """
+    """Birth death process.
+
     A special case of continuous-time Markov process where the state transitions are of only two types: "births", which
     increase the state variable by one and "deaths", which decrease the state by one.
 
@@ -1413,171 +1698,115 @@ class BirthDeathProcess(MarkovProcess):
     Sojourn times have exponential p.d.f. :math:`\lambda e^{-\lambda t}`.
     """
 
-    '''
-    Birth process examples [1]:
-    - Radioactive transformations
-    - Conversion of fibroge molecules into fibrin molecules follows a birth process (blood clotting)
-
-    Application areas [1]:
-    - Epidemics
-    - Queues, inventories, and reliability
-    - Production management
-    - Computer communication systems
-    - Neutron propagation
-    - Optics
-    - Chemical reactions
-    - Construction and mining
-    - Compartmental models
-
-    References:
-    [1] Birth and Death Processes (Chapter 4)
-        http://neutrino.aquaphoenix.com/ReactionDiffusion/SERC5chap4.pdf
-    [2] https://cs.nyu.edu/mishra/COURSES/09.HPGP/scribe3
-    '''
+    # Birth process examples [1]:
+    # - Radioactive transformations
+    # - Conversion of fibroge molecules into fibrin molecules follows a birth process (blood clotting)
+    #
+    # Application areas [1]:
+    # - Epidemics
+    # - Queues, inventories, and reliability
+    # - Production management
+    # - Computer communication systems
+    # - Neutron propagation
+    # - Optics
+    # - Chemical reactions
+    # - Construction and mining
+    # - Compartmental models
+    #
+    # References:
+    # [1] Birth and Death Processes (Chapter 4)
+    #     http://neutrino.aquaphoenix.com/ReactionDiffusion/SERC5chap4.pdf
+    # [2] https://cs.nyu.edu/mishra/COURSES/09.HPGP/scribe3
 
     def __init__(self, ig, name='birth-death-process', t=TimeAlways()):
         super().__init__(name, t)
 
         self.ig = ig  # inifinitesimal generator of the process
 
-    def apply(self, pop, group, iter, t):
-        return None
-
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SIRModelGillespie(Rule):
-    '''
-    Gillespie algorithm
-
-    SRC: https://en.wikipedia.org/wiki/Gillespie_algorithm
-    '''
+    """Gillespie algorithm.
+    """
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class PoissonIncidenceProcess(PoissonProcess):
-    '''
-    Homogenous and inhomogenous Poisson point process for disease incidence.
+    """Homogenous and inhomogenous Poisson point process for disease incidence.
 
     The non-homogeneity of the Poisson process is handled by allowing the user to specify how the rate (i.e., the
     $\lambda$ parameter) of the process changes over time.  The change to that rate is given as the combination of a
     delta on it and the number of iterations for that delta to take place.  The rate parameter is allowed to change
     gradually (i.e., at every step of the simulation) or in strict increments (e.g., only every 10 iterations) and is
-    controlled by the 'inc_smooth' parameter.
-
-    The rate can change in the following ways (as determined by the 'rate_delta_mode' parameter which takes values of
-    the 'RateDeltaMode' enumeration):
-
-    - NC   No change (i.e., the Poisson process is stationary)
-    - ADD  Additive
-    - MUL  Multiplicative
-    - EXP  Exponential
-    - FN   User-provided lambda function called at every iteration
+    controlled by the ``inc_smooth`` argument.  The rate is determined by the ``rate_delta_mode`` argument.
 
     A Cox process, also known as a doubly stochastic Poisson process is a point process which is a generalization of a
     Poisson process where the time-dependent intensity is itself a stochastic process.  The Cox process can be
     implemented by passing as an argument a function which will be called at every iteration to determine the current
-    Poisson rate.  'rate_delta_mode=RateDeltaMode.FN' must be used in that case.
+    Poisson rate.  ``rate_delta_mode = RateDeltaMode.FN`` must be used in that case.
 
     An example model given as "AD incidence doubles every five years after 65 yo" can be instantiated by using the
     delta of two and the number of iterations of five.
 
-    --------------------------------------------------------------------------------------------------------------------
+    Epidemiology of Alzheimer's disease and other forms of dementia in China, 1990-2010: a systematic review and
+    analysis.  `PDF <https://www.thelancet.com/action/showPdf?pii=S0140-6736%2813%2960221-4>`_
 
-    Epidemiology of Alzheimer's disease and other forms of dementia in China, 1990-2010: a systematic review and analysis.
-    https://www.thelancet.com/action/showPdf?pii=S0140-6736%2813%2960221-4
+    `Wikipedia: Incidence (epidemiology) <https://en.wikipedia.org/wiki/Incidence_(epidemiology)>`_
 
-    --------------------------------------------------------------------------------------------------------------------
+    Rule notation A::
 
-    SRC: https://en.wikipedia.org/wiki/Incidence_(epidemiology); retrieved on 2019.06.05
+        code:
+            PoissonIncidenceProcess('ad', 65, 0.01, 2, 5, rate_delta_mode=PoissonIncidenceProcess.RateDeltaMode.EXP))
 
-    # Incidence (epidemiology)
-    --------------------------
+        init:
+            age_0=65, l_0=0.01, c=2, t_c=5
 
-    Incidence in epidemiology is a measure of the probability of occurrence of a given medical condition in a
-    population within a specified period of time. Although sometimes loosely expressed simply as the number of new
-    cases during some time period, it is better expressed as a proportion or a rate[1] with a denominator.
+        is-applicable:
+            has-attr: age, ad
 
-    Incidence proportion (also known as cumulative incidence) is the number of new cases within a specified time period
-    divided by the size of the population initially at risk. For example, if a population initially contains 1,000
-    non-diseased persons and 28 develop a condition over two years of observation, the incidence proportion is 28 cases
-    per 1,000 persons per two years, i.e. 2.8% per two years.
+        apply:
+            if (group.attr.age >= age_0):
+                l = double_rate(l)        # l0 * c^{(group.attr.age - age_0) / t_c}
+                p_0 = PoissonPMF(l,0)  # ...
+                move-mass:
+                        p_0 -> A:age = group.attr.age + 1
+                    1 - p_0 -> A:age = group.attr.age + 1, A:ad = True
 
-    (...)
+    Rule notation B::
 
-
-    ## Incidence vs. prevalence
-    ---------------------------
-
-    Incidence should not be confused with prevalence, which is the proportion of cases in the population at a given
-    time rather than rate of occurrence of new cases. Thus, incidence conveys information about the risk of contracting
-    the disease, whereas prevalence indicates how widespread the disease is. Prevalence is the proportion of the total
-    number of cases to the total population and is more a measure of the burden of the disease on society with no
-    regard to time at risk or when subjects may have been exposed to a possible risk factor. Prevalence can also be
-    measured with respect to a specific subgroup of a population (see: denominator data). Incidence is usually more
-    useful than prevalence in understanding the disease etiology: for example, if the incidence rate of a disease in a
-    population increases, then there is a risk factor that promotes the incidence.
-
-    For example, consider a disease that takes a long time to cure and was widespread in 2002 but dissipated in 2003.
-    This disease will have both high incidence and high prevalence in 2002, but in 2003 it will have a low incidence
-    yet will continue to have a high prevalence (because it takes a long time to cure, so the fraction of individuals
-    that are affected remains high). In contrast, a disease that has a short duration may have a low prevalence and a
-    high incidence. When the incidence is approximately constant for the duration of the disease, prevalence is
-    approximately the product of disease incidence and average disease duration, so prevalence = incidence × duration.
-    The importance of this equation is in the relation between prevalence and incidence; for example, when the
-    incidence increases, then the prevalence must also increase. Note that this relation does not hold for age-specific
-    prevalence and incidence, where the relation becomes more complicated.[6]
-
-    (...)
-
-
-    ----[ Notation A ]----
-
-    code:
-        PoissonIncidenceProcess('ad', 65, 0.01, 2, 5, rate_delta_mode=PoissonIncidenceProcess.RateDeltaMode.EXP))
-
-    init:
-        age_0=65, l_0=0.01, c=2, t_c=5
-
-    is-applicable:
-        has-attr: age, ad
-
-    apply:
-        if (group.attr.age >= age_0):
+        (group.attr.age >= age_0)
             l = double_rate(l)        # l0 * c^{(group.attr.age - age_0) / t_c}
-            p_0 = PoissonPMF(l,0)  # ...
-            move-mass:
-                    p_0 -> A:age = group.attr.age + 1
-                1 - p_0 -> A:age = group.attr.age + 1, A:ad = True
+            p_0 = PoissonPMF(l,0)
+            p_0     -> A:age = group.attr.age + 1
+            1 - p_0 -> A:age = group.attr.age + 1, A:ad = True
 
-
-    ----[ Notation B ]----
-
-    (group.attr.age >= age_0)
-        l = double_rate(l)        # l0 * c^{(group.attr.age - age_0) / t_c}
-        p_0 = PoissonPMF(l,0)
-        p_0     -> A:age = group.attr.age + 1
-        1 - p_0 -> A:age = group.attr.age + 1, A:ad = True
-
-
-    ----[ Scratchpad ]----
-
-    mu = e^(lambda * x)
-    log(mu) = lambda * x
-
-    log(mu/t) = lambda * x
-    log(mu/t) = lambda * x
-    log(mu) - log(t) = lambda * x
-    log(mu) = lambda * x + log(t)
-
-    log(incidence) = lambda * x + log(age - age_0)
-    '''
+    Args:
+        attr (str): Attribute name for the disease.
+        age_0 (int): Lower bound cut-off age for getting AD.
+        rate_0 (float): Base rate of the Poisson process (i.e., at the cut-off age).
+        delta (float): Increase the rate by this factor.
+        delta_t (float): Increase the rate every this many time units
+        rate_delta_mode (str):
+            - ``NC``  - No change (i.e., the Poisson process is stationary)
+            - ``ADD`` - Additive
+            - ``MUL`` - Multiplicative
+            - ``EXP`` - Exponential
+            - ``FN``  - User-provided lambda function called at every iteration
+        fn_calc_lambda (Callable, optional): Custom lambda function.
+        is_smooth (bool): Smooth increment if true, defined increments otherwise.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
 
     RateDeltaMode = IntEnum('RateDeltaMode', 'NC ADD MUL EXP FN')  # incidence (or rate) change mode
 
-    def __init__(self, attr, age_0, rate_0, delta, delta_t, rate_delta_mode=RateDeltaMode.NC, fn_calc_lambda=None, is_smooth=True, name='change-incidence', t=TimeAlways()):
-        super().__init__(name, t)
+    def __init__(self, attr, age_0, rate_0, delta, delta_t, rate_delta_mode=RateDeltaMode.NC, fn_calc_lambda=None, is_smooth=True, name='change-incidence', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
 
         self.attr = attr            # the attribute name for the disease
         self.age_0 = age_0          # lower bound cut-off age for getting AD
@@ -1597,15 +1826,17 @@ class PoissonIncidenceProcess(PoissonProcess):
         }.get(self.rate_delta_mode)
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         return self.get_split_specs(group)
 
     def calc_lambda_nc(self, age):
-        ''' No rate change (i.e., a stationary Poisson point process). '''
+        """No rate change (i.e., a stationary Poisson point process)."""
 
         return self.rate_0
 
     def calc_lambda_add(self, age):
-        ''' Additive rate change. '''
+        """Additive rate change."""
 
         if self.is_smooth:
             return self.rate_0 + self.delta *            ((age - self.age_0) / self.delta_t)
@@ -1613,7 +1844,7 @@ class PoissonIncidenceProcess(PoissonProcess):
             return self.rate_0 + self.delta *  math.floor((age - self.age_0) / self.delta_t)
 
     def calc_lambda_mul(self, age):
-        ''' Multiplicative rate change. '''
+        """Multiplicative rate change."""
 
         if self.is_smooth:
             return self.rate_0 * self.delta *            ((age - self.age_0) / self.delta_t)
@@ -1621,7 +1852,7 @@ class PoissonIncidenceProcess(PoissonProcess):
             return self.rate_0 * self.delta *  math.floor((age - self.age_0) / self.delta_t)
 
     def calc_lambda_exp(self, age):
-        ''' Exponential rate change. '''
+        """Exponential rate change."""
 
         if self.is_smooth:
             return self.rate_0 * self.delta **           ((age - self.age_0) / self.delta_t)
@@ -1629,17 +1860,17 @@ class PoissonIncidenceProcess(PoissonProcess):
             return self.rate_0 * self.delta ** math.floor((age - self.age_0) / self.delta_t)
 
     def calc_lambda_hmm(self, age):
-        '''
-        Poisson hidden Markov models (PHMM) are special cases of hidden Markov models where a Poisson process has a
-        rate which varies in association with changes between the different states of a Markov model.
-        '''
+        """Poisson hidden Markov models (PHMM) are special cases of hidden Markov models where a Poisson process has a
+        rate which varies in association with changes between the different states of a Markov model."""
 
         return self.rate_0
 
     def get_split_specs(self, group, age_inc=1):
-        '''
-        age_inc - how much to increment the 'age' attribute
-        '''
+        """
+        Args:
+            group (Group): Group.
+            age_inc (int): Number by which to increment the ``age`` attribute.
+        """
 
         age = group.ga('age')
 
@@ -1656,9 +1887,13 @@ class PoissonIncidenceProcess(PoissonProcess):
         ]
 
     def is_applicable(self, group, iter, t):
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
         return super().is_applicable(group, iter, t) and group.ha(['age', self.attr])
 
     def setup(self, pop, group):
+        """See :meth:`pram.rule.Rule.setup <Rule.setup()>`."""
+
         if group.ha('age'):
             return self.get_split_specs(group, 0)
         else:
@@ -1667,59 +1902,62 @@ class PoissonIncidenceProcess(PoissonProcess):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class OneDecayProcess(Rule):
-    '''
-    Radioactive one-decay process.
+    """Radioactive one-decay process.
 
     N(t) = N_0 e^{-\lambda t}
-    '''
+    """
 
     pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SegregationModel(Rule):
-    '''
-    Segregation model.
+    """Segregation model.
 
+   Rule notation A::
 
-    ----[ Notation A ]----
+        code:
+            SegregationModel('team', 2)
 
-    code:
-        SegregationModel('team', 2)
+        init:
+            p_migrate = 0.05
 
-    init:
-        p_migrate = 0.05
+        is-applicable:
+            has-attr: team
+            has-rel: @
 
-    is-applicable:
-        has-attr: team
-        has-rel: @
+        apply:
+            p_team = n@_{attr.team = group.attr.team} / n@  # ...
+            if (p_team < 0.5):
+                rd p_migrate -> R:@ = get_random_site()
+                nc 1 - p_migrate
 
-    apply:
-        p_team = n@_{attr.team = group.attr.team} / n@  # ...
-        if (p_team < 0.5):
-            rd p_migrate -> R:@ = get_random_site()
-            nc 1 - p_migrate
+    Rule notation B::
 
+        p_team = n@_{attr.team = group.attr.team} / n@
+        if (p_team < 0.5) p_migrate -> R:@ = get_random_site()
 
-    ----[ Notation B ]----
+    Args:
+        attr (str): Name.
+        attr_dom_card (str): Cardinality of the attribute values set.
+        p_migrate (str): Probability of the population to migrate if repelled.
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
 
-    p_team = n@_{attr.team = group.attr.team} / n@
-    if (p_team < 0.5) p_migrate -> R:@ = get_random_site()
-    '''
-
-    def __init__(self, attr, attr_dom_card, p_migrate=0.05):
-        '''
-        attr_dom_card - cardinality of the attribute values set
-        p_migrate     - the proportion of the population to migrate if repelled
-        '''
-
-        super().__init__('segregation-model', TimeAlways())
+    def __init__(self, attr, attr_dom_card, p_migrate=0.05, name='segregation-model', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
 
         self.attr = attr
         self.p_migrate = p_migrate           # proportion of the population that will migrate if repelled
         self.p_repel = 1.00 / attr_dom_card  # population will be repelled (i.e., will move) if the site that population is at has a proportion of same self.attr lower than this
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         attr_val = group.get_attr(self.attr)
         site     = group.get_site_at()
         m        = site.get_mass()
@@ -1740,7 +1978,7 @@ class SegregationModel(Rule):
             return None
 
     def get_random_site(self, pop, site):
-        ''' Returns a random site different than the specified one. '''
+        """Get a random site different than the specified one."""
 
         s = random.choice(list(pop.sites.values()))
         while s == site:
@@ -1748,26 +1986,27 @@ class SegregationModel(Rule):
         return s
 
     def is_applicable(self, group, iter, t):
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
         return super().is_applicable(group, iter, t) and group.ha([self.attr]) and group.hr([Site.AT])
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SEIRModel(Rule, ABC):
-    '''
-    The SEIR compartmental epidemiological model.
+    """The SEIR compartmental epidemiological model.
+    """
 
-    Disease states (SEIR)
-        S Susceptible
-        E Exposed (i.e., incubation period)
-        I Infectious (can infect other agents)
-        R Recovered
-
-    State transition timing
-        S  Until E (either by another agent or on import)
-        E  Random sample
-        I  Random sample
-        R  Indefinite
-    '''
+    # Disease states (SEIR)
+    #     S Susceptible
+    #     E Exposed (i.e., incubation period)
+    #     I Infectious (can infect other agents)
+    #     R Recovered
+    #
+    # State transition timing
+    #     S  Until E (either by another agent or on import)
+    #     E  Random sample
+    #     I  Random sample
+    #     R  Indefinite
 
     State = IntEnum('State', 'S E I R')
 
@@ -1779,8 +2018,8 @@ class SEIRModel(Rule, ABC):
 
 
     # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, name='seir', t=TimeAlways(), susceptibility=1.0, p_start_E=0.05, do_clean=True, name_human=None, memo=None):
-        super().__init__(name, t, name_human, memo)
+    def __init__(self, name='seir', t=TimeAlways(), susceptibility=1.0, p_start_E=0.05, do_clean=True, memo=None):
+        super().__init__(name, t, memo)
 
         self.susceptibility = susceptibility
         self.p_start_E = p_start_E    # prob of starting in the E state
@@ -1788,6 +2027,8 @@ class SEIRModel(Rule, ABC):
 
     # ------------------------------------------------------------------------------------------------------------------
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         if iter == 0:
             return [
                 GroupSplitSpec(p=    self.p_start_E, attr_set={ self.__class__.ATTR: self.__class__.State.E }),
@@ -1872,98 +2113,103 @@ class SEIRModel(Rule, ABC):
 
     # ------------------------------------------------------------------------------------------------------------------
     def is_applicable(self, group, iter, t):
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
         return super().is_applicable(group, iter, t) and group.get_attr(self.__class__.ATTR) in self.__class__.State
 
     def setup(self, pop, group):
+        """See :meth:`pram.rule.Rule.setup <Rule.setup()>`."""
+
         return [GroupSplitSpec(p=1.0, attr_set={ self.__class__.ATTR: __class__.State.S })]
 
     def cleanup(self, pop, group):
+        """See :meth:`pram.rule.Rule.cleanup <Rule.cleanup()>`."""
+
         return [GroupSplitSpec(p=1.0, attr_del=['tE', 'tI'])]
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SEIRFluModel(SEIRModel):
-    '''
-    The SEIR model for the influenza.
+    """The SEIR model for the influenza.
+    """
 
-    --------------------------------------------------------------------------------------------------------------------
-    This part is taken from the "FRED daily rules" by David Sinclair and John Grefenstette (5 Feb, 2019)
-    --------------------------------------------------------------------------------------------------------------------
-
-    Disease states (SEIR)
-        S  Susceptible
-        E  Exposed (i.e., incubation period)
-        IS Infectious & Symptomatic (can infect other agents)
-        IA Infectious & Asymptomatic (can infect other agents)
-        R  Recovered
-
-    State transition probability
-        S  --> E   1.00
-        E  --> IS  0.67
-        E  --> IA  0.33
-        IS --> R   1.00
-        IA --> R   1.00
-
-    State transition timing
-        S      Until E (either by another agent or on import)
-        E      Median = 1.9, dispersion = 1.23 days (M= 45.60, d=29.52 hours)
-        IS/IA  Median = 5.0, dispersion = 1.50 days (M=120.00, d=36.00 hours)
-        R      Indefinite
-
-    Probability of staying home
-        IS/IA  0.50
-
-    Time periods
-        Drawn from a log-normal distribution
-            median = exp(mean)
-        Dispersion is equivalent to the standard deviation, but with range of [median/dispersion, median*dispersion]
-            E      [1.54, 2.34] days ([36.96,  56.16] hours)
-            IS/IA  [3.33, 7.50] days ([79.92, 180.00] hours)
-
-    --------------------------------------------------------------------------------------------------------------------
-    This part is taken from FRED docs on parameters (github.com/PublicHealthDynamicsLab/FRED/wiki/Parameters)
-    --------------------------------------------------------------------------------------------------------------------
-
-    The median and dispersion of the lognormal distribution are typically how incubation periods and symptoms are
-    reported in the literature (e.g., Lessler, 2009).  They are translated into to the parameters of the lognormal
-    distribution using the formulas:
-
-        location = log(median)
-        scale = 0.5 * log(dispersion)
-
-    We can expect that about 95% of the draws from this lognormal distribution will fall between (median / dispersion)
-    and (median * dispersion).
-
-    Example (Lessler, 2009):
-
-        influenza_incubation_period_median     = 1.9
-        influenza_incubation_period_dispersion = 1.81
-        influenza_symptoms_duration_median     = 5.0
-        influenza_symptoms_duration_dispersion = 1.5
-
-    These values give an expected incubation period of about 1 to 3.5 days, and symptoms lasting about 3 to 7.5 days.
-
-    --------------------------------------------------------------------------------------------------------------------
-    This part is based on my own reading of the following article:
-    Lessler (2009) Incubation periods of acute respiratory viral infections -- A systematic review.
-    --------------------------------------------------------------------------------------------------------------------
-
-    Influenza A
-        incubation period median     = 1.9
-        incubation period dispersion = 1.22
-
-    Timer
-        1. Sample once per time step and store the current time in state as group attribute.
-        2. Sample once and register a timer event with the global simulation timer which will perform the appropriate
-           mass distribution.
-    '''
+    # --------------------------------------------------------------------------------------------------------------------
+    # This part is taken from the "FRED daily rules" by David Sinclair and John Grefenstette (5 Feb, 2019)
+    # --------------------------------------------------------------------------------------------------------------------
+    #
+    # Disease states (SEIR)
+    #     S  Susceptible
+    #     E  Exposed (i.e., incubation period)
+    #     IS Infectious & Symptomatic (can infect other agents)
+    #     IA Infectious & Asymptomatic (can infect other agents)
+    #     R  Recovered
+    #
+    # State transition probability
+    #     S  --> E   1.00
+    #     E  --> IS  0.67
+    #     E  --> IA  0.33
+    #     IS --> R   1.00
+    #     IA --> R   1.00
+    #
+    # State transition timing
+    #     S      Until E (either by another agent or on import)
+    #     E      Median = 1.9, dispersion = 1.23 days (M= 45.60, d=29.52 hours)
+    #     IS/IA  Median = 5.0, dispersion = 1.50 days (M=120.00, d=36.00 hours)
+    #     R      Indefinite
+    #
+    # Probability of staying home
+    #     IS/IA  0.50
+    #
+    # Time periods
+    #     Drawn from a log-normal distribution
+    #         median = exp(mean)
+    #     Dispersion is equivalent to the standard deviation, but with range of [median/dispersion, median*dispersion]
+    #         E      [1.54, 2.34] days ([36.96,  56.16] hours)
+    #         IS/IA  [3.33, 7.50] days ([79.92, 180.00] hours)
+    #
+    # --------------------------------------------------------------------------------------------------------------------
+    # This part is taken from FRED docs on parameters (github.com/PublicHealthDynamicsLab/FRED/wiki/Parameters)
+    # --------------------------------------------------------------------------------------------------------------------
+    #
+    # The median and dispersion of the lognormal distribution are typically how incubation periods and symptoms are
+    # reported in the literature (e.g., Lessler, 2009).  They are translated into to the parameters of the lognormal
+    # distribution using the formulas:
+    #
+    #     location = log(median)
+    #     scale = 0.5 * log(dispersion)
+    #
+    # We can expect that about 95% of the draws from this lognormal distribution will fall between (median / dispersion)
+    # and (median * dispersion).
+    #
+    # Example (Lessler, 2009):
+    #
+    #     influenza_incubation_period_median     = 1.9
+    #     influenza_incubation_period_dispersion = 1.81
+    #     influenza_symptoms_duration_median     = 5.0
+    #     influenza_symptoms_duration_dispersion = 1.5
+    #
+    # These values give an expected incubation period of about 1 to 3.5 days, and symptoms lasting about 3 to 7.5 days.
+    #
+    # --------------------------------------------------------------------------------------------------------------------
+    # This part is based on my own reading of the following article:
+    # Lessler (2009) Incubation periods of acute respiratory viral infections -- A systematic review.
+    # --------------------------------------------------------------------------------------------------------------------
+    #
+    # Influenza A
+    #     incubation period median     = 1.9
+    #     incubation period dispersion = 1.22
+    #
+    # Timer
+    #     1. Sample once per time step and store the current time in state as group attribute.
+    #     2. Sample once and register a timer event with the global simulation timer which will perform the appropriate
+    #        mass distribution.
 
     ATTR = 'flu-state'
     NAME = 'SEIR flu model'
 
     # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, t=TimeAlways(), susceptibility=1.0, p_start_E=0.05, do_clean=True, name_human=None, memo=None):
-        super().__init__('flu', t, susceptibility, p_start_E, do_clean, name_human, memo)
+    def __init__(self, t=TimeAlways(), susceptibility=1.0, p_start_E=0.05, do_clean=True, memo=None):
+        super().__init__('flu', t, susceptibility, p_start_E, do_clean, memo)
 
         # self.T['E_median']     = lambda: 1.90 * self.t_mul
         # self.T['E_dispersion'] = 1.23
@@ -1993,7 +2239,8 @@ class SEIRFluModel(SEIRModel):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class GoToRule(Rule):
-    '''
+    """GoTo.
+
     Changes the location of a group from the designated site to the designated site.  Both of the sites are
     specificed by relation name (e.g., 'store').  The rule will only apply to a group that (a) is currently located at
     the "from" relation and has the "to" relation.  If the "from" argument is None, all groups will qualify as long as
@@ -2004,14 +2251,20 @@ class GoToRule(Rule):
     The group's current location is defined by the 'Site.AT' relation name and that's the relation that this rule
     updates.
 
-    Example uses:
-        - Compel a portion of agents that are at 'home' go to 'work' or vice versa
-    '''
+    Example use is to compel a portion of agents that are at ``home`` go to ``work`` or vice versa.
+
+    Args:
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
 
     NAME = 'Goto'
 
-    def __init__(self, p, rel_from, rel_to, t=TimeAlways(), i=IterAlways(), name_human=None, memo=None):
-        super().__init__('goto', t, i, name_human, memo)
+    def __init__(self, p, rel_from, rel_to, name='goto', t=TimeAlways(), i=IterAlways(), group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
 
         # Err.type(rel_from, 'rel_from', str, True)
         # Err.type(rel_to, 'rel_to', str)
@@ -2021,12 +2274,16 @@ class GoToRule(Rule):
         self.rel_to = rel_to
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         return [
             GroupSplitSpec(p=self.p, rel_set={ Site.AT: group.get_rel(self.rel_to) }),
             GroupSplitSpec(p=1 - self.p)
         ]
 
     def is_applicable(self, group, iter, t):
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
         if not super().is_applicable(group, iter, t):
             return False
 
@@ -2043,7 +2300,8 @@ class GoToRule(Rule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class GoToAndBackTimeAtRule(Rule):
-    '''
+    """GoTo and back.
+
     Compels agents to go to the designated site and back; agents stay at the destination for a specificed amount of
     time.
 
@@ -2056,7 +2314,19 @@ class GoToAndBackTimeAtRule(Rule):
 
     This rule is only applicable to groups with both to and from sites and only those that are currently located at the
     latter.
-    '''
+
+    Args:
+        to (str): Name of destination site.
+        back (str): Name of source site.
+        time_pdf_to (Mapping[int,float]): PDF for going to the destination site.
+        time_pdf_back (Mapping[int,float]): PDF for going back to the source site.
+        do_force_back (bool): Force the entire population back to the source site?
+        name (str): Name.
+        t (:class:`~pram.rule.Time`, int, tuple[int,int], set[int]): Compatible time selector.
+        i (:class:`~pram.rule.Iter`, int, tuple[int,int], set[int]): Compatible iteration selector.
+        group_qry (GroupQry, optional): Compatible group selector.
+        memo (str, optional): Description.
+    """
 
     # TODO: Switch from PDF to CDF because it's more natural.
 
@@ -2065,8 +2335,8 @@ class GoToAndBackTimeAtRule(Rule):
     TIME_PDF_TO_DEF   = { 8: 0.5, 12:0.5 }
     TIME_PDF_BACK_DEF = { 1: 0.05, 3: 0.2, 4: 0.25, 5: 0.2, 6: 0.1, 7: 0.1, 8: 0.1 }
 
-    def __init__(self, t=[8,16], i=None, to='school', back='home', time_pdf_to=None, time_pdf_back=None, t_at_attr='t@', do_force_back=True, name_human=None, memo=None):
-        super().__init__('to-and-back', t, i, name_human, memo)
+    def __init__(self, to='school', back='home', time_pdf_to=None, time_pdf_back=None, t_at_attr='t@', do_force_back=True, name='to-and-back', t=[8,16], i=IterAlways(), group_qry=None, memo=None):
+        super().__init__(name, t, i, group_qry, memo)
 
         self.to   = to
         self.back = back
@@ -2081,6 +2351,8 @@ class GoToAndBackTimeAtRule(Rule):
         self.do_force_back = do_force_back  # force all agents to go back at the end of rule time (i.e., 't.t1')?
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         if group.has_rel({ Site.AT: group.get_rel(self.back) }) and not group.has_attr(self.t_at_attr):
             return self.apply_to(group, iter, t)
 
@@ -2110,6 +2382,8 @@ class GoToAndBackTimeAtRule(Rule):
         ]
 
     def is_applicable(self, group, iter, t):
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
         return super().is_applicable(group, iter, t) and group.has_sites([self.to, self.back])
 
 
@@ -2117,8 +2391,8 @@ class GoToAndBackTimeAtRule(Rule):
 class ResetRule(Rule):
     NAME = 'Reset'
 
-    def __init__(self, t=5, i=None, attr_del=None, attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
-        super().__init__('reset', t, i, name_human, memo)
+    def __init__(self, t=5, i=None, attr_del=None, attr_set=None, rel_del=None, rel_set=None, memo=None):
+        super().__init__('reset', t, i, memo)
 
         self.attr_del = attr_del
         self.attr_set = attr_set
@@ -2126,6 +2400,8 @@ class ResetRule(Rule):
         self.rel_set  = rel_set
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         return [GroupSplitSpec(p=1.0, attr_del=self.attr_del, attr_set=self.attr_set, rel_del=self.rel_del, rel_set=self.rel_del)]
 
 
@@ -2133,11 +2409,13 @@ class ResetRule(Rule):
 class ResetSchoolDayRule(ResetRule):
     NAME = 'Reset school day'
 
-    def __init__(self, t=5, i=None, attr_del=['t-at-school'], attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
-        super().__init__(t, i, attr_del, attr_set, rel_del, rel_set, name_human, memo)
+    def __init__(self, t=5, i=None, attr_del=['t-at-school'], attr_set=None, rel_del=None, rel_set=None, memo=None):
+        super().__init__(t, i, attr_del, attr_set, rel_del, rel_set, memo)
         self.name = 'reset-school-day'
 
     def is_applicable(self, group, iter, t):
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
         return super().is_applicable(group, iter, t) and group.has_sites(['home', 'school'])
 
 
@@ -2145,11 +2423,13 @@ class ResetSchoolDayRule(ResetRule):
 class ResetWorkDayRule(ResetRule):
     NAME = 'Reset work day'
 
-    def __init__(self, t=5, i=None, attr_del=None, attr_set=None, rel_del=None, rel_set=None, name_human=None, memo=None):
-        super().__init__(t, i, attr_del, attr_set, rel_del, rel_set, name_human, memo)
+    def __init__(self, t=5, i=None, attr_del=None, attr_set=None, rel_del=None, rel_set=None, memo=None):
+        super().__init__(t, i, attr_del, attr_set, rel_del, rel_set, memo)
         self.name = 'reset-work-day'
 
     def is_applicable(self, group, iter, t):
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
         return super().is_applicable(group, iter, t) and group.has_sites(['home', 'work'])
 
 
@@ -2157,13 +2437,15 @@ class ResetWorkDayRule(ResetRule):
 class RuleAnalyzerTestRule(Rule):
     NAME = 'Rule analyzer test'
 
-    def __init__(self, t=[8,20], i=None, name_human=None, memo=None):
-        super().__init__('progress-flu', t, i, name_human, memo)
+    def __init__(self, t=[8,20], i=None, memo=None):
+        super().__init__('progress-flu', t, i, memo)
 
     def an(self, s): return f'b{s}'  # attribute name
     def rn(self, s): return f's{s}'  # relation  name
 
     def apply(self, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         if group.has_attr({ 'flu-stage': 's' }):
             pass
         elif group.has_attr({ 'flu-stage': 'i' }):
@@ -2172,6 +2454,8 @@ class RuleAnalyzerTestRule(Rule):
             pass
 
     def is_applicable(self, group, iter, t):
+        """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
+
         g = group
         c01, c02, c03, c04, c05 = 'cc01', 'cc02', 'cc03', 'cc04', 'cc05'  # attribute names stored in local variables
         s01, s02, s03, s04, s05 = 'ss01', 'ss02', 'ss03', 'ss04', 'ss05'  # ^ (relation)
@@ -2191,47 +2475,46 @@ class RuleAnalyzerTestRule(Rule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SimpleFluProgressRule(Rule):
-    '''
-    Describes how a population transitions between the flu states of susceptible, infected, and recovered.
+    """Describes how a population transitions between the flu states of susceptible, infected, and recovered.
 
+    Rule notation A::
 
-    ----[ Notation A ]----
+        code:
+            SimpleFluProgressRule()
 
-    code:
-        SimpleFluProgressRule()
+        is-applicable:
+            has-attr: flu
 
-    is-applicable:
-        has-attr: flu
+        apply:
+            if group.attr.flu = 's':
+                p_inf = n@_{attr.flu = 'i'} / n@
+                move-mass:
+                    p_inf -> A:flu = 'i'
+            if group.attr.flu = 'i':
+                move-mass:
+                    0.2 -> A:flu = 'r'
+            if group.attr.flu = 'r':
+                move-mass:
+                    0.1 -> A:flu = 's'
 
-    apply:
-        if group.attr.flu = 's':
-            p_inf = n@_{attr.flu = 'i'} / n@
-            move-mass:
-                p_inf -> A:flu = 'i'
-        if group.attr.flu = 'i':
-            move-mass:
-                0.2 -> A:flu = 'r'
-        if group.attr.flu = 'r':
-            move-mass:
-                0.1 -> A:flu = 's'
+    Rule notation B::
 
-
-    ----[ Notation B ]----
-
-    if (flu = s)
-        p_inf = n@_{attr.flu = i} / n@
-        p_inf -> A: flu = 'i'
-    if (flu = i) 0.2 > A:flu = r
-    if (flu = r) 0.1 > A:flu = s
-    '''
+        if (flu = s)
+            p_inf = n@_{attr.flu = i} / n@
+            p_inf -> A: flu = 'i'
+        if (flu = i) 0.2 > A:flu = r
+        if (flu = r) 0.1 > A:flu = s
+    """
 
     ATTRS = { 'flu': [ 's', 'i', 'r' ] }
     NAME = 'Simple flu progression model'
 
-    def __init__(self, t=None, i=None, name_human=None, memo=None):
-        super().__init__('flu-progress-simple', t, i, name_human, memo)
+    def __init__(self, t=None, i=None, memo=None):
+        super().__init__('flu-progress-simple', t, i, memo)
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
             p_infection = group.get_site_at().get_mass_prop(GroupQry(attr={ 'flu': 'i' }))
@@ -2257,6 +2540,8 @@ class SimpleFluProgressRule(Rule):
         raise ValueError('Unknown flu state')
 
     def setup(self, pop, group):
+        """See :meth:`pram.rule.Rule.setup <Rule.setup()>`."""
+
         return [
             GroupSplitSpec(p=0.9, attr_set={ 'flu': 's' }),
             GroupSplitSpec(p=0.1, attr_set={ 'flu': 'i' })
@@ -2265,52 +2550,51 @@ class SimpleFluProgressRule(Rule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SimpleFluProgressMoodRule(Rule):
-    '''
-    Describes how a population transitions between the states of susceptible, infected, and recovered.  Includes the
+    """Describes how a population transitions between the states of susceptible, infected, and recovered.  Includes the
     inconsequential 'mood' attribute which may improve exposition of how the PRAM framework works.
 
+    Rule notation A::
 
-    ----[ Notation A ]----
+        code:
+            SimpleFluProgressMoodRule()
 
-    code:
-        SimpleFluProgressMoodRule()
+        is-applicable:
+            has-attr: flu
 
-    is-applicable:
-        has-attr: flu
+        apply:
+            if group.attr.flu = 's':
+                p_inf = n@_{attr.flu = 'i'} / n@
+                move-mass:
+                    p_inf -> A:flu = 'i', A:mood = 'annoyed'
+            if group.attr.flu = 'i':
+                move-mass:
+                    0.2 -> A:flu = 'r', A:mood = 'happy'
+                    0.5 ->              A:mood = 'bored'
+                    0.3 ->              A:mood = 'annoyed'
+            if group.attr.flu = 'r':
+                move-mass:
+                    0.1 -> A:flu = 's'
 
-    apply:
-        if group.attr.flu = 's':
-            p_inf = n@_{attr.flu = 'i'} / n@
-            move-mass:
-                p_inf -> A:flu = 'i', A:mood = 'annoyed'
-        if group.attr.flu = 'i':
-            move-mass:
-                0.2 -> A:flu = 'r', A:mood = 'happy'
-                0.5 ->              A:mood = 'bored'
-                0.3 ->              A:mood = 'annoyed'
-        if group.attr.flu = 'r':
-            move-mass:
-                0.1 -> A:flu = 's'
+    Rule notation B::
 
-
-    ----[ Notation B ]----
-
-    if (flu = s)
-        p_inf = n@_{attr.flu = i} / n@
-        p_inf -> A:flu = 'i', A:mood = 'annoyed'
-    if (flu = i)
-        0.2 -> A:flu = 'r', A:mood = 'happy'
-        0.5 ->              A:mood = 'bored'
-        0.3 ->              A:mood = 'annoyed'
-    if (flu = r) 0.1 > A:flu = s
-    '''
+        if (flu = s)
+            p_inf = n@_{attr.flu = i} / n@
+            p_inf -> A:flu = 'i', A:mood = 'annoyed'
+        if (flu = i)
+            0.2 -> A:flu = 'r', A:mood = 'happy'
+            0.5 ->              A:mood = 'bored'
+            0.3 ->              A:mood = 'annoyed'
+        if (flu = r) 0.1 > A:flu = s
+    """
 
     NAME = 'Simple flu progression model with mood'
 
-    def __init__(self, t=TimeAlways(), name_human=None, memo=None):
-        super().__init__('flu-progress-simple', t, name_human, memo)
+    def __init__(self, t=TimeAlways(), memo=None):
+        super().__init__('flu-progress-simple', t, memo)
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         # Susceptible:
         if group.has_attr({ 'flu': 's' }):
             p_infection = group.get_site_at().get_mass_prop(GroupQry(attr={ 'flu': 'i' }))
@@ -2341,53 +2625,52 @@ class SimpleFluProgressMoodRule(Rule):
 
 # ----------------------------------------------------------------------------------------------------------------------
 class SimpleFluLocationRule(Rule):
-    '''
-    Describes how student population changes location conditional upon being exposed to the flu.
+    """Describes how student population changes location conditional upon being exposed to the flu.
 
+    Rule notation A::
 
-    ----[ Notation A ]----
+        code:
+            SimpleFluLocationRule()
 
-    code:
-        SimpleFluLocationRule()
+        is-applicable:
+            has-attr: flu
+            has-rel: home, school
 
-    is-applicable:
-        has-attr: flu
-        has-rel: home, school
+        apply:
+            if group.attr.flu = 'i':
+                if group.attr.income = 'l':
+                    rd 0.1 -> R:@ = group.rel.home  # rd - redistribute mass
+                    nc 0.9                          # nc - no change
+                if group.attr.income = 'm':
+                    rd 0.6 -> R:@ = group.rel.home
+                    nc 0.4
+            if group.attr.flu = 'r':
+                rd 0.8 -> R:@ = group.rel.school
+                nc 0.2
 
-    apply:
-        if group.attr.flu = 'i':
-            if group.attr.income = 'l':
-                rd 0.1 -> R:@ = group.rel.home  # rd - redistribute mass
-                nc 0.9                          # nc - no change
-            if group.attr.income = 'm':
-                rd 0.6 -> R:@ = group.rel.home
+    Rule notation B::
+
+        if (flu = i)
+            if (income = l)
+                rd 0.1 -> R:@ = home
+                nc 0.9
+            if (income = m)
+                rd 0.6 > R:@ = home
                 nc 0.4
-        if group.attr.flu = 'r':
-            rd 0.8 -> R:@ = group.rel.school
+        if (flu = r)
+            rd 0.8 > R:@ = school
             nc 0.2
-
-
-    ----[ Notation B ]----
-
-    if (flu = i)
-        if (income = l)
-            rd 0.1 -> R:@ = home
-            nc 0.9
-        if (income = m)
-            rd 0.6 > R:@ = home
-            nc 0.4
-    if (flu = r)
-        rd 0.8 > R:@ = school
-        nc 0.2
-    '''
+    """
 
     ATTRS = { 'flu': [ 's', 'i', 'r' ], 'income': ['l', 'm'] }
     NAME = 'Simple flu location model'
 
-    def __init__(self, t=TimeAlways(), name_human=None, memo=None):
-        super().__init__('flu-location', t, name_human, memo)
+    def __init__(self, t=TimeAlways(), memo=None):
+        super().__init__('flu-location', t, memo)
 
     def apply(self, pop, group, iter, t):
+        """See :meth:`pram.rule.Rule.apply <Rule.apply()>`."""
+
         # Infected and low income:
         if group.has_attr({ 'flu': 'i', 'income': 'l' }):
             return [

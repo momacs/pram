@@ -117,7 +117,7 @@ class AttrRelEncoder(object):
 
         Args:
             obj (object): The object (currently, an instance of Group or GroupQry).
-            is_enc (bool): Flag: Should the object be already encoded?
+            is_enc (bool, optional): Should the object be already encoded?
 
         Returns:
             Iterable[object]: The list of objects that meet the criteria specified above.
@@ -134,7 +134,7 @@ class AttrRelEncoder(object):
             obj (object): The object (currently, an instance of Group or GroupQry).
 
         Returns:
-            self: For method call chaining.
+            ``self``
 
         Todo:
             Currently unused and unneeded.  Implement if that changes.
@@ -151,7 +151,7 @@ class AttrRelEncoder(object):
             obj (object): The object (currently, an instance of Group or GroupQry).
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         for o in self.__class__._prep_obj(obj, False):
@@ -218,7 +218,7 @@ class AttrRelEncoder(object):
             p (Probe): Probe to be encoded.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         if isinstance(p, GroupProbe):
@@ -257,9 +257,9 @@ class GroupPopulation(object):
 
     Args:
         sim (Simulation): The simulation.
-        do_keep_mass_flow_specs (bool): Flag: Store the last iteration mass flow specs?  This is False by default for
-            memory usage sake.  If set to True, ``self.last_iter.mass_flow_specs`` will hold the specs until they are
-            overwriten at the next iteration of the simulation.
+        do_keep_mass_flow_specs (bool, optional): Store the last iteration mass flow specs?  This is False by default
+            for memory usage sake.  If set to True, ``self.last_iter.mass_flow_specs`` will hold the specs until they
+            are overwriten at the next iteration of the simulation.
     """
 
     def __init__(self, sim, hist_len=0, do_keep_mass_flow_specs=False):
@@ -316,7 +316,7 @@ class GroupPopulation(object):
             group (Group): The group being added.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         if not self.is_frozen:
@@ -350,7 +350,7 @@ class GroupPopulation(object):
             groups (Iterable[Group]): Groups to be added.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         for g in groups:
@@ -366,7 +366,7 @@ class GroupPopulation(object):
             resource (Resource): The resource to be added.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         h = resource.get_hash()
@@ -385,7 +385,7 @@ class GroupPopulation(object):
             resource (Resource): The resource to be added.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         for r in resources:
@@ -399,7 +399,7 @@ class GroupPopulation(object):
             site (Site): The site to be added.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         h = site.get_hash()
@@ -417,7 +417,7 @@ class GroupPopulation(object):
             sites (Site): The sites to be added.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         for s in sites:
@@ -434,7 +434,7 @@ class GroupPopulation(object):
             group (Group): The group being added.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         g = self.vita_groups.get(group.get_hash())
@@ -460,13 +460,12 @@ class GroupPopulation(object):
             rules (Iterable[Rule]): The rules.
             iter (int): Simulation interation.
             t (int): Simulation time.
-            is_rule_setup (bool): Flag: Is this invocation of this method during rule setup stage of the simulation?
-            is_rule_cleanup (bool): Flag: Is this invocation of this method during rule cleanup stage of the
-                simulation?
-            is_sim_setup (bool): Flag: Is this invocation of this method during simulation setup stage?
+            is_rule_setup (bool): Is this invocation of this method during rule setup stage of the simulation?
+            is_rule_cleanup (bool): Is this invocation of this method during rule cleanup stage of the simulation?
+            is_sim_setup (bool): Is this invocation of this method during simulation setup stage?
 
         Returns:
-            self: For method call chaining.
+            ``self``
 
         Todo:
             Optimize by using hashes if groups already exist and Group objects if they don't.
@@ -499,7 +498,7 @@ class GroupPopulation(object):
         method).
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         self.groups = { k:v for k,v in self.groups.items() if v.m > 0 }
@@ -514,7 +513,7 @@ class GroupPopulation(object):
         (2) Move mass from VITA groups to their corresponding groups.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         # (1) Remove VOID groups (no dict comprehension because we want to edit the existing dict in-place):
@@ -548,7 +547,7 @@ class GroupPopulation(object):
         only used to determine the total population size.
 
         Returns:
-            self: For method call chaining.
+            ``self``
         """
 
         # [g.freeze() for g in self.groups.values()]
@@ -562,15 +561,14 @@ class GroupPopulation(object):
         return self
 
     def gen_agent_pop(self):
+        """Generates a population of agents based on the current groups population.
+
+        Todo:
+            Implement.
+
+        Returns
+            AgentPopulation
         """
-        Args:
-
-
-        Returns:
-            self: For method call chaining.
-        """
-
-        ''' Generates a population of agents based on the current groups population. '''
 
         pass
 
@@ -589,12 +587,13 @@ class GroupPopulation(object):
         return self.groups.get(Group.gen_hash(attr, rel))
 
     def get_group_cnt(self, only_non_empty=False):
-        """
-        Args:
+        """Get number of groups.
 
+        Args:
+            only_non_empty (bool, optional): Count only non-empty group?
 
         Returns:
-            self: For method call chaining.
+            int
         """
 
         if only_non_empty:
@@ -611,7 +610,7 @@ class GroupPopulation(object):
         :class:`~pram.entity.Site`.
 
         Args:
-            qry (GroupQry): The group query.
+            qry (GroupQry, optional): The group query.
 
         Returns:
             [Group]: List of groups (can be empty)
@@ -638,9 +637,9 @@ class GroupPopulation(object):
 
         Args:
             qry (GroupQry, optional): Group condition.
-            hist_delta (int): Number of steps back in the history to base the delta off of.  For instance, a value of 2
-                will yield the change of mass compared to two iterations back.  The group's history must be long enough
-                (controlled by :attribute:`~pram.entity.Group.hist_len`).
+            hist_delta (int, optional): Number of steps back in the history to base the delta off of.  For instance, a
+                value of 2 will yield the change of mass compared to two iterations back.  The group's history must be
+                long enough (controlled by ``hist_len`` attribute).
 
         Returns:
             float: Mass
@@ -700,43 +699,37 @@ class GroupPopulation(object):
         return self.m
 
     def get_next_group_name(self):
-        """
-        Args:
+        """Get the next group name.
 
+        To be used by sequential group adding if naming groups is desired.
 
         Returns:
-            self: For method call chaining.
+            str
         """
 
         return f'g.{len(self.groups)}'
 
     def get_site_cnt(self):
-        """
-        Args:
-
+        """Get number of sites.
 
         Returns:
-            self: For method call chaining.
+            int
         """
 
         return len(self.sites)
 
     def transfer_mass(self, src_group_hashes, mass_flow_specs, iter, t, is_sim_setup):
-        """
-        Args:
+        """Transfers population mass.
 
-
-        Returns:
-            self: For method call chaining.
-        """
-
-        '''
         Transfers the mass as described by the list of "destination" groups.  "Source" groups (i.e., those that
         participate in mass transfer) have their masses reset before the most-transfer mass is tallied up.
 
         Because this method is called only once per simulation iteration, it is a good place to put simulation-
         wide computations that should happen after the iteration-specific computations have concluded.
-        '''
+
+        Returns:
+            ``self``
+        """
 
         m_flow_tot = 0  # total mass transferred
 
