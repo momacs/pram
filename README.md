@@ -21,6 +21,7 @@ This software is in the pre-release stage.
 - [dotmap](https://pypi.org/project/dotmap)
 - [iteround](https://pypi.org/project/iteround)
 - [matplotlib](https://matplotlib.org)
+- [NetworkX](https://networkx.github.io)
 - [numpy](https://www.numpy.org)
 - [psutil](https://github.com/giampaolo/psutil)
 - [psycopg2](https://www.psycopg.org/)
