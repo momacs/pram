@@ -14,6 +14,8 @@ from abc import abstractmethod, ABC
 
 from dotmap import DotMap
 
+from ..data   import ProbePersistenceMem, GroupSizeProbe
+from ..entity import Group
 from  .model  import Model, ModelConstructionError, MCSolver, ODESolver
 from ..entity import GroupQry
 from ..rule   import TimeAlways, IterAlways, DiscreteInvMarkovChain, ODEDerivatives, ODESystemMass
@@ -270,7 +272,7 @@ class SEIRModel_MC(DiscreteInvMarkovChain):
 
     Model parameters:
         - beta  - Transmission rate (or effective contact rate)
-        - k     - Progression rate from exposed (latent) to infected
+        - kappa - Progression rate from exposed (latent) to infected
         - gamma - Recovery rate
     """
 
@@ -365,6 +367,13 @@ class SEIRModel(Model):
     """SEIR model interface.
     """
 
+    SERIES = [
+        { 'var': 'p0', 'lw': 0.5, 'color': 'red',    'ms': 0, 'lbl': 'S' },
+        { 'var': 'p1', 'lw': 0.5, 'color': 'blue',   'ms': 0, 'lbl': 'E' },
+        { 'var': 'p2', 'lw': 0.5, 'color': 'green',  'ms': 0, 'lbl': 'I' },
+        { 'var': 'p3', 'lw': 0.5, 'color': 'orange', 'ms': 0, 'lbl': 'R' }
+    ]
+
     def __init__(self, var, beta, kappa, gamma, name='seir-model', t=TimeAlways(), i=IterAlways(), solver=MCSolver(), memo=None, cb_before_apply=None):
         if isinstance(solver, MCSolver):
             self.rule = SEIRModel_MC (var, beta, kappa, gamma, name, t, i, memo, cb_before_apply)
@@ -372,6 +381,17 @@ class SEIRModel(Model):
             self.rule = SEIRModel_ODE(var, beta, kappa, gamma, name, t, i, solver.dt, memo)
         else:
             raise ModelConstructionError('Incompatible solver')
+
+    def get_group_size_probe(self, persistence=ProbePersistenceMem()):
+        return GroupSizeProbe.by_attr(self.rule.attr, self.rule.attr, list(self.rule.tm.keys()), persistence=persistence)
+
+    def get_group_names(var, ord_offset=0):
+        return [
+            (ord_offset + 0, 'S', Group.gen_hash(attr={ var: 's' })),
+            (ord_offset + 1, 'E', Group.gen_hash(attr={ var: 'e' })),
+            (ord_offset + 2, 'I', Group.gen_hash(attr={ var: 'i' })),
+            (ord_offset + 3, 'R', Group.gen_hash(attr={ var: 'r' }))
+        ]
 
 
 class SEQIHRModel(Model):

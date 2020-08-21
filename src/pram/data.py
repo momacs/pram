@@ -55,14 +55,16 @@ class ProbePersistence(ABC):
         pass
 
     @abstractmethod
-    def plot(self, probe, series, figpath=None, figsize=(12,4), legend_loc='upper right', dpi=150):
+    def plot(self, probe, series, ylabel=None, xlabel='Iteration', figpath=None, figsize=None, legend_loc='upper right', dpi=150):
         """Plots data associated with a probe.
 
         Args:
             probe (Probe): The probe.
             series (dict): Series specification (see examples below).
+            ylabel (str): Label of the Y axis.
+            xlabel (str, optional): Label of the X axis.
             figpath (str, optional): Filepath to save the figure.
-            figsize ((int,int)): Figure size in (w,h) format.
+            figsize ((float,float), optional): Figure size in (w,h) format.
             legend_loc (str): Legend location (e.g., 'upper right').
             dpi (int): Resolution.
 
@@ -356,7 +358,7 @@ class ProbePersistenceDB(ProbePersistence):
         probe_item = self.probes[DB.str_to_name(probe.name)]
         probe_item.ins_val.append([c.val for c in probe.consts] + vals)
 
-    def plot(self, probe, series, ylabel='Population mass', xlabel='Iteration', figpath=None, figsize=(12,4), legend_loc='upper right', dpi=150, subplot_l=0.08, subplot_r=0.98, subplot_t=0.95, subplot_b=0.25):
+    def plot(self, probe, series, ylabel='Population mass', xlabel='Iteration', figpath=None, figsize=None, legend_loc='upper right', dpi=150, subplot_l=0.08, subplot_r=0.98, subplot_t=0.95, subplot_b=0.25):
         """Plots data associated with a probe.
 
         Args:
@@ -365,7 +367,7 @@ class ProbePersistenceDB(ProbePersistence):
             ylabel (str): Label of the Y axis.
             xlabel (str, optional): Label of the X axis.
             figpath (str, optional): Filepath to save the figure.
-            figsize ((int,int)): Figure size in (w,h) format.
+            figsize ((float,float), optional): Figure size in (w,h) format.
             legend_loc (str): Legend location (e.g., 'upper right').
             dpi (int): Resolution.
             subplot_l (float): Left margin adjustment.
@@ -380,14 +382,14 @@ class ProbePersistenceDB(ProbePersistence):
 
             p = GroupSizeProbe.by_attr('flu', 'flu', ['s', 'i', 'r'], persistence=ProbePersistenceDB())
 
-            # define a simulation
+            # define a simulation here
 
             series = [
                 { 'var': 'p0', 'lw': 0.75, 'linestyle': '-',  'marker': 'o', 'color': 'red',   'markersize': 0, 'lbl': 'S' },
                 { 'var': 'p1', 'lw': 0.75, 'linestyle': '--', 'marker': '+', 'color': 'blue',  'markersize': 0, 'lbl': 'I' },
                 { 'var': 'p2', 'lw': 0.75, 'linestyle': ':',  'marker': 'x', 'color': 'green', 'markersize': 0, 'lbl': 'R' }
             ]
-            p.plot(series, figsize=(16,3))
+            p.plot(series)
 
         """
 
@@ -430,7 +432,7 @@ class ProbePersistenceDB(ProbePersistence):
 
         if figpath is None:
             mng = plt.get_current_fig_manager()
-            # mng.frame.Maximize(True)    # TODO: [low priority] The below should work on different OSs
+            # mng.frame.Maximize(True)    # TODO: [low priority] This should work on different OSs
             # mng.window.showMaximized()
             # mng.full_screen_toggle()
             # mng.window.state('zoomed')
@@ -958,7 +960,7 @@ class GroupProbe(Probe, ABC):
 
         return '\n'.join(self.msg)
 
-    def plot(self, series, fig_fpath=None, figsize=(8,8), legend_loc='upper right', dpi=300):
+    def plot(self, series, figpath=None, figsize=None, legend_loc='upper right', dpi=300):
         """Plots data associated with a probe.
 
         This method calls :meth:`~pram.data.ProbePersistence.plot`.
@@ -967,7 +969,7 @@ class GroupProbe(Probe, ABC):
         if not self.persistence:
             return print('Plotting error: The probe is not associated with a persistence backend')
 
-        return self.persistence.plot(self, series, 'Probability', fig_fpath, figsize, legend_loc, dpi)
+        return self.persistence.plot(probe=self, series=series, ylabel='Probability', figpath=figpath, figsize=figsize, legend_loc=legend_loc, dpi=dpi)
 
     def set_consts(self, consts=None):
         """Sets the probe's constants.

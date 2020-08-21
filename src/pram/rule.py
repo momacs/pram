@@ -516,7 +516,7 @@ class SimRule(Rule, ABC):
 
         pass
 
-    def is_applicable(self, group, iter, t):
+    def is_applicable(self, iter, t):
         """See :meth:`pram.rule.Rule.is_applicable <Rule.is_applicable()>`."""
 
         return super().is_applicable_iter(iter) and super().is_applicable_time(t)

@@ -1552,7 +1552,7 @@ class TrajectoryEnsemble(object):
 
         return plot if do_ret_plot else self
 
-    def run(self, iter_or_dur=1):
+    def run(self, iter_or_dur=1, is_quiet=False):
         """Run the ensemble.
 
         The ensemble will be executed on a computational cluster if the cluster info has been associated with it or
@@ -1570,11 +1570,11 @@ class TrajectoryEnsemble(object):
             return
 
         if not self.cluster_inf:
-            return self.run__seq(iter_or_dur)
+            return self.run__seq(iter_or_dur, is_quiet)
         else:
-            return self.run__par(iter_or_dur)
+            return self.run__par(iter_or_dur, is_quiet)
 
-    def run__seq(self, iter_or_dur=1):
+    def run__seq(self, iter_or_dur=1, is_quiet=False):
         """Run the ensemble sequentially.
 
         Args:
@@ -1589,20 +1589,25 @@ class TrajectoryEnsemble(object):
         self.unpersisted_probes = []  # added only for congruency with self.run__par()
         traj_col = len(str(len(self.traj)))
         for (i,t) in enumerate(self.traj.values()):
-            # print(f'Running trajectory {i+1} of {len(self.traj)} (iter count: {iter_or_dur}): {t.name or "unnamed simulation"}')
-            with TqdmUpdTo(total=iter_or_dur, miniters=1, desc=f'traj: {i+1:>{traj_col}} of {len(self.traj):>{traj_col}},  iters:{Size.b2h(iter_or_dur, False)}', bar_format='{desc}  |{bar}| {percentage:3.0f}% [{elapsed}<{remaining}, {rate_fmt}{postfix}]', dynamic_ncols=True, ascii=' 123456789.') as pbar:
+            if is_quiet:
                 t.sim.set_cb_save_state(self.save_work)
-                t.sim.set_cb_upd_progress(lambda i,n: pbar.update_to(i+1))
                 t.run(iter_or_dur)
-                t.sim.set_cb_upd_progress(None)
                 t.sim.set_cb_save_state(None)
+            else:
+                # print(f'Running trajectory {i+1} of {len(self.traj)} (iter count: {iter_or_dur}): {t.name or "unnamed simulation"}')
+                with TqdmUpdTo(total=iter_or_dur, miniters=1, desc=f'traj: {i+1:>{traj_col}} of {len(self.traj):>{traj_col}},  iters:{Size.b2h(iter_or_dur, False)}', bar_format='{desc}  |{bar}| {percentage:3.0f}% [{elapsed}<{remaining}, {rate_fmt}{postfix}]', dynamic_ncols=True, ascii=' 123456789.') as pbar:
+                    t.sim.set_cb_save_state(self.save_work)
+                    t.sim.set_cb_upd_progress(lambda i,n: pbar.update_to(i+1))
+                    t.run(iter_or_dur)
+                    t.sim.set_cb_upd_progress(None)
+                    t.sim.set_cb_save_state(None)
         print(f'Total time: {Time.tsdiff2human(Time.ts() - ts_sim_0)}')
         self.save_sims()
         self.is_db_empty = False
         del self.unpersisted_probes
         return self
 
-    def run__par(self, iter_or_dur=1):
+    def run__par(self, iter_or_dur=1, is_quiet=False):
         """Run the ensemble on a computational cluster.
 
         Args:

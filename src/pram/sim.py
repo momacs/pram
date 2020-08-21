@@ -14,9 +14,8 @@
 # Contributors
 #     Tomek D Loboda  (https://github.com/ubiq-x)                                                     [2018.12.16 - ...]
 #         The original author of the present design and implementation
-#     Paul R Cohen                                                                                    [2018.10.01 - ...]
+#     Paul R Cohen                                                                             [2018.10.01 - 2019.12.31]
 #         The idea of PRAMs
-#         The original implementation (not available here)
 #
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1287,36 +1286,6 @@ class Simulation(object):
 
         return self
 
-    def clear_probes(self):
-        """Removes all probes.
-
-        Returns:
-            ``self``
-        """
-
-        self.probes.clear()
-        return self
-
-    def clear_rules(self):
-        """Removes all rules.
-
-        Returns:
-            ``self``
-        """
-
-        self.rules.clear()
-        return self
-
-    def clear_sim_rules(self):
-        """Removes all simulation rules.
-
-        Returns:
-            ``self``
-        """
-
-        self.sim_rules.clear()
-        return self
-
     def commit_group(self, group):
         """Finishes adding a new group.
 
@@ -1571,7 +1540,7 @@ class Simulation(object):
         """Return value of the designated pragma.
 
         Available pragmas, their data types, and their functions are:
-        
+
         - **analyze** (*bool*): Should static and dynamic rule analyses be performed?
         - **autocompact** (*bool*): Should the simulation be autocompacted after every iteration?
         - **autoprune_groups** (*bool*): Should empty groups be removed after every iteration?
@@ -2203,7 +2172,8 @@ class Simulation(object):
 
             # Apply simulation rules:
             for r in self.sim_rules:
-                r.apply(self, self.timer.get_i(), self.timer.get_t())
+                if r.is_applicable(self.timer.get_i(), self.timer.get_t()):
+                    r.apply(self, self.timer.get_i(), self.timer.get_t())
 
             # Save last-iter info:
             # self.comp_hist.mem_iter.append(psutil.Process(self.pid).memory_full_info().uss)  # TODO: ray doesn't work with memory_full_info() (access denied)
